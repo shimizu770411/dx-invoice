@@ -1,0 +1,8 @@
+{
+    "recommendations": [
+        "bradlc.vscode-tailwindcss",
+        "ms-ceintl.vscode-language-pack-ja",
+        "anthropic.claude-code",
+        "esbenp.prettier-vscode"
+    ]
+}

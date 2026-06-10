@@ -39,9 +39,9 @@ export function TextareaUI({
     return (
         <div>
             {label && (
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                <label className="brand-label">
                     {label}
-                    {required && <span style={{ color: 'red' }}>*</span>}
+                    {required && <span className="brand-label-required">*</span>}
                 </label>
             )}
             <textarea

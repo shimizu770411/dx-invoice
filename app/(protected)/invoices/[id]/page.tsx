@@ -1,18 +1,17 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useForm, FormProvider, useFieldArray, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { invoiceFormSchema, InvoiceFormData, DEFAULT_INVOICE_FORM_VALUES } from '../schemas/InvoiceFormSchema'
-import { useInvoiceEdit, useInvoiceFreeItems, calculateInvoiceTotals } from '../hooks/useInvoiceForm'
+import { useInvoiceEdit, calculateInvoiceTotals } from '../hooks/useInvoiceForm'
 import { InvoiceItemTable } from '../components/InvoiceItemTable'
-import { InvoiceTotals } from '../components/InvoiceTotals'
 import { InvoiceOtherFields } from '../components/InvoiceOtherFields'
 import { InvoiceCustomerSummary } from '../components/InvoiceCustomerSummary'
 import { InvoiceBasicInfo } from '../components/InvoiceBasicInfo'
-import { InvoiceFreeItemInput } from '../components/InvoiceFreeItemInput'
 import { ProductVariant } from '@/lib/products'
+import { resolveUnitPriceMember } from '@/lib/itemPricing'
 import { toast } from '@/hooks/use-toast'
 
 export default function InvoiceEditPage() {
@@ -34,28 +33,21 @@ export default function InvoiceEditPage() {
 
     const { fields: itemFields } = useFieldArray({ control, name: 'items' })
 
-    const {
-        fields: freeItemFields,
-        append: appendFreeItemField,
-        remove: removeFreeItemField,
-    } = useFieldArray({ control, name: 'freeItems' })
+    const { fields: freeItemFields } = useFieldArray({ control, name: 'freeItems' })
 
-    const { loading, customer, invoice, items, setItems, freeItems, setFreeItems, onSubmit } = useInvoiceEdit(
-        invoiceId,
-        reset
-    )
-    const { handleAddFreeItem, handleRemoveFreeItem } = useInvoiceFreeItems(
-        freeItems,
-        setFreeItems,
-        appendFreeItemField,
-        removeFreeItemField
-    )
+    const { loading, customer, invoice, items, setItems, freeItems, onSubmit } = useInvoiceEdit(invoiceId, reset)
     const [activeTab, setActiveTab] = useState<'items' | 'other'>('items')
     const watchedItems = useWatch({ control, name: 'items' })
     const watchedFreeItems = useWatch({ control, name: 'freeItems' })
     const watchedIsMember = useWatch({ control, name: 'isMember' })
 
-    const handleVariantChange = (index: number, variant: ProductVariant) => {
+    const handleVariantChange = (
+        index: number,
+        variant: ProductVariant,
+        options?: { isService?: boolean }
+    ) => {
+        const isMember = watchedIsMember === 'true'
+        const isService = options?.isService ?? false
         setItems((prev) =>
             prev.map((item, i) =>
                 i !== index
@@ -65,14 +57,41 @@ export default function InvoiceEditPage() {
                           productVariantId: variant.id,
                           productVariant: variant,
                           unitPriceGeneral: variant.priceGeneral,
-                          unitPriceMember: variant.priceMember,
+                          unitPriceMember: isService
+                              ? 0
+                              : resolveUnitPriceMember(item, variant, isMember),
+                          isService,
                       }
             )
         )
     }
 
+    // 会員/一般切替時に、各 item の unitPriceMember を再計算
+    useEffect(() => {
+        const isMember = watchedIsMember === 'true'
+        setItems((prev) =>
+            prev.map((item) => {
+                if (!item.productVariant) return item
+                const next = resolveUnitPriceMember(item, item.productVariant, isMember)
+                return next === item.unitPriceMember ? item : { ...item, unitPriceMember: next }
+            })
+        )
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [watchedIsMember])
+
     if (loading) {
-        return <div className="p-8">読み込み中...</div>
+        return (
+            <div
+                className="p-10"
+                style={{
+                    fontFamily: 'var(--font-mincho)',
+                    color: 'var(--brand-text-muted)',
+                    letterSpacing: '0.15em',
+                }}
+            >
+                読み込み中…
+            </div>
+        )
     }
 
     if (!customer || !invoice) {
@@ -100,79 +119,273 @@ export default function InvoiceEditPage() {
         }
     }
 
+    const onSubmitWithStoreCheck = async (formValues: InvoiceFormData) => {
+        const customerStoreId = customer?.storeId ? String(customer.storeId) : ''
+        const mismatches = items
+            .map((it, i) => {
+                const qty = formValues.items[i]?.qty ?? it.qty
+                if ((qty ?? 0) <= 0) return null
+                const variantStoreId = (it as any).productVariant?.storeId
+                if (!variantStoreId) return null
+                if (String(variantStoreId) === customerStoreId) return null
+                return (it as any).productItem?.name ?? '-'
+            })
+            .filter((n): n is string => !!n)
+        if (mismatches.length > 0) {
+            const ok = confirm(
+                `以下の明細は店舗変更により現在の顧客では利用できない種類が紐付いています:\n\n・${mismatches.join('\n・')}\n\n種類を選び直すことを推奨します。このまま更新してよろしいですか？`
+            )
+            if (!ok) return
+        }
+        return onSubmit(formValues)
+    }
+
+    const tabStyle = (active: boolean): React.CSSProperties => ({
+        padding: '14px 28px',
+        fontSize: '15px',
+        fontWeight: active ? 600 : 500,
+        letterSpacing: '0.15em',
+        fontFamily: 'var(--font-mincho)',
+        cursor: 'pointer',
+        transition: 'all 0.2s ease',
+        border: 'none',
+        borderBottom: `3px solid ${active ? 'var(--brand-gold)' : 'transparent'}`,
+        backgroundColor: active ? '#ffffff' : 'transparent',
+        color: active ? 'var(--brand-navy)' : 'var(--brand-text-muted)',
+    })
+
     return (
         <FormProvider {...methods}>
-            <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="flex flex-col p-8 pb-24">
-                <h1 className="mb-8 text-2xl font-bold">請求書 編集</h1>
+            <form
+                onSubmit={handleSubmit(onSubmitWithStoreCheck, onInvalid)}
+                className="flex flex-col px-10 py-8 pb-28"
+                style={{ backgroundColor: '#fbfaf7', minHeight: 'calc(100vh - 68px)' }}
+            >
+                {/* ページヘッダー */}
+                <div
+                    className="flex items-end justify-between mb-6 pb-5"
+                    style={{ borderBottom: '1px solid var(--brand-border)' }}
+                >
+                    <div>
+                        <p
+                            className="font-garamond mb-2"
+                            style={{
+                                fontSize: '12px',
+                                color: 'var(--brand-gold-soft)',
+                                letterSpacing: '0.3em',
+                                fontWeight: 500,
+                            }}
+                        >
+                            INVOICE · EDIT
+                        </p>
+                        <h1
+                            className="font-mincho"
+                            style={{
+                                fontSize: '26px',
+                                fontWeight: 600,
+                                color: 'var(--brand-navy)',
+                                letterSpacing: '0.2em',
+                                lineHeight: 1.2,
+                            }}
+                        >
+                            請求書 編集
+                            {invoice.docNo && (
+                                <span
+                                    style={{
+                                        fontSize: '16px',
+                                        color: 'var(--brand-text-muted)',
+                                        fontWeight: 400,
+                                        letterSpacing: '0.15em',
+                                        marginLeft: '20px',
+                                    }}
+                                >
+                                    — No. {invoice.docNo}
+                                </span>
+                            )}
+                        </h1>
+                    </div>
+                </div>
 
                 {/* 顧客情報サマリー */}
                 <InvoiceCustomerSummary customer={customer} />
 
                 {/* タブ */}
-                <div className="mb-4 flex border-b-2 border-gray-300">
+                <div
+                    className="flex"
+                    style={{
+                        borderBottom: '2px solid var(--brand-border)',
+                        backgroundColor: '#fbfaf7',
+                    }}
+                >
                     <button
                         type="button"
                         onClick={() => setActiveTab('items')}
-                        className={`cursor-pointer border-none px-6 py-3 ${
-                            activeTab === 'items'
-                                ? 'border-b-2 border-blue-600 bg-blue-600 text-white'
-                                : 'bg-transparent text-gray-700'
-                        }`}
+                        style={tabStyle(activeTab === 'items')}
                     >
-                        明細
+                        明　細
                     </button>
                     <button
                         type="button"
                         onClick={() => setActiveTab('other')}
-                        className={`cursor-pointer border-none px-6 py-3 ${
-                            activeTab === 'other'
-                                ? 'border-b-2 border-blue-600 bg-blue-600 text-white'
-                                : 'bg-transparent text-gray-700'
-                        }`}
+                        style={tabStyle(activeTab === 'other')}
                     >
                         その他
                     </button>
                 </div>
 
-                {/* 明細タブ */}
-                {activeTab === 'items' && (
-                    <>
-                        <InvoiceBasicInfo control={control} />
-                        {(errors.items?.root?.message ?? (errors.items as any)?.message) && (
-                            <p className="-mt-4 mb-4 text-sm text-red-600">
-                                {errors.items?.root?.message ?? (errors.items as any)?.message}
-                            </p>
+                {/* タブコンテンツ */}
+                <div
+                    style={{
+                        backgroundColor: '#ffffff',
+                        border: '1px solid var(--brand-border)',
+                        borderTop: 'none',
+                        padding: '28px 32px',
+                    }}
+                >
+                    {/* 明細タブ */}
+                    {activeTab === 'items' && (
+                        <>
+                            <InvoiceBasicInfo control={control} />
+                            {(errors.items?.root?.message ?? (errors.items as any)?.message) && (
+                                <p
+                                    className="mb-4 font-mincho"
+                                    style={{
+                                        marginTop: '-8px',
+                                        fontSize: '14px',
+                                        color: 'var(--brand-red)',
+                                        letterSpacing: '0.05em',
+                                    }}
+                                >
+                                    {errors.items?.root?.message ?? (errors.items as any)?.message}
+                                </p>
+                            )}
+                            <InvoiceItemTable
+                                items={items}
+                                fields={itemFields}
+                                control={control}
+                                isMember={watchedIsMember === 'true'}
+                                freeItems={freeItems}
+                                freeFields={freeItemFields}
+                                onVariantChange={handleVariantChange}
+                                setValue={setValue}
+                                currentStoreId={customer?.storeId ? String(customer.storeId) : null}
+                            />
+                        </>
+                    )}
+
+                    {/* その他タブ */}
+                    {activeTab === 'other' && <InvoiceOtherFields control={control} />}
+                </div>
+
+                {/* 操作ボタン & 合計（画面下部固定） */}
+                <div
+                    className="fixed bottom-0 left-0 right-0 flex items-center justify-between gap-6 px-10 py-3"
+                    style={{
+                        backgroundColor: '#ffffff',
+                        borderTop: '1px solid var(--brand-border)',
+                        boxShadow: '0 -4px 12px rgba(1, 8, 62, 0.06)',
+                        zIndex: 40,
+                    }}
+                >
+                    {/* 合計表示（左側） */}
+                    <div
+                        className="flex items-center gap-x-8 flex-wrap"
+                        style={{
+                            fontFamily: 'var(--font-mincho)',
+                            color: 'var(--brand-text)',
+                        }}
+                    >
+                        {[
+                            { label: '小　計', value: totals.subtotal, sign: '¥' },
+                            { label: '消費税', value: totals.tax, sign: '¥' },
+                            { label: '合　計', value: totals.total, sign: '¥' },
+                            {
+                                label: '会費入金',
+                                value: totals.membershipPaidAmount,
+                                sign: totals.membershipPaidAmount > 0 ? '−¥' : '¥',
+                            },
+                        ].map((t) => (
+                            <div key={t.label} className="flex items-baseline gap-2">
+                                <span
+                                    style={{
+                                        fontSize: '12px',
+                                        color: 'var(--brand-text-muted)',
+                                        letterSpacing: '0.15em',
+                                    }}
+                                >
+                                    {t.label}
+                                </span>
+                                <span
+                                    style={{
+                                        fontFamily: 'var(--font-garamond), var(--font-mincho)',
+                                        fontSize: '16px',
+                                        fontVariantNumeric: 'tabular-nums',
+                                    }}
+                                >
+                                    {t.sign}
+                                    {t.value.toLocaleString()}
+                                </span>
+                            </div>
+                        ))}
+                        <div
+                            className="flex items-baseline gap-2 pl-4"
+                            style={{ borderLeft: '1px solid var(--brand-border)' }}
+                        >
+                            <span
+                                style={{
+                                    fontSize: '13px',
+                                    color: 'var(--brand-navy)',
+                                    letterSpacing: '0.25em',
+                                    fontWeight: 600,
+                                }}
+                            >
+                                差引合計
+                            </span>
+                            <span
+                                style={{
+                                    fontFamily: 'var(--font-garamond), var(--font-mincho)',
+                                    fontSize: '24px',
+                                    fontWeight: 600,
+                                    color: 'var(--brand-navy)',
+                                    fontVariantNumeric: 'tabular-nums',
+                                }}
+                            >
+                                ¥{totals.grandTotal.toLocaleString()}
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* ボタン（右側） */}
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                        {isDirty && (
+                            <span
+                                className="font-mincho"
+                                style={{
+                                    fontSize: '12px',
+                                    color: 'var(--brand-red)',
+                                    letterSpacing: '0.15em',
+                                }}
+                            >
+                                ※ 未保存の変更があります
+                            </span>
                         )}
-                        <InvoiceFreeItemInput onAdd={handleAddFreeItem} count={freeItems.length} />
-                        <InvoiceItemTable
-                            items={items}
-                            fields={itemFields}
-                            control={control}
-                            isMember={watchedIsMember === 'true'}
-                            freeItems={freeItems}
-                            freeFields={freeItemFields}
-                            handleRemoveFreeItem={handleRemoveFreeItem}
-                            onVariantChange={handleVariantChange}
-                            setValue={setValue}
-                        />
-                        <InvoiceTotals totals={totals} />
-                    </>
-                )}
-
-                {/* その他タブ */}
-                {activeTab === 'other' && <InvoiceOtherFields control={control} />}
-
-                {/* 操作ボタン */}
-                <div className="fixed bottom-0 right-0 p-2">
-                    {isDirty && <div className="text-red-600 text-right pb-1 text-sm">未保存の変更があります</div>}
-                    <div className="flex gap-4 bg-white">
                         <button
                             type="button"
                             onClick={() => {
                                 router.push('/cases')
                                 router.refresh()
                             }}
-                            className="cursor-pointer rounded border-0 bg-gray-500 px-6 py-3 text-white"
+                            className="font-mincho transition-colors"
+                            style={{
+                                padding: '12px 28px',
+                                backgroundColor: '#ffffff',
+                                color: 'var(--brand-text-muted)',
+                                border: '1px solid var(--brand-border)',
+                                fontSize: '14px',
+                                letterSpacing: '0.25em',
+                                fontWeight: 500,
+                                cursor: 'pointer',
+                            }}
                         >
                             閉じる
                         </button>
@@ -180,20 +393,39 @@ export default function InvoiceEditPage() {
                             type="button"
                             disabled={isDirty}
                             onClick={() => router.push(`/pdf/invoice/${invoice.id}`)}
-                            className={`rounded border-0 px-6 py-3 text-white ${
-                                isDirty ? 'cursor-not-allowed bg-gray-300' : 'cursor-pointer bg-cyan-600'
-                            }`}
+                            className="font-mincho transition-colors"
+                            style={{
+                                padding: '12px 28px',
+                                backgroundColor: isDirty ? '#ffffff' : '#ffffff',
+                                color: isDirty ? '#c4bfb0' : 'var(--brand-gold-soft)',
+                                border: isDirty
+                                    ? '1px dashed var(--brand-border)'
+                                    : '1px solid var(--brand-gold)',
+                                fontSize: '14px',
+                                letterSpacing: '0.25em',
+                                fontWeight: 500,
+                                cursor: isDirty ? 'not-allowed' : 'pointer',
+                                boxShadow: isDirty ? 'none' : '0 1px 2px rgba(196, 174, 106, 0.2)',
+                            }}
                         >
                             PDFプレビュー
                         </button>
                         <button
                             type="submit"
                             disabled={isSubmitting}
-                            className={`rounded border-0 px-6 py-3 text-white ${
-                                isSubmitting ? 'cursor-not-allowed bg-gray-300' : 'cursor-pointer bg-green-600'
-                            }`}
+                            className="font-mincho transition-colors text-white"
+                            style={{
+                                padding: '12px 44px',
+                                backgroundColor: isSubmitting ? '#7a7a7a' : 'var(--brand-navy)',
+                                border: 'none',
+                                fontSize: '14px',
+                                letterSpacing: '0.4em',
+                                fontWeight: 500,
+                                cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                                boxShadow: '0 2px 4px rgba(1, 8, 62, 0.15)',
+                            }}
                         >
-                            {isSubmitting ? '保存中...' : '更新'}
+                            {isSubmitting ? '保存中…' : '更　新'}
                         </button>
                     </div>
                 </div>

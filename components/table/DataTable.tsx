@@ -30,10 +30,6 @@ export interface DataTableProps<T> {
     rowKey: (item: T, index: number) => string | number
 }
 
-/**
- * ページング対応の汎用テーブルコンポーネント
- * 右側の操作カラムは固定化、その他のカラムは横スクロール対応
- */
 export function DataTable<T>({
     columns,
     actionColumn,
@@ -78,31 +74,67 @@ export function DataTable<T>({
         itemsPerPage,
     })
 
+    const headerStyle: React.CSSProperties = {
+        backgroundColor: 'var(--brand-navy-dark)',
+        color: '#ffffff',
+        fontFamily: 'var(--font-mincho)',
+        fontSize: '14px',
+        fontWeight: 500,
+        letterSpacing: '0.25em',
+        padding: '16px 14px',
+        textAlign: 'left',
+        borderBottom: '2px solid var(--brand-gold)',
+        position: 'sticky',
+        top: 0,
+        zIndex: 10,
+    }
+
     return (
-        <div className="flex flex-col">
-            {/* テーブル部分 */}
+        <div
+            className="flex flex-col"
+            style={{
+                border: '1px solid var(--brand-border)',
+                backgroundColor: '#ffffff',
+            }}
+        >
             <div className="flex flex-1 flex-col overflow-hidden">
-                {/* 横スクロール可能エリア */}
                 <div className="flex-1 overflow-auto">
                     <table className="w-full border-collapse bg-white">
                         <thead>
-                            <tr className="sticky top-0 z-10 bg-gray-100">
+                            <tr>
                                 {columns.map((col) => (
                                     <th
                                         key={col.key}
-                                        className={`text-xl border-b border-gray-200 px-3 py-3 text-left ${
-                                            col.sortable ? 'cursor-pointer select-none hover:bg-gray-200' : ''
-                                        }`}
+                                        className={col.sortable ? 'cursor-pointer select-none transition-colors' : ''}
                                         style={{
+                                            ...headerStyle,
                                             width: col.width,
                                             minWidth: col.width ?? '100px',
                                         }}
                                         onClick={() => handleSortClick(col)}
+                                        onMouseEnter={(e) => {
+                                            if (col.sortable) {
+                                                e.currentTarget.style.backgroundColor = 'var(--brand-navy)'
+                                            }
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            if (col.sortable) {
+                                                e.currentTarget.style.backgroundColor = 'var(--brand-navy-dark)'
+                                            }
+                                        }}
                                     >
-                                        <span className="inline-flex items-center gap-1">
+                                        <span className="inline-flex items-center gap-2">
                                             {col.label}
                                             {col.sortable && (
-                                                <span className="text-xl text-gray-400">
+                                                <span
+                                                    style={{
+                                                        fontSize: '12px',
+                                                        color:
+                                                            sortKey === col.key
+                                                                ? 'var(--brand-gold)'
+                                                                : 'rgba(196, 174, 106, 0.45)',
+                                                    }}
+                                                >
                                                     {sortKey === col.key ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}
                                                 </span>
                                             )}
@@ -112,7 +144,12 @@ export function DataTable<T>({
                                                         e.stopPropagation()
                                                         setSortKey(null)
                                                     }}
-                                                    className="ml-1 cursor-pointer text-base text-gray-400 hover:text-gray-600"
+                                                    style={{
+                                                        marginLeft: '4px',
+                                                        fontSize: '12px',
+                                                        color: 'rgba(255,255,255,0.6)',
+                                                        cursor: 'pointer',
+                                                    }}
                                                     title="ソートをリセット"
                                                 >
                                                     ✕
@@ -123,8 +160,13 @@ export function DataTable<T>({
                                 ))}
                                 {actionColumn && (
                                     <th
-                                        className="sticky right-0 z-20 border-b border-l border-gray-200 bg-gray-100 px-3 py-3 text-center"
                                         style={{
+                                            ...headerStyle,
+                                            position: 'sticky',
+                                            right: 0,
+                                            zIndex: 20,
+                                            borderLeft: '1px solid rgba(196, 174, 106, 0.2)',
+                                            textAlign: 'center',
                                             width: actionColumn.width || '150px',
                                             minWidth: '150px',
                                         }}
@@ -139,7 +181,14 @@ export function DataTable<T>({
                                 <tr>
                                     <td
                                         colSpan={columns.length + (actionColumn ? 1 : 0)}
-                                        className="border-0 px-8 py-8 text-center text-gray-500 text-2xl"
+                                        style={{
+                                            padding: '48px 24px',
+                                            textAlign: 'center',
+                                            color: 'var(--brand-text-muted)',
+                                            fontSize: '16px',
+                                            fontFamily: 'var(--font-mincho)',
+                                            letterSpacing: '0.15em',
+                                        }}
                                     >
                                         {emptyMessage}
                                     </td>
@@ -149,13 +198,32 @@ export function DataTable<T>({
                                     <React.Fragment key={rowKey(item, index)}>
                                         <tr
                                             onClick={() => onRowClick?.(item)}
-                                            className={`transition-colors duration-200 ${onRowClick ? 'cursor-pointer hover:bg-blue-50' : ''}`}
+                                            className={`transition-colors duration-200 ${onRowClick ? 'cursor-pointer' : ''}`}
+                                            onMouseEnter={(e) => {
+                                                if (onRowClick) {
+                                                    e.currentTarget.style.backgroundColor = 'var(--brand-ivory)'
+                                                }
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                if (onRowClick) {
+                                                    e.currentTarget.style.backgroundColor = 'transparent'
+                                                }
+                                            }}
                                         >
-                                            {columns.map((col) => (
+                                            {columns.map((col, cIdx) => (
                                                 <td
                                                     key={`${rowKey(item, index)}-${col.key}`}
-                                                    className="border-b border-gray-200 px-3 py-3 text-2xl"
                                                     style={{
+                                                        borderBottom: subRow
+                                                            ? 'none'
+                                                            : '1px solid var(--brand-border)',
+                                                        padding: '16px 14px',
+                                                        fontSize: '18px',
+                                                        color: 'var(--brand-text)',
+                                                        fontFamily:
+                                                            cIdx === 0
+                                                                ? 'var(--font-garamond), var(--font-mincho)'
+                                                                : 'var(--font-mincho)',
                                                         width: col.width,
                                                     }}
                                                 >
@@ -164,7 +232,18 @@ export function DataTable<T>({
                                             ))}
                                             {actionColumn && (
                                                 <td
-                                                    className="sticky right-0 z-10 border-b border-l border-gray-200 bg-white px-3 py-3 text-center"
+                                                    style={{
+                                                        position: 'sticky',
+                                                        right: 0,
+                                                        zIndex: 10,
+                                                        borderBottom: subRow
+                                                            ? 'none'
+                                                            : '1px solid var(--brand-border)',
+                                                        borderLeft: '1px solid var(--brand-border)',
+                                                        backgroundColor: '#ffffff',
+                                                        padding: '16px 14px',
+                                                        textAlign: 'center',
+                                                    }}
                                                     onClick={(e) => e.stopPropagation()}
                                                 >
                                                     {actionColumn.render(item, index)}
@@ -173,12 +252,26 @@ export function DataTable<T>({
                                         </tr>
                                         {subRow && (
                                             <tr
-                                                className={onRowClick ? 'cursor-pointer hover:bg-blue-50' : ''}
+                                                className={onRowClick ? 'cursor-pointer' : ''}
                                                 onClick={() => onRowClick?.(item)}
+                                                onMouseEnter={(e) => {
+                                                    if (onRowClick) {
+                                                        e.currentTarget.style.backgroundColor = 'var(--brand-ivory)'
+                                                    }
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    if (onRowClick) {
+                                                        e.currentTarget.style.backgroundColor = 'transparent'
+                                                    }
+                                                }}
                                             >
                                                 <td
                                                     colSpan={columns.length + (actionColumn ? 1 : 0)}
-                                                    className="border-b border-gray-200 px-3 py-3 bg-gray-50"
+                                                    style={{
+                                                        borderBottom: '1px solid var(--brand-border)',
+                                                        padding: '12px 14px 16px',
+                                                        backgroundColor: '#fbfaf7',
+                                                    }}
                                                     onClick={(e) => e.stopPropagation()}
                                                 >
                                                     {subRow(item, index)}
@@ -193,31 +286,53 @@ export function DataTable<T>({
                 </div>
             </div>
 
-            {/* ページネーション部分 */}
             {totalPages > 1 && (
-                <div className="flex items-center justify-center gap-4 border-t border-gray-200 bg-gray-50 px-4 py-4">
+                <div
+                    className="flex items-center justify-center gap-3 px-4 py-4"
+                    style={{
+                        borderTop: '1px solid var(--brand-border)',
+                        backgroundColor: 'var(--brand-ivory)',
+                    }}
+                >
                     <button
                         onClick={prevPage}
                         disabled={currentPage === 1}
-                        className={`rounded px-4 py-2 transition-colors ${
-                            currentPage === 1
-                                ? 'cursor-not-allowed bg-gray-300 text-white'
-                                : 'cursor-pointer bg-blue-600 text-white hover:bg-blue-700'
-                        }`}
+                        className="font-mincho transition-all"
+                        style={{
+                            padding: '8px 20px',
+                            fontSize: '14px',
+                            letterSpacing: '0.2em',
+                            border: '1px solid var(--brand-navy)',
+                            backgroundColor: currentPage === 1 ? '#f0eee8' : '#ffffff',
+                            color: currentPage === 1 ? '#c4bfb0' : 'var(--brand-navy)',
+                            borderColor: currentPage === 1 ? '#e0dbcc' : 'var(--brand-navy)',
+                            cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                        }}
                     >
                         前へ
                     </button>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
                         {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
                             <button
                                 key={page}
                                 onClick={() => goToPage(page)}
-                                className={`rounded px-3 py-2 text-sm transition-colors ${
-                                    currentPage === page
-                                        ? 'bg-blue-600 text-white'
-                                        : 'bg-gray-200 text-black hover:bg-gray-300'
-                                }`}
+                                className="font-garamond transition-all"
+                                style={{
+                                    minWidth: '36px',
+                                    padding: '6px 10px',
+                                    fontSize: '14px',
+                                    fontWeight: 500,
+                                    border: '1px solid transparent',
+                                    backgroundColor:
+                                        currentPage === page ? 'var(--brand-navy)' : 'transparent',
+                                    color:
+                                        currentPage === page
+                                            ? '#ffffff'
+                                            : 'var(--brand-text-muted)',
+                                    borderColor:
+                                        currentPage === page ? 'var(--brand-navy)' : 'transparent',
+                                }}
                             >
                                 {page}
                             </button>
@@ -227,17 +342,31 @@ export function DataTable<T>({
                     <button
                         onClick={nextPage}
                         disabled={currentPage === totalPages}
-                        className={`rounded px-4 py-2 transition-colors ${
-                            currentPage === totalPages
-                                ? 'cursor-not-allowed bg-gray-300 text-white'
-                                : 'cursor-pointer bg-blue-600 text-white hover:bg-blue-700'
-                        }`}
+                        className="font-mincho transition-all"
+                        style={{
+                            padding: '8px 20px',
+                            fontSize: '14px',
+                            letterSpacing: '0.2em',
+                            border: '1px solid var(--brand-navy)',
+                            backgroundColor: currentPage === totalPages ? '#f0eee8' : '#ffffff',
+                            color: currentPage === totalPages ? '#c4bfb0' : 'var(--brand-navy)',
+                            borderColor:
+                                currentPage === totalPages ? '#e0dbcc' : 'var(--brand-navy)',
+                            cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                        }}
                     >
                         次へ
                     </button>
 
-                    <span className="ml-4 text-sm text-gray-600">
-                        {currentPage} / {totalPages} ページ
+                    <span
+                        className="ml-4 font-garamond"
+                        style={{
+                            fontSize: '12px',
+                            color: 'var(--brand-gold-soft)',
+                            letterSpacing: '0.15em',
+                        }}
+                    >
+                        {currentPage} / {totalPages}
                     </span>
                 </div>
             )}

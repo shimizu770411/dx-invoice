@@ -41,9 +41,9 @@ export function AutocompleteUI({
     return (
         <div>
             {label && (
-                <label className="mb-2 block font-large">
+                <label className="brand-label">
                     {label}
-                    {required && <span className="text-red-600">*</span>}
+                    {required && <span className="brand-label-required">*</span>}
                 </label>
             )}
             <Popover open={open && filteredOptions.length > 0} onOpenChange={setOpen}>

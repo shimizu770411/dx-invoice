@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import '../globals.css'
+import '@/lib/zod-config'
 import AuthGuard from '@/components/AuthGuard'
 import Navigation from '@/components/Navigation'
 import { Providers } from '@/components/QueryProvider'
@@ -20,16 +21,23 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     rel="stylesheet"
                 />
                 {/* Webフォント */}
-                {/* Notoゴシック: 請求書のゴシック体部分に使用 */}
+                <link rel="preconnect" href="https://fonts.googleapis.com" />
+                <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+                {/* 明朝体（タイトル・見出し・請求書等） */}
                 <link
-                    href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@700;900&display=swap"
+                    href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;500;600;700;900&display=swap"
                     rel="stylesheet"
                 />
-                {/* Noto明朝: 請求書の明朝体 部分に使用 */}
+                {/* ゴシック体（本文） */}
                 <link
                     href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap"
                     rel="stylesheet"
-                ></link>
+                />
+                {/* 欧文セリフ（装飾英字） */}
+                <link
+                    href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600&display=swap"
+                    rel="stylesheet"
+                />
             </head>
             <body>
                 <Providers>

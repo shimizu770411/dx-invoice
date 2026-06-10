@@ -9,87 +9,132 @@ export default function Navigation() {
 
     const navItems = [
         { href: '/cases', label: '案件一覧' },
+        { href: '/products', label: '商品管理' },
+        { href: '/stores', label: '店舗管理' },
         { href: '/users', label: '社員管理' },
         { href: '/company', label: '自社情報' },
     ]
 
     const isActive = (href: string) => {
-        if (href === '/cases') {
-            return pathname === '/cases' || pathname?.startsWith('/cases/')
-        }
-        if (href === '/users') {
-            return pathname === '/users' || pathname?.startsWith('/users/')
-        }
-        if (href === '/company') {
-            return pathname === '/company' || pathname?.startsWith('/company/')
-        }
+        if (href === '/cases') return pathname === '/cases' || pathname?.startsWith('/cases/')
+        if (href === '/products') return pathname === '/products' || pathname?.startsWith('/products/')
+        if (href === '/stores') return pathname === '/stores' || pathname?.startsWith('/stores/')
+        if (href === '/users') return pathname === '/users' || pathname?.startsWith('/users/')
+        if (href === '/company') return pathname === '/company' || pathname?.startsWith('/company/')
         return pathname === href
     }
 
     return (
         <nav
+            className="relative flex items-center justify-between px-8"
             style={{
-                backgroundColor: '#1f2937',
-                color: '#fff',
-                padding: '1rem 2rem',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                backgroundColor: 'var(--brand-navy-dark)',
+                color: '#ffffff',
+                height: '68px',
+                borderBottom: '3px solid var(--brand-gold)',
+                boxShadow: '0 2px 12px rgba(1, 8, 62, 0.2)',
             }}
         >
-            <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
+            <div className="flex items-stretch gap-10 h-full">
                 <Link
                     href="/cases"
-                    style={{
-                        color: '#fff',
-                        textDecoration: 'none',
-                        fontSize: '1.25rem',
-                        fontWeight: 'bold',
-                    }}
+                    className="flex items-center gap-3"
+                    style={{ textDecoration: 'none', color: '#ffffff' }}
                 >
-                    葬儀業務システム
-                </Link>
-                {navItems.map((item) => (
-                    <Link
-                        key={item.href}
-                        href={item.href}
+                    <span
+                        className="font-mincho"
                         style={{
-                            color: isActive(item.href) ? '#60a5fa' : '#fff',
-                            textDecoration: 'none',
-                            padding: '0.5rem 1rem',
-                            borderRadius: '4px',
-                            backgroundColor: isActive(item.href) ? 'rgba(96, 165, 250, 0.1)' : 'transparent',
-                            transition: 'background-color 0.2s',
+                            fontSize: '20px',
+                            fontWeight: 600,
+                            letterSpacing: '0.2em',
+                            lineHeight: 1,
                         }}
                     >
-                        {item.label}
-                    </Link>
-                ))}
+                        葬儀業務支援
+                    </span>
+                    <span
+                        className="font-garamond hidden md:inline"
+                        style={{
+                            fontSize: '11px',
+                            color: 'var(--brand-gold)',
+                            letterSpacing: '0.25em',
+                            lineHeight: 1,
+                            borderLeft: '1px solid rgba(196, 174, 106, 0.4)',
+                            paddingLeft: '12px',
+                            marginLeft: '2px',
+                        }}
+                    >
+                        FUNERAL SYSTEM
+                    </span>
+                </Link>
+
+                <div className="flex items-stretch">
+                    {navItems.map((item) => {
+                        const active = isActive(item.href)
+                        return (
+                            <Link
+                                key={item.href}
+                                href={item.href}
+                                className="relative flex items-center px-6 transition-colors"
+                                style={{
+                                    color: active ? 'var(--brand-gold)' : 'rgba(255, 255, 255, 0.85)',
+                                    textDecoration: 'none',
+                                    fontSize: '15px',
+                                    letterSpacing: '0.1em',
+                                    fontWeight: active ? 600 : 400,
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (!active) e.currentTarget.style.color = 'var(--brand-gold-light)'
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (!active) e.currentTarget.style.color = 'rgba(255, 255, 255, 0.85)'
+                                }}
+                            >
+                                {item.label}
+                                {active && (
+                                    <span
+                                        className="absolute left-0 right-0 bottom-0"
+                                        style={{
+                                            height: '3px',
+                                            backgroundColor: 'var(--brand-gold)',
+                                        }}
+                                    />
+                                )}
+                            </Link>
+                        )
+                    })}
+                </div>
             </div>
+
             <button
                 onClick={async () => {
                     await logout()
                 }}
                 title="ログアウト"
+                className="flex items-center gap-2 px-4 py-2 transition-all"
                 style={{
                     backgroundColor: 'transparent',
-                    color: '#fff',
-                    padding: '0.25rem 0.5rem',
-                    borderRadius: '4px',
+                    color: 'rgba(255, 255, 255, 0.9)',
+                    border: '1px solid rgba(196, 174, 106, 0.4)',
+                    fontSize: '14px',
+                    letterSpacing: '0.15em',
                     cursor: 'pointer',
-                    transition: 'background-color 0.2s',
                 }}
-                onMouseOver={(e) => {
-                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)'
+                onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--brand-gold)'
+                    e.currentTarget.style.color = 'var(--brand-navy-dark)'
+                    e.currentTarget.style.borderColor = 'var(--brand-gold)'
                 }}
-                onMouseOut={(e) => {
+                onMouseLeave={(e) => {
                     e.currentTarget.style.backgroundColor = 'transparent'
+                    e.currentTarget.style.color = 'rgba(255, 255, 255, 0.9)'
+                    e.currentTarget.style.borderColor = 'rgba(196, 174, 106, 0.4)'
                 }}
             >
-                <span className="material-symbols-outlined" style={{ fontSize: '2rem' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>
                     logout
                 </span>
+                <span>ログアウト</span>
             </button>
         </nav>
     )

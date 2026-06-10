@@ -73,13 +73,45 @@ export function CaseSearchForm({ formParams, setFormParams, onSearch, onReset, i
     }
 
     return (
-        <div className="mb-8 rounded-lg bg-gray-100">
+        <div
+            className="mb-8 bg-white"
+            style={{
+                border: '1px solid var(--brand-border)',
+                borderLeft: '3px solid var(--brand-navy)',
+            }}
+        >
             <button
                 type="button"
                 onClick={() => setOpen((prev) => !prev)}
-                className="flex w-full items-center justify-between px-6 py-4 font-medium hover:bg-gray-200 rounded-lg"
+                className="flex w-full items-center justify-between px-6 py-4 transition-colors"
+                style={{
+                    fontFamily: 'var(--font-mincho)',
+                    fontSize: '16px',
+                    fontWeight: 500,
+                    letterSpacing: '0.2em',
+                    color: 'var(--brand-navy)',
+                    backgroundColor: open ? 'var(--brand-ivory)' : '#ffffff',
+                }}
+                onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--brand-ivory)'
+                }}
+                onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = open ? 'var(--brand-ivory)' : '#ffffff'
+                }}
             >
-                <span>検索条件</span>
+                <span className="flex items-center gap-3">
+                    <span
+                        className="font-garamond"
+                        style={{
+                            fontSize: '11px',
+                            color: 'var(--brand-gold-soft)',
+                            letterSpacing: '0.3em',
+                        }}
+                    >
+                        SEARCH
+                    </span>
+                    <span>検索条件</span>
+                </span>
                 {open ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
             </button>
             {open && (

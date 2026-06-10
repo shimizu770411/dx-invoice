@@ -77,33 +77,90 @@ export default function UsersPage() {
     }
 
     if (isLoading) {
-        return <div className="p-8">読み込み中...</div>
+        return (
+            <div
+                className="p-10"
+                style={{
+                    fontFamily: 'var(--font-mincho)',
+                    color: 'var(--brand-text-muted)',
+                    letterSpacing: '0.15em',
+                }}
+            >
+                読み込み中…
+            </div>
+        )
     }
 
     return (
-        <div className="mx-auto max-w-4xl p-8">
-            <div className="flex items-start justify-between">
-                <h1 className="mb-8 text-2xl font-bold">社員管理</h1>
+        <div
+            className="px-10 py-8"
+            style={{ backgroundColor: '#fbfaf7', minHeight: 'calc(100vh - 68px)' }}
+        >
+            {/* ページヘッダー */}
+            <div
+                className="flex items-end justify-between mb-8 pb-5"
+                style={{ borderBottom: '1px solid var(--brand-border)' }}
+            >
+                <div>
+                    <p
+                        className="font-garamond mb-2"
+                        style={{
+                            fontSize: '12px',
+                            color: 'var(--brand-gold-soft)',
+                            letterSpacing: '0.3em',
+                            fontWeight: 500,
+                        }}
+                    >
+                        STAFF MANAGEMENT
+                    </p>
+                    <h1
+                        className="font-mincho"
+                        style={{
+                            fontSize: '28px',
+                            fontWeight: 600,
+                            color: 'var(--brand-navy)',
+                            letterSpacing: '0.2em',
+                            lineHeight: 1.2,
+                        }}
+                    >
+                        社員管理
+                    </h1>
+                </div>
                 <CreateButton onClick={handleNewUser}>新規登録</CreateButton>
             </div>
 
             {/* 検索条件エリア */}
-            <section className="mb-6 rounded-lg border bg-gray-50 p-6">
+            <section
+                className="mb-6 bg-white"
+                style={{
+                    border: '1px solid var(--brand-border)',
+                    borderLeft: '3px solid var(--brand-navy)',
+                    padding: '22px 28px',
+                }}
+            >
                 <div className="grid grid-cols-[1fr_auto] items-end gap-4">
                     <div>
-                        <label className="mb-1 block text-xl font-semibold">名前</label>
+                        <label className="brand-label">名前</label>
                         <input
                             type="text"
                             value={searchName}
                             onChange={(e) => setSearchName(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                             placeholder="名前で検索"
-                            className="w-full rounded-md border border-gray-300 px-3 py-2 text-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full focus:outline-none transition-colors"
+                            style={{
+                                padding: '12px 14px',
+                                fontSize: '16px',
+                                border: '1px solid var(--brand-input-border)',
+                                backgroundColor: 'var(--brand-ivory-light)',
+                                fontFamily: 'var(--font-mincho)',
+                                letterSpacing: '0.05em',
+                            }}
                         />
                     </div>
                     <div className="flex gap-2">
-                        <SearchButton onClick={handleSearch} isLoading={isLoading} />
                         <ResetButton onClick={handleReset} />
+                        <SearchButton onClick={handleSearch} isLoading={isLoading} />
                     </div>
                 </div>
             </section>

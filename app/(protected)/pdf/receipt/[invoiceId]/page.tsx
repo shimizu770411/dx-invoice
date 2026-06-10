@@ -4,9 +4,6 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { getInvoice } from '@/lib/invoices'
 import { getProducts } from '@/lib/products'
-import { CreateButton } from '@/components/button/CreateButton'
-import { ResetButton } from '@/components/button/ResetButton'
-import { SearchButton } from '@/components/button/SearchButton'
 import { toast } from '@/hooks/use-toast'
 import { PdfReceiptLayout } from '@/app/(protected)/pdf/components/PdfReceiptLayout'
 
@@ -17,7 +14,6 @@ export default function ReceiptPdfPage() {
     const [loading, setLoading] = useState(true)
     const [invoice, setInvoice] = useState<any>(null)
     const [products, setProducts] = useState<any[]>([])
-    const [pdfUrl, setPdfUrl] = useState<string | null>(null)
     const [generating, setGenerating] = useState(false)
 
     useEffect(() => {
@@ -57,72 +53,167 @@ export default function ReceiptPdfPage() {
         }
     }
 
-    const handlePreviewPDF = async () => {
-        setGenerating(true)
-        try {
-            const res = await fetch(`/api/pdf/receipt/${invoiceId}`)
-            if (!res.ok) throw new Error(await res.text())
-            const blob = await res.blob()
-            const url = URL.createObjectURL(blob)
-            setPdfUrl(url)
-        } catch (error) {
-            console.error('Failed to preview PDF:', error)
-            toast({ title: 'PDFの生成に失敗しました', variant: 'destructive', duration: 3000 })
-        } finally {
-            setGenerating(false)
-        }
+
+    const btnOutline: React.CSSProperties = {
+        padding: '12px 28px',
+        backgroundColor: '#ffffff',
+        color: 'var(--brand-text-muted)',
+        border: '1px solid var(--brand-border)',
+        fontSize: '14px',
+        letterSpacing: '0.25em',
+        fontWeight: 500,
+        fontFamily: 'var(--font-mincho)',
+        cursor: 'pointer',
+        transition: 'all 0.15s',
+    }
+    const btnPrimary: React.CSSProperties = {
+        padding: '12px 36px',
+        backgroundColor: 'var(--brand-navy)',
+        color: '#ffffff',
+        border: 'none',
+        fontSize: '14px',
+        letterSpacing: '0.3em',
+        fontWeight: 500,
+        fontFamily: 'var(--font-mincho)',
+        cursor: 'pointer',
+        boxShadow: '0 2px 4px rgba(1, 8, 62, 0.15)',
+        transition: 'all 0.15s',
     }
 
     if (loading) {
-        return <div className="p-8">読み込み中...</div>
+        return (
+            <div
+                className="p-10"
+                style={{
+                    fontFamily: 'var(--font-mincho)',
+                    color: 'var(--brand-text-muted)',
+                    letterSpacing: '0.15em',
+                }}
+            >
+                読み込み中…
+            </div>
+        )
     }
 
     if (!invoice) {
-        return <div className="p-8">請求書が見つかりません</div>
-    }
-
-    // PDFプレビュー表示
-    if (pdfUrl) {
         return (
-            <div className="flex h-screen flex-col p-8">
-                <div className="mb-4 flex justify-end gap-3">
-                    <ResetButton
-                        onClick={() => {
-                            URL.revokeObjectURL(pdfUrl)
-                            setPdfUrl(null)
-                        }}
-                    >
-                        閉じる
-                    </ResetButton>
-                    <SearchButton isLoading={generating} onClick={handleGeneratePDF}>
-                        PDFダウンロード
-                    </SearchButton>
-                </div>
-                <iframe src={pdfUrl} className="h-[calc(100vh-100px)] w-full rounded border border-gray-300" />
+            <div
+                className="p-10"
+                style={{
+                    fontFamily: 'var(--font-mincho)',
+                    color: 'var(--brand-red)',
+                    letterSpacing: '0.15em',
+                }}
+            >
+                請求書が見つかりません
             </div>
         )
     }
 
     return (
-        <div className="mx-auto max-w-2xl p-8">
+        <div
+            className="px-10 py-8"
+            style={{ backgroundColor: '#fbfaf7', minHeight: 'calc(100vh - 68px)' }}
+        >
             {generating && (
-                <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-white/80 backdrop-blur-sm">
-                    <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-300 border-t-gray-700" />
-                    <p className="text-sm text-gray-600">PDF を生成しています...</p>
+                <div
+                    className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4"
+                    style={{ backgroundColor: 'rgba(251, 250, 247, 0.9)', backdropFilter: 'blur(4px)' }}
+                >
+                    <div
+                        className="animate-spin"
+                        style={{
+                            width: '44px',
+                            height: '44px',
+                            border: '3px solid var(--brand-border)',
+                            borderTopColor: 'var(--brand-navy)',
+                            borderRadius: '50%',
+                        }}
+                    />
+                    <p
+                        className="font-mincho"
+                        style={{
+                            fontSize: '14px',
+                            color: 'var(--brand-navy)',
+                            letterSpacing: '0.15em',
+                        }}
+                    >
+                        PDF を生成しています…
+                    </p>
                 </div>
             )}
-            <div className="mb-8 flex justify-end gap-3">
-                <SearchButton isLoading={generating} onClick={handlePreviewPDF}>
-                    PDFプレビュー
-                </SearchButton>
-                <CreateButton disabled={generating} onClick={handleGeneratePDF}>
-                    {generating ? '生成中...' : 'PDFダウンロード'}
-                </CreateButton>
-                <ResetButton onClick={() => router.back()}>閉じる</ResetButton>
+
+            {/* ページヘッダー */}
+            <div
+                className="flex items-end justify-between mb-6 pb-5"
+                style={{ borderBottom: '1px solid var(--brand-border)' }}
+            >
+                <div>
+                    <p
+                        className="font-garamond mb-2"
+                        style={{
+                            fontSize: '12px',
+                            color: 'var(--brand-gold-soft)',
+                            letterSpacing: '0.3em',
+                            fontWeight: 500,
+                        }}
+                    >
+                        RECEIPT
+                    </p>
+                    <h1
+                        className="font-mincho"
+                        style={{
+                            fontSize: '26px',
+                            fontWeight: 600,
+                            color: 'var(--brand-navy)',
+                            letterSpacing: '0.2em',
+                            lineHeight: 1.2,
+                        }}
+                    >
+                        領収書発行
+                        {invoice.docNo && (
+                            <span
+                                style={{
+                                    fontSize: '16px',
+                                    color: 'var(--brand-text-muted)',
+                                    fontWeight: 400,
+                                    letterSpacing: '0.15em',
+                                    marginLeft: '20px',
+                                }}
+                            >
+                                — 請求書 No. {invoice.docNo}
+                            </span>
+                        )}
+                    </h1>
+                </div>
+
             </div>
 
-            {/* 領収書レイアウト（PDF生成用） */}
-            <PdfReceiptLayout contentId="receipt-pdf-content" document={invoice} products={products} />
+            {/* 操作ボタン（帳票の左端揃え） */}
+            <div className="mx-auto mb-6" style={{ maxWidth: '760px' }}>
+                <div className="flex gap-3">
+                    <button type="button" style={btnPrimary} disabled={generating} onClick={handleGeneratePDF}>
+                        {generating ? '生成中…' : 'PDFダウンロード'}
+                    </button>
+                    <button type="button" style={btnOutline} onClick={() => router.back()}>
+                        閉じる
+                    </button>
+                </div>
+            </div>
+
+            {/* 領収書レイアウト（PDF生成用）*/}
+            <div
+                className="mx-auto"
+                style={{
+                    maxWidth: '760px',
+                    backgroundColor: '#ffffff',
+                    border: '1px solid var(--brand-border)',
+                    padding: '32px',
+                    boxShadow: '0 4px 16px rgba(1, 8, 62, 0.06)',
+                }}
+            >
+                <PdfReceiptLayout contentId="receipt-pdf-content" document={invoice} products={products} />
+            </div>
         </div>
     )
 }

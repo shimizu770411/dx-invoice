@@ -20,6 +20,7 @@ export interface EstimateItem {
     unitPriceMember: number
     qty: number
     amount: number
+    isService?: boolean
     sortNo: number
     productItem?: any
     productVariant?: any
@@ -57,5 +58,10 @@ export async function createEstimate(customerId: string, data: any): Promise<Est
 
 export async function updateEstimate(id: string, data: any): Promise<Estimate> {
     const response = await apiClient.put(`/estimates/${id}`, data)
+    return response.data
+}
+
+export async function unconfirmEstimate(id: string): Promise<Estimate> {
+    const response = await apiClient.post(`/estimates/${id}/unconfirm`)
     return response.data
 }

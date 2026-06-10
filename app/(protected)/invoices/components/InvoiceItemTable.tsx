@@ -17,6 +17,7 @@ type Props = {
     handleRemoveFreeItem?: (index: number) => void
     onVariantChange?: (index: number, variant: ProductVariant) => void
     setValue?: UseFormSetValue<InvoiceFormData>
+    currentStoreId?: string | null
 }
 
 export function InvoiceItemTable({ control, fields, freeFields, setValue, ...rest }: Props) {

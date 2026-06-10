@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
         const unpaid = searchParams.get('unpaid') === 'true'
         const estimateStatusConfirmed = searchParams.get('estimateStatusConfirmed') === 'true'
         const estimateStatus = searchParams.get('estimateStatus') || undefined
+        const noEstimate = searchParams.get('noEstimate') === 'true'
         const salesStaffName = searchParams.get('salesStaffName') || undefined
         const funeralPlace = searchParams.get('funeralPlace') || undefined
 
@@ -211,6 +212,10 @@ export async function GET(request: NextRequest) {
             )
         }
 
+        if (noEstimate) {
+            filteredCustomers = filteredCustomers.filter((customer: any) => customer.estimates.length === 0)
+        }
+
         if (paid || unpaid) {
             filteredCustomers = customers.filter((customer: any) => {
                 const invoice = customer.invoices[0]
@@ -319,6 +324,7 @@ export async function POST(request: NextRequest) {
             age: toIntOrNull(data.age),
             religion: toNullIfEmpty(data.religion),
             receptionAt: data.receptionAt ? new Date(data.receptionAt) : null,
+            storeId: data.storeId ? BigInt(data.storeId) : null,
             chiefMournerName: toNullIfEmpty(data.chiefMournerName),
             chiefMournerRelation: toNullIfEmpty(data.chiefMournerRelation),
             chiefMournerCityId: data.chiefMournerCityId ? BigInt(data.chiefMournerCityId) : null,
@@ -343,24 +349,20 @@ export async function POST(request: NextRequest) {
             memberCardNote: toNullIfEmpty(data.memberCardNote),
         }
 
-        // receptionNo を MAX + 1 で採番（Stringカラムのため number で計算）
-        const maxReception = await prisma.customer.aggregate({
-            _max: {
-                receptionNo: true,
-            },
+        // receptionNo を既存の最大数値 + 1 で採番
+        // 「R-001」「1」のように混在しても数字部分を抽出して最大値を取得
+        const allReceptions = await prisma.customer.findMany({
+            select: { receptionNo: true },
+            where: { receptionNo: { not: null } },
         })
-
-        const currentMaxRaw = maxReception._max.receptionNo
-
-        const currentMaxNumber =
-            currentMaxRaw === null || currentMaxRaw === undefined
-                ? 0
-                : typeof currentMaxRaw === 'number'
-                  ? currentMaxRaw
-                  : parseInt(currentMaxRaw as string, 10) || 0
+        const currentMaxNumber = allReceptions.reduce((max, { receptionNo }) => {
+            if (!receptionNo) return max
+            const m = String(receptionNo).match(/(\d+)/)
+            const n = m ? parseInt(m[1], 10) : 0
+            return Math.max(max, isNaN(n) ? 0 : n)
+        }, 0)
 
         const nextReceptionNo = currentMaxNumber + 1
-
         customerData.receptionNo = String(nextReceptionNo)
 
         // 顧客を作成
@@ -387,6 +389,7 @@ export async function POST(request: NextRequest) {
                                 memberName: toNullIfEmpty(membership.memberName),
                                 courseUnits: toIntOrNull(membership.courseUnits),
                                 maturityAmount: toIntOrNull(membership.maturityAmount),
+                                paymentAmountOnce: toIntOrNull(membership.paymentAmountOnce),
                                 paymentTimes: toIntOrNull(membership.paymentTimes),
                                 paymentAmount: toIntOrNull(membership.paymentAmount),
                                 salesStaffName: toNullIfEmpty(membership.salesStaffName),

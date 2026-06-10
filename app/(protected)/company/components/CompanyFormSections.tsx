@@ -5,6 +5,54 @@ import { FormInput } from '@/components/form/FormInput'
 import { FormSelect } from '@/components/form/FormSelect'
 import { CompanyFormData } from '../schemas/CompanyFormSchema'
 import { BANK_TYPE_OPTIONS } from '../constants/companyOptions'
+import { BankBranchSelector } from './BankBranchSelector'
+
+const sectionStyle: React.CSSProperties = {
+    backgroundColor: '#ffffff',
+    border: '1px solid var(--brand-border)',
+    padding: '28px 32px',
+    marginBottom: '20px',
+}
+
+const sectionHeaderStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'baseline',
+    gap: '14px',
+    marginBottom: '24px',
+    paddingBottom: '14px',
+    borderBottom: '1px solid var(--brand-border)',
+}
+
+const enLabelStyle: React.CSSProperties = {
+    fontFamily: 'var(--font-garamond)',
+    fontSize: '11px',
+    color: 'var(--brand-gold-soft)',
+    letterSpacing: '0.3em',
+    fontWeight: 500,
+}
+
+const jpLabelStyle: React.CSSProperties = {
+    fontFamily: 'var(--font-mincho)',
+    fontSize: '18px',
+    fontWeight: 600,
+    color: 'var(--brand-navy)',
+    letterSpacing: '0.2em',
+}
+
+const subSectionStyle: React.CSSProperties = {
+    border: '1px solid var(--brand-border)',
+    borderLeft: '3px solid var(--brand-gold)',
+    padding: '20px 24px',
+    marginBottom: '14px',
+    backgroundColor: '#fbfaf7',
+}
+
+const subSectionHeaderStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'baseline',
+    gap: '10px',
+    marginBottom: '18px',
+}
 
 export function BasicInfoSection() {
     const {
@@ -13,8 +61,11 @@ export function BasicInfoSection() {
     } = useFormContext<CompanyFormData>()
 
     return (
-        <section className="mb-6 rounded-lg border bg-white p-8">
-            <h2 className="mb-6 text-xl font-semibold">基本情報</h2>
+        <section style={sectionStyle}>
+            <div style={sectionHeaderStyle}>
+                <span style={enLabelStyle}>BASIC</span>
+                <h2 style={jpLabelStyle}>基本情報</h2>
+            </div>
             <div className="grid grid-cols-2 gap-4">
                 <div>
                     <FormInput name="companyNo" control={control} label="会社番号" error={errors.companyNo} />
@@ -73,25 +124,33 @@ function BankSection({ bankNumber }: { bankNumber: BankNumber }) {
     const prefix = `bank${bankNumber}` as const
 
     return (
-        <div className="mb-4 rounded-lg border p-6">
-            <h3 className="mb-4 font-semibold">振込先{bankNumber}</h3>
-            <div className="grid grid-cols-2 gap-4">
-                <div>
-                    <FormInput
-                        name={`${prefix}Name`}
-                        control={control}
-                        label="銀行名"
-                        error={errors[`${prefix}Name`]}
-                    />
-                </div>
-                <div>
-                    <FormInput
-                        name={`${prefix}Branch`}
-                        control={control}
-                        label="支店名"
-                        error={errors[`${prefix}Branch`]}
-                    />
-                </div>
+        <div style={subSectionStyle}>
+            <div style={subSectionHeaderStyle}>
+                <span
+                    style={{
+                        fontFamily: 'var(--font-garamond)',
+                        fontSize: '11px',
+                        color: 'var(--brand-gold-soft)',
+                        letterSpacing: '0.3em',
+                        fontWeight: 500,
+                    }}
+                >
+                    BANK {bankNumber}
+                </span>
+                <h3
+                    style={{
+                        fontFamily: 'var(--font-mincho)',
+                        fontSize: '15px',
+                        fontWeight: 600,
+                        color: 'var(--brand-navy)',
+                        letterSpacing: '0.15em',
+                    }}
+                >
+                    振込先 {bankNumber}
+                </h3>
+            </div>
+            <BankBranchSelector bankNumber={bankNumber} />
+            <div className="grid grid-cols-2 gap-4 mt-4">
                 <div>
                     <FormSelect
                         name={`${prefix}Type`}
@@ -125,8 +184,22 @@ function BankSection({ bankNumber }: { bankNumber: BankNumber }) {
 
 export function BankInfoSection() {
     return (
-        <section className="mb-6 rounded-lg border bg-white p-8">
-            <h2 className="mb-6 text-xl font-semibold">振込先情報（最大4件）</h2>
+        <section style={sectionStyle}>
+            <div style={sectionHeaderStyle}>
+                <span style={enLabelStyle}>BANK ACCOUNTS</span>
+                <h2 style={jpLabelStyle}>振込先情報</h2>
+                <span
+                    style={{
+                        fontFamily: 'var(--font-mincho)',
+                        fontSize: '12px',
+                        color: 'var(--brand-text-muted)',
+                        letterSpacing: '0.15em',
+                        marginLeft: 'auto',
+                    }}
+                >
+                    最大4件
+                </span>
+            </div>
             {([1, 2, 3, 4] as BankNumber[]).map((n) => (
                 <BankSection key={n} bankNumber={n} />
             ))}

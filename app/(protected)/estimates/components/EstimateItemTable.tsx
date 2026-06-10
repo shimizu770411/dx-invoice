@@ -18,6 +18,7 @@ type Props = {
     onVariantChange?: (index: number, variant: ProductVariant) => void
     setValue?: UseFormSetValue<EstimateFormData>
     readOnly?: boolean
+    currentStoreId?: string | null
 }
 
 export function EstimateItemTable({ control, fields, freeFields, setValue, ...rest }: Props) {

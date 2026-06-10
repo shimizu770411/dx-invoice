@@ -20,6 +20,7 @@ export interface InvoiceItem {
   unitPriceMember: number;
   qty: number;
   amount: number;
+  isService?: boolean;
   sortNo: number;
   productItem?: any;
   productVariant?: any;

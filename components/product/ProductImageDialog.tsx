@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Image from 'next/image'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { ProductItem } from '@/lib/products'
+import { resolveProductImageUrl } from '@/lib/utils'
 
 type Props = {
     product: ProductItem
@@ -45,7 +46,7 @@ export function ProductImageDialog({ product }: Props) {
                             {v.imageUrl ? (
                                 <div className="relative h-48 w-64 overflow-hidden rounded-md border-0">
                                     <Image
-                                        src={`/images/products/${v.imageUrl}`}
+                                        src={resolveProductImageUrl(v.imageUrl) || ''}
                                         alt={v.name}
                                         fill
                                         className="object-contain"

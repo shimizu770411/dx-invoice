@@ -26,6 +26,11 @@ services:
       - NODE_ENV=development
       - AUTO_MIGRATE=true
       - PROJECT_ROOT=/app
+      # Windows ホスト ↔ Linux コンテナ間の inotify 不達対策（HMR 反映を確実化）
+      - WATCHPACK_POLLING=true
+      - CHOKIDAR_USEPOLLING=true
+      - CHOKIDAR_INTERVAL=500
+      - TURBOPACK_FILE_WATCHER_POLL=true
     command: >
       sh -c "
         echo 'Checking pnpm installation...' &&
@@ -76,7 +81,7 @@ services:
         echo 'Clearing Next.js cache...' &&
         rm -rf .next &&
         export DATABASE_URL='postgresql://user:password@postgres:5432/funeral_system?schema=public' &&
-        pnpm exec next dev -H 0.0.0.0
+        pnpm exec next dev -H 0.0.0.0 --webpack
       "
     depends_on:
       postgres:

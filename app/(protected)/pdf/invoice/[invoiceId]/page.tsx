@@ -6,7 +6,6 @@ import { getInvoice } from '@/lib/invoices'
 import { getProducts } from '@/lib/products'
 import { CreateButton } from '@/components/button/CreateButton'
 import { ResetButton } from '@/components/button/ResetButton'
-import { SearchButton } from '@/components/button/SearchButton'
 import { toast } from '@/hooks/use-toast'
 import { PdfInvoiceLayout } from '@/app/(protected)/pdf/components/PdfInvoiceLayout'
 
@@ -17,12 +16,12 @@ export default function InvoicePdfPage() {
     const [loading, setLoading] = useState(true)
     const [invoice, setInvoice] = useState<any>(null)
     const [products, setProducts] = useState<any[]>([])
-    const [pdfUrl, setPdfUrl] = useState<string | null>(null)
     const [generating, setGenerating] = useState(false)
 
     useEffect(() => {
         loadData()
-    }, [router, invoiceId])
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [invoiceId])
 
     const loadData = async () => {
         try {
@@ -56,50 +55,12 @@ export default function InvoicePdfPage() {
         }
     }
 
-    const handlePreviewPDF = async () => {
-        setGenerating(true)
-        try {
-            const res = await fetch(`/api/pdf/invoice/${invoiceId}`)
-            if (!res.ok) throw new Error(await res.text())
-            const blob = await res.blob()
-            const url = URL.createObjectURL(blob)
-            setPdfUrl(url)
-        } catch (error) {
-            console.error('Failed to preview PDF:', error)
-            toast({ title: 'PDFの生成に失敗しました', variant: 'destructive', duration: 3000 })
-        } finally {
-            setGenerating(false)
-        }
-    }
-
     if (loading) {
         return <div className="p-8">読み込み中...</div>
     }
 
     if (!invoice) {
         return <div className="p-8">請求書が見つかりません</div>
-    }
-
-    // PDFプレビュー表示
-    if (pdfUrl) {
-        return (
-            <div className="flex h-screen flex-col p-8">
-                <div className="mb-4 flex justify-end gap-3">
-                    <ResetButton
-                        onClick={() => {
-                            URL.revokeObjectURL(pdfUrl)
-                            setPdfUrl(null)
-                        }}
-                    >
-                        閉じる
-                    </ResetButton>
-                    <SearchButton isLoading={generating} onClick={handleGeneratePDF}>
-                        PDFダウンロード
-                    </SearchButton>
-                </div>
-                <iframe src={pdfUrl} className="h-[calc(100vh-100px)] w-full rounded border border-gray-300" />
-            </div>
-        )
     }
 
     return (
@@ -110,17 +71,14 @@ export default function InvoicePdfPage() {
                     <p className="text-sm text-gray-600">PDF を生成しています...</p>
                 </div>
             )}
-            <div className="mb-8 flex justify-end gap-3">
-                <SearchButton isLoading={generating} onClick={handlePreviewPDF}>
-                    PDFプレビュー
-                </SearchButton>
+            <div className="mb-8 flex justify-start gap-3">
                 <CreateButton disabled={generating} onClick={handleGeneratePDF}>
                     {generating ? '生成中...' : 'PDFダウンロード'}
                 </CreateButton>
                 <ResetButton onClick={() => router.back()}>閉じる</ResetButton>
             </div>
 
-            {/* 請求書レイアウト（PDF生成用） */}
+            {/* 請求書レイアウト */}
             <PdfInvoiceLayout
                 contentId="invoice-pdf-content"
                 title="家御葬儀請求書"

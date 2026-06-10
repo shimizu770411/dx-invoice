@@ -25,9 +25,27 @@ export function CheckboxUI({ checked = false, onChange, onBlur, label, error, re
                         borderColor: error ? '#dc3545' : undefined,
                     }}
                 />
-                <span style={{ fontWeight: '500' }}>
+                <span
+                    style={{
+                        fontFamily: 'var(--font-mincho)',
+                        fontWeight: 500,
+                        fontSize: '15px',
+                        letterSpacing: '0.1em',
+                        color: 'var(--brand-text)',
+                    }}
+                >
                     {label}
-                    {required && <span style={{ color: 'red' }}>*</span>}
+                    {required && (
+                        <span
+                            style={{
+                                color: 'var(--brand-red-accent)',
+                                marginLeft: '4px',
+                                fontWeight: 600,
+                            }}
+                        >
+                            *
+                        </span>
+                    )}
                 </span>
             </label>
             {error && (

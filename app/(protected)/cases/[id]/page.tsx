@@ -148,11 +148,45 @@ export default function EditCustomerPage() {
     }
 
     if (isLoading) {
-        return <div style={{ padding: '2rem' }}>読み込み中...</div>
+        return (
+            <div
+                style={{
+                    padding: '3rem',
+                    fontFamily: 'var(--font-mincho)',
+                    color: 'var(--brand-text-muted)',
+                    letterSpacing: '0.15em',
+                }}
+            >
+                読み込み中…
+            </div>
+        )
     }
 
     if (error) {
-        return <div style={{ padding: '2rem' }}>エラー: データの読み込みに失敗しました</div>
+        return (
+            <div
+                style={{
+                    padding: '3rem',
+                    fontFamily: 'var(--font-mincho)',
+                    color: 'var(--brand-red)',
+                    letterSpacing: '0.15em',
+                }}
+            >
+                エラー: データの読み込みに失敗しました
+            </div>
+        )
+    }
+
+    const linkBtnBase: React.CSSProperties = {
+        padding: '10px 20px',
+        fontSize: '14px',
+        letterSpacing: '0.15em',
+        fontWeight: 500,
+        fontFamily: 'var(--font-mincho)',
+        cursor: 'pointer',
+        transition: 'all 0.15s ease',
+        border: '1px solid transparent',
+        minWidth: '120px',
     }
 
     return (
@@ -163,67 +197,117 @@ export default function EditCustomerPage() {
                     logFormErrors(errors)
                 })}
                 onKeyDown={(e) => {
-                    // textareaを除く要素でEnterキーを押してもフォームがsubmitされない
                     if (e.key === 'Enter' && !(e.target instanceof HTMLTextAreaElement)) {
                         e.preventDefault()
                     }
                 }}
-                className="flex h-[calc(100vh-2rem)] flex-col"
+                className="flex flex-col"
+                style={{
+                    height: 'calc(100vh - 68px)',
+                    backgroundColor: '#fbfaf7',
+                }}
             >
-                <div className="flex flex-1 flex-col overflow-hidden p-8">
-                    <div className="flex items-start justify-between">
-                        <h1 className="mb-8 text-2xl font-bold">葬儀案件 編集</h1>
-                        {/* 関連機能へのリンク */}
+                <div className="flex flex-1 flex-col overflow-hidden px-10 py-8">
+                    {/* ページヘッダー */}
+                    <div
+                        className="flex items-end justify-between mb-6 pb-5"
+                        style={{ borderBottom: '1px solid var(--brand-border)' }}
+                    >
                         <div>
-                            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                                <button
-                                    type="button"
-                                    onClick={handleNavigateToEstimate}
-                                    style={{
-                                        padding: '0.5rem 1rem',
-                                        backgroundColor: hasEstimate ? '#0070f3' : '#28a745',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '4px',
-                                        cursor: 'pointer',
-                                    }}
-                                >
-                                    {hasEstimate ? '見積書編集' : '見積書作成'}
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={handleNavigateToInvoice}
-                                    style={{
-                                        padding: '0.5rem 1rem',
-                                        backgroundColor: hasInvoice ? '#0070f3' : '#28a745',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '4px',
-                                        cursor: 'pointer',
-                                    }}
-                                >
-                                    {hasInvoice ? '請求書編集' : '請求書作成'}
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={handleNavigateToFlowers}
-                                    style={{
-                                        padding: '0.5rem 1rem',
-                                        backgroundColor: '#17a2b8',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '4px',
-                                        cursor: 'pointer',
-                                    }}
-                                >
-                                    供花登録
-                                </button>
-                            </div>
+                            <p
+                                className="font-garamond mb-2"
+                                style={{
+                                    fontSize: '12px',
+                                    color: 'var(--brand-gold-soft)',
+                                    letterSpacing: '0.3em',
+                                    fontWeight: 500,
+                                }}
+                            >
+                                CASE DETAIL
+                            </p>
+                            <h1
+                                className="font-mincho"
+                                style={{
+                                    fontSize: '26px',
+                                    fontWeight: 600,
+                                    color: 'var(--brand-navy)',
+                                    letterSpacing: '0.2em',
+                                    lineHeight: 1.2,
+                                }}
+                            >
+                                葬儀案件 編集
+                                {customer?.deceasedName && (
+                                    <span
+                                        style={{
+                                            fontSize: '16px',
+                                            color: 'var(--brand-text-muted)',
+                                            fontWeight: 400,
+                                            letterSpacing: '0.15em',
+                                            marginLeft: '20px',
+                                        }}
+                                    >
+                                        — 故 {customer.deceasedName} 様
+                                    </span>
+                                )}
+                            </h1>
+                        </div>
+
+                        {/* 関連機能へのリンク */}
+                        <div className="flex gap-2 flex-wrap">
+                            <button
+                                type="button"
+                                onClick={handleNavigateToEstimate}
+                                style={{
+                                    ...linkBtnBase,
+                                    backgroundColor: hasEstimate ? '#ffffff' : 'var(--brand-navy)',
+                                    color: hasEstimate ? 'var(--brand-navy)' : '#ffffff',
+                                    borderColor: 'var(--brand-navy)',
+                                    boxShadow: '0 1px 2px rgba(1, 8, 62, 0.08)',
+                                }}
+                            >
+                                {hasEstimate ? '見積書編集' : '見積書作成'}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleNavigateToInvoice}
+                                style={{
+                                    ...linkBtnBase,
+                                    backgroundColor: hasInvoice ? '#ffffff' : 'var(--brand-navy)',
+                                    color: hasInvoice ? 'var(--brand-navy)' : '#ffffff',
+                                    borderColor: 'var(--brand-navy)',
+                                    boxShadow: '0 1px 2px rgba(1, 8, 62, 0.08)',
+                                }}
+                            >
+                                {hasInvoice ? '請求書編集' : '請求書作成'}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleNavigateToFlowers}
+                                style={{
+                                    ...linkBtnBase,
+                                    backgroundColor: '#ffffff',
+                                    color: 'var(--brand-gold-soft)',
+                                    borderColor: 'var(--brand-gold)',
+                                    boxShadow: '0 1px 2px rgba(196, 174, 106, 0.2)',
+                                }}
+                            >
+                                供花登録
+                            </button>
                         </div>
                     </div>
+
                     {/* タブ */}
                     <CaseFormTabs activeTab={activeTab} onTabChange={setActiveTab} />
-                    <div className="mt-4 flex-1 overflow-y-auto pb-4 pr-2">
+
+                    {/* タブコンテンツ */}
+                    <div
+                        className="flex-1 overflow-y-auto"
+                        style={{
+                            backgroundColor: '#ffffff',
+                            border: '1px solid var(--brand-border)',
+                            padding: '28px 32px',
+                        }}
+                    >
                         {activeTab === 'deceasedInfo' && <DeceasedInfoTab />}
                         {activeTab === 'chiefMourner' && <ChiefMournerTab />}
                         {activeTab === 'payer' && <PayerTab />}
@@ -235,16 +319,22 @@ export default function EditCustomerPage() {
                     </div>
 
                     {/* 操作ボタン */}
-                    <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem', justifyContent: 'flex-end' }}>
+                    <div
+                        className="flex justify-end gap-3 pt-5 mt-5"
+                        style={{ borderTop: '1px solid var(--brand-border)' }}
+                    >
                         <button
                             onClick={() => router.back()}
                             type="button"
+                            className="font-mincho transition-colors"
                             style={{
-                                padding: '0.75rem 1.5rem',
-                                backgroundColor: '#6c757d',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '4px',
+                                padding: '12px 36px',
+                                backgroundColor: '#ffffff',
+                                color: 'var(--brand-text-muted)',
+                                border: '1px solid var(--brand-border)',
+                                fontSize: '15px',
+                                letterSpacing: '0.25em',
+                                fontWeight: 500,
                                 cursor: 'pointer',
                             }}
                         >
@@ -253,16 +343,21 @@ export default function EditCustomerPage() {
                         <button
                             type="submit"
                             disabled={updateMutation.isPending}
+                            className="font-mincho transition-colors text-white"
                             style={{
-                                padding: '0.75rem 1.5rem',
-                                backgroundColor: updateMutation.isPending ? '#ccc' : '#0070f3',
-                                color: 'white',
+                                padding: '12px 48px',
+                                backgroundColor: updateMutation.isPending
+                                    ? '#7a7a7a'
+                                    : 'var(--brand-navy)',
                                 border: 'none',
-                                borderRadius: '4px',
+                                fontSize: '15px',
+                                letterSpacing: '0.4em',
+                                fontWeight: 500,
                                 cursor: updateMutation.isPending ? 'not-allowed' : 'pointer',
+                                boxShadow: '0 2px 4px rgba(1, 8, 62, 0.15)',
                             }}
                         >
-                            {updateMutation.isPending ? '更新中...' : '更新'}
+                            {updateMutation.isPending ? '更新中…' : '更　新'}
                         </button>
                     </div>
                 </div>

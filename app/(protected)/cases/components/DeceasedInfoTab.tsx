@@ -1,15 +1,21 @@
-import { useFormContext } from 'react-hook-form'
+import { useState } from 'react'
+import { useFormContext, useWatch } from 'react-hook-form'
 import { CaseFormData } from '../schemas/CaseFormSchema'
 import { FormInput } from '@/components/form/FormInput'
 import { FormSelect } from '@/components/form/FormSelect'
 import { FormAutocomplete } from '@/components/form/FormAutocomplete'
 import { GENDER_OPTIONS, RELIGION_OPTIONS } from '../constants/casesOptions'
+import { AgeCalculatorDialog } from './AgeCalculatorDialog'
 
 export function DeceasedInfoTab() {
     const {
         control,
+        setValue,
         formState: { errors },
     } = useFormContext<CaseFormData>()
+
+    const [calcOpen, setCalcOpen] = useState(false)
+    const receptionAt = useWatch({ control, name: 'receptionAt' }) as string | undefined
 
     return (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
@@ -63,18 +69,51 @@ export function DeceasedInfoTab() {
             />
 
             {/* 行年 */}
-            <FormInput<CaseFormData>
-                name="age"
-                control={control}
-                label="行年"
-                type="number"
-                required
-                prefix="満"
-                suffix="歳"
-                min={0}
-                max={999}
-                error={errors.age}
-            />
+            <div>
+                <div className="flex items-center justify-between mb-2">
+                    <label className="brand-label" style={{ marginBottom: 0 }}>
+                        行年
+                        <span className="brand-label-required">*</span>
+                    </label>
+                    <button
+                        type="button"
+                        onClick={() => setCalcOpen(true)}
+                        className="inline-flex items-center gap-1 font-mincho transition-colors"
+                        style={{
+                            padding: '4px 12px',
+                            fontSize: '12px',
+                            letterSpacing: '0.1em',
+                            border: '1px solid var(--brand-gold)',
+                            backgroundColor: '#ffffff',
+                            color: 'var(--brand-gold-soft)',
+                            cursor: 'pointer',
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = 'var(--brand-gold)'
+                            e.currentTarget.style.color = 'var(--brand-navy-dark)'
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = '#ffffff'
+                            e.currentTarget.style.color = 'var(--brand-gold-soft)'
+                        }}
+                    >
+                        <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>
+                            calculate
+                        </span>
+                        生年月日から算出
+                    </button>
+                </div>
+                <FormInput<CaseFormData>
+                    name="age"
+                    control={control}
+                    type="number"
+                    prefix="満"
+                    suffix="歳"
+                    min={0}
+                    max={999}
+                    error={errors.age}
+                />
+            </div>
 
             {/* 御宗旨 */}
             <FormAutocomplete<CaseFormData>
@@ -83,6 +122,15 @@ export function DeceasedInfoTab() {
                 label="御宗旨"
                 options={[...RELIGION_OPTIONS]}
                 error={errors.religion}
+            />
+
+            <AgeCalculatorDialog
+                open={calcOpen}
+                onClose={() => setCalcOpen(false)}
+                onConfirm={(age) => {
+                    setValue('age', age, { shouldDirty: true, shouldValidate: true })
+                }}
+                baseDate={receptionAt}
             />
         </div>
     )

@@ -2,6 +2,30 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+    /* 玉泉院ブランドカラー */
+    --brand-navy: #020e70;
+    --brand-navy-dark: #01083e;
+    --brand-navy-light: #2a3490;
+    --brand-gold: #c4ae6a;
+    --brand-gold-light: #d8c488;
+    --brand-gold-soft: #8a7e5c;
+    --brand-red: #9a1f28;
+    --brand-red-accent: #d12935;
+    --brand-ivory: #f7f6f2;
+    --brand-ivory-light: #fafaf7;
+    --brand-border: #e5e1d4;
+    --brand-input-border: #d4cfc0;
+    --brand-text: #1a1a1a;
+    --brand-text-muted: #6b6b6b;
+
+    --font-mincho:
+        'Noto Serif JP', 'YakuHanMP', '游明朝 Medium', 'Yu Mincho', YuMincho, 'Hiragino Mincho ProN', serif;
+    --font-gothic:
+        'Noto Sans JP', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', 'Yu Gothic', sans-serif;
+    --font-garamond: 'EB Garamond', serif;
+}
+
 * {
     box-sizing: border-box;
     padding: 0;
@@ -15,12 +39,35 @@ body {
 }
 
 body {
-    font-family:
-        -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans',
-        'Droid Sans', 'Helvetica Neue', sans-serif;
+    font-family: var(--font-gothic);
+    color: var(--brand-text);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    font-size: 1.25rem; /* text-xl */
+    font-size: 1.125rem; /* 18px */
+}
+
+/* 明朝体ユーティリティ */
+.font-mincho {
+    font-family: var(--font-mincho);
+}
+.font-garamond {
+    font-family: var(--font-garamond);
+}
+
+/* フォームラベル共通スタイル */
+.brand-label {
+    display: block;
+    margin-bottom: 8px;
+    font-family: var(--font-mincho);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--brand-navy);
+    letter-spacing: 0.12em;
+}
+.brand-label-required {
+    color: var(--brand-red-accent);
+    margin-left: 4px;
+    font-weight: 600;
 }
 
 a {

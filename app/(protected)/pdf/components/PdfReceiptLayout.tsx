@@ -9,6 +9,9 @@ type DisplayRow = {
     label: string
     estimateItem?: PdfDocumentItem | null
     showProductVariantName: boolean
+    isFreeItem?: boolean
+    isMaturity?: boolean
+    isFixedRow?: boolean
 }
 
 function buildDisplayRows(
@@ -34,6 +37,8 @@ function buildDisplayRows(
     }
     // フリー項目を末尾に追加
     for (const fi of freeItems ?? []) {
+        const isMaturity = fi.productItemName === '満期サービス'
+        const isCancellationFee = fi.productItemName === '解約手数料'
         rows.push({
             label: fi.productItemName,
             estimateItem: {
@@ -45,6 +50,9 @@ function buildDisplayRows(
                 sortNo: fi.sortNo,
             },
             showProductVariantName: false,
+            isFreeItem: true,
+            isMaturity,
+            isFixedRow: isMaturity || isCancellationFee,
         })
     }
     return rows
@@ -220,6 +228,11 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
                                                 <div className="whitespace-pre-wrap break-words">
                                                     {row.estimateItem?.description ?? ''}
                                                 </div>
+                                                {row.isFreeItem && !row.isFixedRow && row.estimateItem && (
+                                                    <div>
+                                                        単価: ¥{row.estimateItem.unitPriceGeneral.toLocaleString()}
+                                                    </div>
+                                                )}
                                             </td>
                                             <td className="border border-black px-1 text-right">
                                                 {row.estimateItem ? `${row.estimateItem.qty.toLocaleString()}` : ''}

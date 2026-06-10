@@ -112,6 +112,7 @@ export async function POST(
                         unitPriceMember: item.unitPriceMember,
                         qty: item.qty,
                         amount: item.amount,
+                        isService: item.isService ?? false,
                         sortNo: item.sortNo,
                     })),
                 },

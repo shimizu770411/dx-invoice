@@ -10,6 +10,87 @@ import { FlowerCustomerInfo } from '../../components/FlowerCustomerInfo'
 import { FlowerFormDialog } from '../../components/FlowerFormDialog'
 import { BillingTargetDialog } from '../../components/BillingTargetDialog'
 import { DataTable } from '@/components/table/DataTable'
+import { PageHeader } from '@/components/layout/PageHeader'
+
+type ActionVariant = 'navy' | 'gold' | 'alert' | 'done' | 'accent' | 'muted'
+
+function actionButtonStyle(variant: ActionVariant, disabled = false): React.CSSProperties {
+    const base: React.CSSProperties = {
+        fontSize: '14px',
+        letterSpacing: '0.15em',
+        fontWeight: 500,
+        borderWidth: '1px',
+        borderStyle: 'solid',
+        borderColor: 'transparent',
+        padding: '8px 18px',
+        transition: 'all 0.15s ease',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontFamily: 'var(--font-mincho)',
+    }
+    if (disabled) {
+        return {
+            ...base,
+            backgroundColor: '#f0eee8',
+            color: '#c4bfb0',
+            borderColor: '#e0dbcc',
+            borderStyle: 'dashed',
+            opacity: 0.7,
+        }
+    }
+    const activeShadow = '0 2px 4px rgba(1, 8, 62, 0.12)'
+    switch (variant) {
+        case 'navy':
+            return {
+                ...base,
+                backgroundColor: 'var(--brand-navy)',
+                color: '#ffffff',
+                boxShadow: activeShadow,
+            }
+        case 'gold':
+            return {
+                ...base,
+                backgroundColor: 'var(--brand-gold)',
+                color: 'var(--brand-navy-dark)',
+                boxShadow: activeShadow,
+            }
+        case 'alert':
+            return {
+                ...base,
+                backgroundColor: 'var(--brand-red)',
+                color: '#ffffff',
+                borderColor: 'var(--brand-red)',
+                boxShadow: '0 2px 4px rgba(154, 31, 40, 0.25)',
+            }
+        case 'done':
+            return {
+                ...base,
+                backgroundColor: '#ffffff',
+                color: 'var(--brand-navy)',
+                borderColor: 'var(--brand-navy)',
+                boxShadow: '0 1px 2px rgba(1, 8, 62, 0.08)',
+            }
+        case 'accent':
+            return {
+                ...base,
+                backgroundColor: '#ffffff',
+                color: 'var(--brand-gold-soft)',
+                borderColor: 'var(--brand-gold)',
+                boxShadow: '0 1px 2px rgba(196, 174, 106, 0.2)',
+            }
+        case 'muted':
+            return {
+                ...base,
+                backgroundColor: '#ffffff',
+                color: 'var(--brand-text-muted)',
+                borderColor: 'var(--brand-border)',
+            }
+        default:
+            return base
+    }
+}
 
 export default function FlowersListPage() {
     const router = useRouter()
@@ -84,66 +165,169 @@ export default function FlowersListPage() {
     }
 
     if (loading) {
-        return <div className="p-8">読み込み中...</div>
+        return (
+            <div
+                className="p-10"
+                style={{ fontFamily: 'var(--font-mincho)', color: 'var(--brand-text-muted)', letterSpacing: '0.15em' }}
+            >
+                読み込み中…
+            </div>
+        )
     }
 
     return (
-        <div className="p-8">
-            <h1 className="mb-8 text-2xl font-bold">供花一覧</h1>
+        <div className="px-10 py-8" style={{ backgroundColor: '#fbfaf7', minHeight: 'calc(100vh - 68px)' }}>
+            {/* ページヘッダー */}
+            <PageHeader
+                eyebrow="FLOWER LIST"
+                title="供花一覧"
+                actions={
+                    <>
+                        <button
+                            onClick={() => router.push(`/pdf/flower/${customerId}`)}
+                            style={{
+                                ...actionButtonStyle('accent'),
+                                padding: '10px 22px',
+                                fontSize: '15px',
+                            }}
+                        >
+                            請求書一括印刷
+                        </button>
+                        <button
+                            onClick={() => setDialogState({ open: true, flower: null })}
+                            style={{
+                                ...actionButtonStyle('navy'),
+                                padding: '10px 22px',
+                                fontSize: '15px',
+                            }}
+                        >
+                            ＋ 供花 新規登録
+                        </button>
+                    </>
+                }
+            />
 
             {/* 顧客情報サマリー */}
             {customer && <FlowerCustomerInfo customer={customer} />}
 
-            {/* 操作ボタン */}
-            <div className="mb-8 flex gap-4">
-                <button
-                    onClick={() => setDialogState({ open: true, flower: null })}
-                    className="cursor-pointer rounded border-0 bg-green-600 px-6 py-3 text-white"
-                >
-                    供花 新規登録
-                </button>
-                <button
-                    onClick={() => router.push(`/pdf/flower/${customerId}`)}
-                    className="cursor-pointer rounded border-0 bg-cyan-600 px-6 py-3 text-white"
-                >
-                    請求書一括印刷
-                </button>
-            </div>
-
-            {/* 供花一覧（請求先単位）: 全ての請求先ブロックを表示 */}
+            {/* 供花一覧（請求先単位） */}
             {targets.length === 0 ? (
-                <p className="text-gray-500">請求先が登録されていません</p>
+                <p
+                    className="font-mincho"
+                    style={{
+                        color: 'var(--brand-text-muted)',
+                        letterSpacing: '0.15em',
+                        padding: '32px 0',
+                        textAlign: 'center',
+                    }}
+                >
+                    請求先が登録されていません
+                </p>
             ) : (
                 targets.map((target) => {
                     const total = getTargetTotal(target)
                     const tax = Math.round(total * 0.1)
                     const totalWithTax = total + tax
                     return (
-                        <div key={target.id} className="mb-8 rounded-lg border border-gray-300 p-6">
+                        <div
+                            key={target.id}
+                            className="mb-8"
+                            style={{
+                                border: '1px solid var(--brand-border)',
+                                backgroundColor: '#ffffff',
+                                boxShadow: '0 1px 2px rgba(1, 8, 62, 0.04)',
+                            }}
+                        >
                             {/* 請求先ヘッダー */}
-                            <div className="mb-4 flex items-center justify-between border-b-2 border-gray-300 pb-4">
+                            <div
+                                className="flex items-center justify-between"
+                                style={{
+                                    padding: '20px 28px',
+                                    backgroundColor: 'var(--brand-ivory-light)',
+                                    borderBottom: '1px solid var(--brand-border)',
+                                }}
+                            >
                                 <div>
-                                    <div className="flex items-start gap-4">
-                                        <h3 className="mb-1 text-lg font-bold">請求先: {target.billToName}</h3>
+                                    <div className="flex items-center gap-3 mb-1">
+                                        <p
+                                            className="font-garamond"
+                                            style={{
+                                                fontSize: '10px',
+                                                color: 'var(--brand-gold-soft)',
+                                                letterSpacing: '0.3em',
+                                                fontWeight: 500,
+                                            }}
+                                        >
+                                            BILL TO
+                                        </p>
                                         <button
                                             onClick={() => setTargetDialogState({ open: true, target })}
-                                            className="cursor-pointer rounded border-0 text-sm text-white"
+                                            className="cursor-pointer"
+                                            style={{
+                                                border: 'none',
+                                                background: 'transparent',
+                                                color: 'var(--brand-text-muted)',
+                                                padding: 0,
+                                                lineHeight: 1,
+                                            }}
+                                            title="請求先を編集"
+                                            aria-label="請求先を編集"
                                         >
-                                            <span className="material-symbols-outlined text-gray-500">edit</span>
+                                            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
+                                                edit
+                                            </span>
                                         </button>
                                     </div>
-                                    <div className="text-sm text-gray-500">
+                                    <h3
+                                        className="font-mincho mb-1"
+                                        style={{
+                                            fontSize: '18px',
+                                            fontWeight: 600,
+                                            color: 'var(--brand-navy)',
+                                            letterSpacing: '0.15em',
+                                        }}
+                                    >
+                                        {target.billToName}
+                                    </h3>
+                                    <div
+                                        className="font-mincho"
+                                        style={{
+                                            fontSize: '13px',
+                                            color: 'var(--brand-text-muted)',
+                                            letterSpacing: '0.05em',
+                                        }}
+                                    >
                                         <p>{target.billToAddress}</p>
                                         {target.billToTel && <p>TEL: {target.billToTel}</p>}
                                     </div>
                                 </div>
 
-                                <div className="flex flex-col items-end gap-2">
+                                <div className="flex flex-col items-end gap-3">
                                     {target.flowers.length > 0 && (
-                                        <p className="text-xl font-bold">
-                                            合計: ¥{totalWithTax.toLocaleString()}
-                                            <span className="text-sm ml-1">(税込)</span>
-                                        </p>
+                                        <div className="text-right">
+                                            <p
+                                                className="font-garamond"
+                                                style={{
+                                                    fontSize: '10px',
+                                                    color: 'var(--brand-gold-soft)',
+                                                    letterSpacing: '0.3em',
+                                                    marginBottom: '2px',
+                                                }}
+                                            >
+                                                TOTAL (TAX INCL.)
+                                            </p>
+                                            <p
+                                                className="font-mincho"
+                                                style={{
+                                                    fontSize: '22px',
+                                                    fontWeight: 600,
+                                                    color: 'var(--brand-navy)',
+                                                    letterSpacing: '0.05em',
+                                                }}
+                                            >
+                                                ¥{totalWithTax.toLocaleString()}
+                                            </p>
+                                        </div>
                                     )}
                                     <div className="flex items-center gap-2">
                                         {!target.isPaid && (
@@ -155,9 +339,19 @@ export default function FlowersListPage() {
                                                         initialBillingTargetId: target.id,
                                                     })
                                                 }
-                                                className="cursor-pointer rounded border-0 bg-blue-600 px-3 py-2 text-sm text-white"
+                                                style={{
+                                                    ...actionButtonStyle('navy'),
+                                                    gap: '4px',
+                                                }}
                                             >
-                                                追加
+                                                <span
+                                                    className="material-symbols-outlined"
+                                                    style={{ fontSize: '18px', lineHeight: 1 }}
+                                                    aria-hidden
+                                                >
+                                                    add
+                                                </span>
+                                                この請求先で追加
                                             </button>
                                         )}
                                         {target.flowers.length > 0 && (
@@ -165,26 +359,42 @@ export default function FlowersListPage() {
                                                 {target.isPaid ? (
                                                     <button
                                                         onClick={() => handlePayment(target.id, true)}
-                                                        className="cursor-pointer rounded border-0 bg-red-600 px-3 py-2 text-sm text-white"
+                                                        style={actionButtonStyle('alert')}
                                                     >
                                                         入金取消
                                                     </button>
                                                 ) : (
                                                     <button
                                                         onClick={() => handlePayment(target.id, false)}
-                                                        className="cursor-pointer rounded border-0 bg-green-600 px-3 py-2 text-sm text-white"
+                                                        style={actionButtonStyle('gold')}
                                                     >
                                                         入金完了
                                                     </button>
                                                 )}
                                                 <span
-                                                    className={`rounded px-2 py-1 text-xs font-semibold ${
-                                                        target.isPaid
-                                                            ? 'bg-green-100 text-green-700'
-                                                            : 'bg-yellow-100 text-yellow-700'
-                                                    }`}
+                                                    className="font-mincho"
+                                                    style={{
+                                                        padding: '8px 18px',
+                                                        fontSize: '14px',
+                                                        letterSpacing: '0.15em',
+                                                        fontWeight: 500,
+                                                        borderWidth: '1px',
+                                                        borderStyle: 'solid',
+                                                        borderColor: target.isPaid
+                                                            ? 'var(--brand-gold)'
+                                                            : 'var(--brand-red)',
+                                                        color: target.isPaid
+                                                            ? 'var(--brand-gold-soft)'
+                                                            : 'var(--brand-red)',
+                                                        backgroundColor: target.isPaid
+                                                            ? 'rgba(196, 174, 106, 0.1)'
+                                                            : 'rgba(154, 31, 40, 0.08)',
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                    }}
                                                 >
-                                                    {target.isPaid ? '入金済み' : '未入金'}
+                                                    {target.isPaid ? '入金済' : '未入金'}
                                                 </span>
                                             </>
                                         )}
@@ -193,69 +403,66 @@ export default function FlowersListPage() {
                             </div>
 
                             {/* 供花明細テーブル */}
-                            <DataTable<Flower>
-                                columns={[
-                                    { key: 'requesterName', label: '依頼主', width: '150px' },
-                                    {
-                                        key: 'labelName',
-                                        label: '名札',
-                                        width: '150px',
-                                        render: (f) => f.labelName || '-',
-                                    },
-                                    {
-                                        key: 'jointNames',
-                                        label: '連名',
-                                        width: '150px',
-                                        render: (f) => f.jointNames || '-',
-                                    },
-                                    {
-                                        key: 'deliveryTo',
-                                        label: '配送先',
-                                        width: '120px',
-                                        render: (f) => f.deliveryTo || '-',
-                                    },
-                                    {
-                                        key: 'amount',
-                                        label: '金額',
-                                        render: (f) => `¥${f.amount.toLocaleString()}`,
-                                    },
-                                ]}
-                                actionColumn={{
-                                    key: 'actions',
-                                    label: '操作',
-                                    width: '130px',
-                                    render: (flower) => (
-                                        <div className="flex justify-center gap-2">
-                                            <button
-                                                onClick={() => !target.isPaid && setDialogState({ open: true, flower })}
-                                                disabled={target.isPaid}
-                                                className={`rounded border-0 px-3 py-1 text-sm text-white ${
-                                                    target.isPaid
-                                                        ? 'cursor-not-allowed bg-gray-300'
-                                                        : 'cursor-pointer bg-cyan-600'
-                                                }`}
-                                            >
-                                                編集
-                                            </button>
-                                            <button
-                                                onClick={() => !target.isPaid && handleDeleteFlower(flower.id)}
-                                                disabled={target.isPaid}
-                                                className={`rounded border-0 px-3 py-1 text-sm text-white ${
-                                                    target.isPaid
-                                                        ? 'cursor-not-allowed bg-gray-300'
-                                                        : 'cursor-pointer bg-red-600'
-                                                }`}
-                                            >
-                                                削除
-                                            </button>
-                                        </div>
-                                    ),
-                                }}
-                                data={target.flowers}
-                                itemsPerPage={50}
-                                emptyMessage="供花が登録されていません"
-                                rowKey={(f) => f.id}
-                            />
+                            <div style={{ padding: '8px 16px 16px' }}>
+                                <DataTable<Flower>
+                                    columns={[
+                                        { key: 'requesterName', label: '依頼主', width: '150px' },
+                                        {
+                                            key: 'labelName',
+                                            label: '名札',
+                                            width: '150px',
+                                            render: (f) => f.labelName || '-',
+                                        },
+                                        {
+                                            key: 'jointNames',
+                                            label: '連名',
+                                            width: '150px',
+                                            render: (f) => f.jointNames || '-',
+                                        },
+                                        {
+                                            key: 'deliveryTo',
+                                            label: '配送先',
+                                            width: '120px',
+                                            render: (f) => f.deliveryTo || '-',
+                                        },
+                                        {
+                                            key: 'amount',
+                                            label: '金額',
+                                            render: (f) => `¥${f.amount.toLocaleString()}`,
+                                        },
+                                    ]}
+                                    actionColumn={{
+                                        key: 'actions',
+                                        label: '操作',
+                                        width: '160px',
+                                        render: (flower) => (
+                                            <div className="flex justify-center gap-2">
+                                                <button
+                                                    onClick={() =>
+                                                        !target.isPaid &&
+                                                        setDialogState({ open: true, flower })
+                                                    }
+                                                    disabled={target.isPaid}
+                                                    style={actionButtonStyle('done', target.isPaid)}
+                                                >
+                                                    編集
+                                                </button>
+                                                <button
+                                                    onClick={() => !target.isPaid && handleDeleteFlower(flower.id)}
+                                                    disabled={target.isPaid}
+                                                    style={actionButtonStyle('alert', target.isPaid)}
+                                                >
+                                                    削除
+                                                </button>
+                                            </div>
+                                        ),
+                                    }}
+                                    data={target.flowers}
+                                    itemsPerPage={50}
+                                    emptyMessage="供花が登録されていません"
+                                    rowKey={(f) => f.id}
+                                />
+                            </div>
                         </div>
                     )
                 })

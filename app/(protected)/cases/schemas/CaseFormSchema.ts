@@ -20,6 +20,14 @@ export const customerMembershipSchema = z.object({
     joinedAt: z.string().optional(),
     memberName: z.string().optional(),
     courseUnits: z.coerce.number().optional(),
+    maturityAmount: z.preprocess(
+        (value) => (typeof value === 'string' ? value.replace(/,/g, '') : value),
+        z.coerce.number().optional()
+    ),
+    paymentAmountOnce: z.preprocess(
+        (value) => (typeof value === 'string' ? value.replace(/,/g, '') : value),
+        z.coerce.number().optional()
+    ),
     paymentTimes: z.coerce.number().optional(),
     paymentAmount: z.preprocess(
         (value) => (typeof value === 'string' ? value.replace(/,/g, '') : value),
@@ -31,6 +39,9 @@ export const customerMembershipSchema = z.object({
 
 // 案件フォームのメインスキーマ
 export const caseFormSchema = z.object({
+    // 担当店舗
+    storeId: z.string().optional(),
+
     // 故人情報
     receptionAt: z.coerce.string().min(1, '必須です'),
     deceasedName: z.coerce.string().min(1, '必須です'),

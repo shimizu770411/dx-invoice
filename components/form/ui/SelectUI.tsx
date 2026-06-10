@@ -42,9 +42,9 @@ export function SelectUI({
     return (
         <div ref={wrapperRef} style={{ position: 'relative' }}>
             {label && (
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                <label className="brand-label">
                     {label}
-                    {required && <span style={{ color: 'red' }}>*</span>}
+                    {required && <span className="brand-label-required">*</span>}
                 </label>
             )}
 

@@ -71,23 +71,88 @@ export default function CompanyPage() {
     }
 
     if (isLoading) {
-        return <div className="p-8">読み込み中...</div>
+        return (
+            <div
+                className="p-10"
+                style={{
+                    fontFamily: 'var(--font-mincho)',
+                    color: 'var(--brand-text-muted)',
+                    letterSpacing: '0.15em',
+                }}
+            >
+                読み込み中…
+            </div>
+        )
     }
 
     return (
-        <div className="mx-auto max-w-4xl p-8">
-            <h1 className="mb-8 text-2xl font-bold">自社情報管理</h1>
+        <div
+            className="px-10 py-8 pb-28"
+            style={{ backgroundColor: '#fbfaf7', minHeight: 'calc(100vh - 68px)' }}
+        >
+            {/* ページヘッダー */}
+            <div
+                className="flex items-end justify-between mb-6 pb-5"
+                style={{ borderBottom: '1px solid var(--brand-border)' }}
+            >
+                <div>
+                    <p
+                        className="font-garamond mb-2"
+                        style={{
+                            fontSize: '12px',
+                            color: 'var(--brand-gold-soft)',
+                            letterSpacing: '0.3em',
+                            fontWeight: 500,
+                        }}
+                    >
+                        COMPANY PROFILE
+                    </p>
+                    <h1
+                        className="font-mincho"
+                        style={{
+                            fontSize: '28px',
+                            fontWeight: 600,
+                            color: 'var(--brand-navy)',
+                            letterSpacing: '0.2em',
+                            lineHeight: 1.2,
+                        }}
+                    >
+                        自社情報管理
+                    </h1>
+                </div>
+            </div>
+
             <FormProvider {...methods}>
                 <form onSubmit={handleSubmit(onSubmit)} noValidate>
                     <BasicInfoSection />
                     <BankInfoSection />
-                    <div className="flex justify-end gap-4">
+
+                    {/* 保存ボタン（画面下部固定） */}
+                    <div
+                        className="fixed bottom-0 left-0 right-0 flex justify-end gap-3 px-10 py-3"
+                        style={{
+                            backgroundColor: '#ffffff',
+                            borderTop: '1px solid var(--brand-border)',
+                            boxShadow: '0 -4px 12px rgba(1, 8, 62, 0.06)',
+                            zIndex: 40,
+                        }}
+                    >
                         <button
                             type="submit"
                             disabled={isSubmitting}
-                            className="rounded-md bg-blue-600 px-6 py-2 text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="font-mincho transition-colors text-white"
+                            style={{
+                                padding: '12px 48px',
+                                backgroundColor: isSubmitting ? '#7a7a7a' : 'var(--brand-navy)',
+                                border: 'none',
+                                fontSize: '15px',
+                                letterSpacing: '0.4em',
+                                fontWeight: 500,
+                                cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                                boxShadow: '0 2px 4px rgba(1, 8, 62, 0.15)',
+                            }}
                         >
-                            {isSubmitting ? '保存中...' : '保存'}
+                            {isSubmitting ? '保存中…' : '保　存'}
                         </button>
                     </div>
                 </form>

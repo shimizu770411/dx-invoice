@@ -107,6 +107,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ cust
                         unitPriceMember: item.unitPriceMember || 0,
                         qty: item.qty || 0,
                         amount: item.amount || 0,
+                        isService: Boolean(item.isService),
                         sortNo: item.sortNo ?? index,
                     })),
                 },

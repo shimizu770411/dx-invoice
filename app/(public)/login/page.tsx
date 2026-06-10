@@ -18,12 +18,11 @@ export default function LoginPage() {
 
         try {
             await login({ tel, password })
-            // 認証状態を確認（クッキーが正しく設定されていることを確認）
             await getMe()
             router.push('/cases')
         } catch (err: any) {
             setError(
-                err.response?.data?.message || 'ログインに失敗しました。ログインIDとパスワードを確認してください。'
+                err.response?.data?.message || 'ログインに失敗しました。ログインIDとパスワードをご確認ください。'
             )
         } finally {
             setLoading(false)
@@ -32,124 +31,213 @@ export default function LoginPage() {
 
     return (
         <div
+            className="min-h-screen flex items-center justify-center px-6 py-12"
             style={{
-                minHeight: '100vh',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: '#f5f5f5',
+                fontFamily:
+                    '"Noto Serif JP", "游明朝 Medium", "Yu Mincho", YuMincho, "Hiragino Mincho ProN", serif',
+                background: 'linear-gradient(180deg, #f7f6f2 0%, #ffffff 100%)',
+                color: '#1a1a1a',
             }}
         >
-            <div
-                style={{
-                    backgroundColor: 'white',
-                    padding: '2rem',
-                    borderRadius: '8px',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                    width: '100%',
-                    maxWidth: '400px',
-                }}
-            >
-                <h1
-                    style={{
-                        marginBottom: '2rem',
-                        textAlign: 'center',
-                        fontSize: '1.5rem',
-                        fontWeight: 'bold',
-                    }}
-                >
-                    葬儀業務システム
-                </h1>
-
-                <form onSubmit={handleSubmit}>
-                    <div style={{ marginBottom: '1rem' }}>
-                        <label
-                            htmlFor="tel"
-                            style={{
-                                display: 'block',
-                                marginBottom: '0.5rem',
-                                fontSize: '0.875rem',
-                                fontWeight: '500',
-                            }}
-                        >
-                            ログインID（TEL）
-                        </label>
-                        <input
-                            id="tel"
-                            type="text"
-                            value={tel}
-                            onChange={(e) => setTel(e.target.value)}
-                            required
-                            style={{
-                                width: '100%',
-                                padding: '0.5rem',
-                                border: '1px solid #ddd',
-                                borderRadius: '4px',
-                                fontSize: '1rem',
-                            }}
-                        />
-                    </div>
-
-                    <div style={{ marginBottom: '1.5rem' }}>
-                        <label
-                            htmlFor="password"
-                            style={{
-                                display: 'block',
-                                marginBottom: '0.5rem',
-                                fontSize: '0.875rem',
-                                fontWeight: '500',
-                            }}
-                        >
-                            パスワード
-                        </label>
-                        <input
-                            id="password"
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            required
-                            style={{
-                                width: '100%',
-                                padding: '0.5rem',
-                                border: '1px solid #ddd',
-                                borderRadius: '4px',
-                                fontSize: '1rem',
-                            }}
-                        />
-                    </div>
-
-                    {error && (
-                        <div
-                            style={{
-                                marginBottom: '1rem',
-                                padding: '0.75rem',
-                                backgroundColor: '#fee',
-                                color: '#c33',
-                                borderRadius: '4px',
-                                fontSize: '0.875rem',
-                            }}
-                        >
-                            {error}
-                        </div>
-                    )}
-
-                    <button
-                        type="submit"
-                        disabled={loading}
+            <div className="w-full max-w-md">
+                {/* ヘッダー部：装飾 + タイトル */}
+                <div className="text-center mb-12">
+                    <p
+                        className="tracking-[0.4em] mb-4"
                         style={{
-                            width: '100%',
-                            padding: '0.75rem',
-                            backgroundColor: loading ? '#ccc' : '#0070f3',
-                            color: 'white',
-                            borderRadius: '4px',
-                            fontSize: '1rem',
-                            fontWeight: '500',
-                            cursor: loading ? 'not-allowed' : 'pointer',
+                            fontFamily: '"EB Garamond", serif',
+                            fontSize: '15px',
+                            color: '#8a7e5c',
+                            fontWeight: 500,
                         }}
                     >
-                        {loading ? 'ログイン中...' : 'ログイン'}
-                    </button>
-                </form>
+                        FUNERAL MANAGEMENT
+                    </p>
+                    <div className="flex items-center justify-center gap-4 mb-6">
+                        <span className="block h-px w-12" style={{ backgroundColor: '#c4ae6a' }} />
+                        <span
+                            style={{
+                                fontFamily: '"EB Garamond", serif',
+                                fontSize: '13px',
+                                color: '#c4ae6a',
+                                letterSpacing: '0.2em',
+                            }}
+                        >
+                            SYSTEM
+                        </span>
+                        <span className="block h-px w-12" style={{ backgroundColor: '#c4ae6a' }} />
+                    </div>
+                    <h1
+                        className="font-medium"
+                        style={{
+                            fontSize: '32px',
+                            letterSpacing: '0.3em',
+                            color: '#020e70',
+                            lineHeight: 1.4,
+                        }}
+                    >
+                        葬儀業務支援
+                    </h1>
+                    <p
+                        className="mt-3"
+                        style={{
+                            fontSize: '14px',
+                            color: '#6b6b6b',
+                            letterSpacing: '0.15em',
+                        }}
+                    >
+                        ご担当者様 ログイン
+                    </p>
+                </div>
+
+                {/* カード */}
+                <div
+                    className="bg-white"
+                    style={{
+                        border: '1px solid #e5e1d4',
+                        boxShadow: '0 4px 24px rgba(2, 14, 112, 0.06)',
+                        padding: '48px 40px',
+                    }}
+                >
+                    <form onSubmit={handleSubmit} className="space-y-8">
+                        <div>
+                            <label
+                                htmlFor="tel"
+                                className="block mb-3"
+                                style={{
+                                    fontSize: '15px',
+                                    fontWeight: 500,
+                                    color: '#020e70',
+                                    letterSpacing: '0.1em',
+                                }}
+                            >
+                                ログインID（電話番号）
+                            </label>
+                            <input
+                                id="tel"
+                                type="tel"
+                                inputMode="numeric"
+                                value={tel}
+                                onChange={(e) => setTel(e.target.value)}
+                                required
+                                autoComplete="username"
+                                placeholder="09012345678"
+                                className="w-full transition-colors focus:outline-none"
+                                style={{
+                                    padding: '14px 16px',
+                                    fontSize: '18px',
+                                    border: '1px solid #d4cfc0',
+                                    backgroundColor: '#fafaf7',
+                                    fontFamily: '"EB Garamond", "Noto Serif JP", serif',
+                                    letterSpacing: '0.05em',
+                                }}
+                                onFocus={(e) => {
+                                    e.currentTarget.style.borderColor = '#020e70'
+                                    e.currentTarget.style.backgroundColor = '#ffffff'
+                                }}
+                                onBlur={(e) => {
+                                    e.currentTarget.style.borderColor = '#d4cfc0'
+                                    e.currentTarget.style.backgroundColor = '#fafaf7'
+                                }}
+                            />
+                        </div>
+
+                        <div>
+                            <label
+                                htmlFor="password"
+                                className="block mb-3"
+                                style={{
+                                    fontSize: '15px',
+                                    fontWeight: 500,
+                                    color: '#020e70',
+                                    letterSpacing: '0.1em',
+                                }}
+                            >
+                                パスワード
+                            </label>
+                            <input
+                                id="password"
+                                type="password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                required
+                                autoComplete="current-password"
+                                className="w-full transition-colors focus:outline-none"
+                                style={{
+                                    padding: '14px 16px',
+                                    fontSize: '18px',
+                                    border: '1px solid #d4cfc0',
+                                    backgroundColor: '#fafaf7',
+                                    fontFamily: '"Noto Serif JP", serif',
+                                    letterSpacing: '0.1em',
+                                }}
+                                onFocus={(e) => {
+                                    e.currentTarget.style.borderColor = '#020e70'
+                                    e.currentTarget.style.backgroundColor = '#ffffff'
+                                }}
+                                onBlur={(e) => {
+                                    e.currentTarget.style.borderColor = '#d4cfc0'
+                                    e.currentTarget.style.backgroundColor = '#fafaf7'
+                                }}
+                            />
+                        </div>
+
+                        {error && (
+                            <div
+                                role="alert"
+                                style={{
+                                    padding: '14px 16px',
+                                    backgroundColor: '#fdf4f4',
+                                    border: '1px solid #d12935',
+                                    color: '#9a1f28',
+                                    fontSize: '14px',
+                                    lineHeight: 1.6,
+                                }}
+                            >
+                                {error}
+                            </div>
+                        )}
+
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="w-full transition-all"
+                            style={{
+                                padding: '18px',
+                                backgroundColor: loading ? '#7a7a7a' : '#020e70',
+                                color: '#ffffff',
+                                fontSize: '18px',
+                                fontWeight: 500,
+                                letterSpacing: '0.5em',
+                                paddingLeft: 'calc(18px + 0.5em)',
+                                cursor: loading ? 'not-allowed' : 'pointer',
+                                fontFamily: '"Noto Serif JP", serif',
+                            }}
+                            onMouseEnter={(e) => {
+                                if (!loading) e.currentTarget.style.backgroundColor = '#01083e'
+                            }}
+                            onMouseLeave={(e) => {
+                                if (!loading) e.currentTarget.style.backgroundColor = '#020e70'
+                            }}
+                        >
+                            {loading ? '認証中' : 'ログイン'}
+                        </button>
+                    </form>
+                </div>
+
+                {/* フッター */}
+                <div className="text-center mt-10">
+                    <p
+                        style={{
+                            fontFamily: '"EB Garamond", serif',
+                            fontSize: '12px',
+                            color: '#8a7e5c',
+                            letterSpacing: '0.25em',
+                        }}
+                    >
+                        — Since 1981 —
+                    </p>
+                </div>
             </div>
         </div>
     )

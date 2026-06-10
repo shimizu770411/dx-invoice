@@ -14,7 +14,6 @@ import {
     InvoiceFreeItemField,
     DEFAULT_INVOICE_FORM_VALUES,
 } from '../schemas/InvoiceFormSchema'
-import { DEFAULT_DESCRIPTION_MAP } from '@/app/(protected)/estimates/constants/estimateOptions'
 
 const sortByProductItemId = (arr: InvoiceItem[]): InvoiceItem[] =>
     arr.slice().sort((a, b) => {
@@ -22,6 +21,61 @@ const sortByProductItemId = (arr: InvoiceItem[]): InvoiceItem[] =>
         if (b.productItemId == null) return -1
         return Number(a.productItemId) - Number(b.productItemId)
     })
+
+// 商品マスタとは連動しない明細フリー行を、明細末尾に常時 5 行表示し、
+// その後に固定の「満期サービス」行（6行目）「解約手数料」行（7行目）を続ける。
+const FIXED_FREE_ROW_COUNT = 5
+export const MATURITY_SERVICE_NAME = '満期サービス'
+export const CANCELLATION_FEE_NAME = '解約手数料'
+const FIXED_ROW_NAMES = [MATURITY_SERVICE_NAME, CANCELLATION_FEE_NAME]
+
+const padInvoiceFreeItems = (arr: InvoiceFreeItem[]): InvoiceFreeItem[] => {
+    const maturity = arr.find((it) => it.productItemName === MATURITY_SERVICE_NAME)
+    const cancellationFee = arr.find((it) => it.productItemName === CANCELLATION_FEE_NAME)
+    const others = arr.filter((it) => !FIXED_ROW_NAMES.includes(it.productItemName))
+
+    const padded: InvoiceFreeItem[] = others.slice()
+    while (padded.length < FIXED_FREE_ROW_COUNT) {
+        padded.push({
+            productItemName: '',
+            description: '',
+            unitPriceGeneral: 0,
+            qty: 0,
+            amount: 0,
+            sortNo: padded.length,
+        })
+    }
+
+    // 6 行目: 満期サービス（既存があれば引継ぎ、無ければ初期値）。摘要は表示しないので常に空に。
+    padded.push(
+        maturity
+            ? { ...maturity, description: '', sortNo: FIXED_FREE_ROW_COUNT }
+            : {
+                  productItemName: MATURITY_SERVICE_NAME,
+                  description: '',
+                  unitPriceGeneral: 0,
+                  qty: 0,
+                  amount: 0,
+                  sortNo: FIXED_FREE_ROW_COUNT,
+              }
+    )
+
+    // 7 行目: 解約手数料（既存があれば引継ぎ、無ければ初期値）。摘要は表示しないので常に空に。
+    padded.push(
+        cancellationFee
+            ? { ...cancellationFee, description: '', sortNo: FIXED_FREE_ROW_COUNT + 1 }
+            : {
+                  productItemName: CANCELLATION_FEE_NAME,
+                  description: '',
+                  unitPriceGeneral: 0,
+                  qty: 0,
+                  amount: 0,
+                  sortNo: FIXED_FREE_ROW_COUNT + 1,
+              }
+    )
+
+    return padded
+}
 
 // -------------------------------------------------------
 // 新規作成フック（customerId から）
@@ -46,12 +100,21 @@ export function useInvoiceCreate(customerId: string, reset: UseFormReset<Invoice
             setCustomer(customerData)
             setEstimates(estimatesData)
 
-            const initialItems: InvoiceItem[] = allProducts.map((product) => {
+            // 顧客の担当店舗でvariantを絞り込み（該当店舗 + 全店舗共通）
+            const storeId = customerData?.storeId ? String(customerData.storeId) : null
+            const filteredProducts = allProducts.map((product) => ({
+                ...product,
+                variants: product.variants.filter(
+                    (v) => !v.storeId || (storeId && String(v.storeId) === storeId)
+                ),
+            }))
+
+            const initialItems: InvoiceItem[] = filteredProducts.map((product) => {
                 const firstVariant = product.variants[0] ?? null
                 return {
                     productItemId: product.id,
                     productVariantId: firstVariant?.id ?? undefined,
-                    description: DEFAULT_DESCRIPTION_MAP[product.name] ?? '',
+                    description: product.defaultDescription ?? '',
                     unitPriceGeneral: firstVariant?.priceGeneral || 0,
                     unitPriceMember: firstVariant?.priceMember || 0,
                     qty: 0,
@@ -63,11 +126,20 @@ export function useInvoiceCreate(customerId: string, reset: UseFormReset<Invoice
             })
             setItems(initialItems)
 
+            const initialFreeItems = padInvoiceFreeItems([])
+            setFreeItems(initialFreeItems)
+
             reset({
                 ...DEFAULT_INVOICE_FORM_VALUES,
                 items: initialItems.map((item) => ({
                     qty: item.qty,
                     description: item.description || '',
+                })),
+                freeItems: initialFreeItems.map((item) => ({
+                    productItemName: item.productItemName || '',
+                    description: item.description || '',
+                    unitPriceGeneral: item.unitPriceGeneral,
+                    qty: item.qty,
                 })),
             })
         } catch (error) {
@@ -123,12 +195,21 @@ export function useInvoiceCreate(customerId: string, reset: UseFormReset<Invoice
                 })
                 return
             }
-            const mergedFreeItems = freeItems.map((item, i) => {
-                const qty = formValues.freeItems[i]?.qty ?? item.qty
-                const description = formValues.freeItems[i]?.description ?? item.description ?? ''
-                const amount = item.unitPriceGeneral * qty
-                return { ...item, qty, description, amount, sortNo: i }
-            })
+            const mergedFreeItems = freeItems
+                .map((item, i) => {
+                    const productItemName = formValues.freeItems[i]?.productItemName ?? item.productItemName ?? ''
+                    const isFixed = FIXED_ROW_NAMES.includes(productItemName)
+                    const description = isFixed
+                        ? ''
+                        : formValues.freeItems[i]?.description ?? item.description ?? ''
+                    const unitPriceGeneral =
+                        formValues.freeItems[i]?.unitPriceGeneral ?? item.unitPriceGeneral
+                    const qty = formValues.freeItems[i]?.qty ?? item.qty
+                    const amount = unitPriceGeneral * qty
+                    return { ...item, productItemName, description, unitPriceGeneral, qty, amount }
+                })
+                .filter((it) => it.productItemName.trim().length > 0 && it.qty > 0)
+                .map((it, i) => ({ ...it, sortNo: i }))
             const totals = calculateInvoiceTotals(
                 items,
                 formValues.items,
@@ -179,8 +260,21 @@ export function useInvoiceEdit(invoiceId: string, reset: UseFormReset<InvoiceFor
             setInvoice(invoiceData)
             const existingItems: InvoiceItem[] = invoiceData.items || []
 
+            // 顧客情報を先に取得して担当店舗を確定
+            const customerData = await getCustomer(invoiceData.customerId)
+            setCustomer(customerData)
+
+            // 顧客の担当店舗でvariantを絞り込み（該当店舗 + 全店舗共通）
+            const storeId = customerData?.storeId ? String(customerData.storeId) : null
+            const filteredProducts = allProducts.map((product) => ({
+                ...product,
+                variants: product.variants.filter(
+                    (v) => !v.storeId || (storeId && String(v.storeId) === storeId)
+                ),
+            }))
+
             // 全アクティブ品目と既存請求明細をマージ
-            const mergedItems: InvoiceItem[] = allProducts.map((product) => {
+            const mergedItems: InvoiceItem[] = filteredProducts.map((product) => {
                 const existing = existingItems.find((item) => item.productItemId === product.id)
                 if (existing) {
                     return { ...existing, productItem: { ...product } }
@@ -189,7 +283,7 @@ export function useInvoiceEdit(invoiceId: string, reset: UseFormReset<InvoiceFor
                 return {
                     productItemId: product.id,
                     productVariantId: firstVariant?.id ?? undefined,
-                    description: DEFAULT_DESCRIPTION_MAP[product.name] ?? '',
+                    description: product.defaultDescription ?? '',
                     unitPriceGeneral: firstVariant?.priceGeneral || 0,
                     unitPriceMember: firstVariant?.priceMember || 0,
                     qty: 0,
@@ -201,11 +295,9 @@ export function useInvoiceEdit(invoiceId: string, reset: UseFormReset<InvoiceFor
             })
 
             const loadedFreeItems: InvoiceFreeItem[] = (invoiceData as any).freeItems || []
+            const paddedFreeItems = padInvoiceFreeItems(loadedFreeItems)
             setItems(mergedItems)
-            setFreeItems(loadedFreeItems)
-
-            const customerData = await getCustomer(invoiceData.customerId)
-            setCustomer(customerData)
+            setFreeItems(paddedFreeItems)
 
             reset({
                 docNo: invoiceData.docNo || '',
@@ -224,8 +316,10 @@ export function useInvoiceEdit(invoiceId: string, reset: UseFormReset<InvoiceFor
                     qty: item.qty,
                     description: item.description || '',
                 })),
-                freeItems: loadedFreeItems.map((item) => ({
+                freeItems: paddedFreeItems.map((item) => ({
+                    productItemName: item.productItemName || '',
                     description: item.description || '',
+                    unitPriceGeneral: item.unitPriceGeneral,
                     qty: item.qty,
                 })),
             })
@@ -267,12 +361,21 @@ export function useInvoiceEdit(invoiceId: string, reset: UseFormReset<InvoiceFor
                 })
                 return
             }
-            const mergedFreeItems = freeItems.map((item, i) => {
-                const qty = formValues.freeItems[i]?.qty ?? item.qty
-                const description = formValues.freeItems[i]?.description ?? item.description ?? ''
-                const amount = item.unitPriceGeneral * qty
-                return { ...item, qty, description, amount, sortNo: i }
-            })
+            const mergedFreeItems = freeItems
+                .map((item, i) => {
+                    const productItemName = formValues.freeItems[i]?.productItemName ?? item.productItemName ?? ''
+                    const isFixed = FIXED_ROW_NAMES.includes(productItemName)
+                    const description = isFixed
+                        ? ''
+                        : formValues.freeItems[i]?.description ?? item.description ?? ''
+                    const unitPriceGeneral =
+                        formValues.freeItems[i]?.unitPriceGeneral ?? item.unitPriceGeneral
+                    const qty = formValues.freeItems[i]?.qty ?? item.qty
+                    const amount = unitPriceGeneral * qty
+                    return { ...item, productItemName, description, unitPriceGeneral, qty, amount }
+                })
+                .filter((it) => it.productItemName.trim().length > 0 && it.qty > 0)
+                .map((it, i) => ({ ...it, sortNo: i }))
             const totals = calculateInvoiceTotals(
                 items,
                 formValues.items,
@@ -329,7 +432,7 @@ export function useInvoiceProductSearch(
             return
         }
 
-        const defaultDescription = DEFAULT_DESCRIPTION_MAP[selectedProduct.name] ?? ''
+        const defaultDescription = selectedProduct.defaultDescription ?? ''
 
         const newItem: InvoiceItem = {
             productItemId: selectedProduct.id,
@@ -394,32 +497,6 @@ export function useInvoiceItems(
 }
 
 // -------------------------------------------------------
-// フリー項目操作フック
-// -------------------------------------------------------
-export function useInvoiceFreeItems(
-    freeItems: InvoiceFreeItem[],
-    setFreeItems: React.Dispatch<React.SetStateAction<InvoiceFreeItem[]>>,
-    appendFreeItemField: (val: InvoiceFreeItemField) => void,
-    removeFreeItemField: (index: number) => void
-) {
-    const handleAddFreeItem = (item: Omit<InvoiceFreeItem, 'id' | 'invoiceItemId' | 'sortNo'>) => {
-        const newItem: InvoiceFreeItem = { ...item, sortNo: freeItems.length }
-        setFreeItems((prev) => [...prev, newItem])
-        appendFreeItemField({
-            description: item.description || '',
-            qty: item.qty,
-        })
-    }
-
-    const handleRemoveFreeItem = (index: number) => {
-        setFreeItems((prev) => prev.filter((_, i) => i !== index))
-        removeFreeItemField(index)
-    }
-
-    return { handleAddFreeItem, handleRemoveFreeItem }
-}
-
-// -------------------------------------------------------
 // 合計計算ユーティリティ
 // -------------------------------------------------------
 export function calculateInvoiceTotals(
@@ -432,12 +509,20 @@ export function calculateInvoiceTotals(
 ) {
     const regularSubtotal = items.reduce((sum, item, i) => {
         const qty = itemFields?.[i]?.qty ?? item.qty
+        // 子商品 + 初期セット種類の場合は合計対象外（一般/会員共通）
+        const isSetIncluded =
+            (item as any)?.productItem?.isSetChild &&
+            (item as any)?.productVariant?.isDefaultSet
+        // サービス品フラグ ON の場合も合計対象外（一般/会員共通）
+        const isServiceIncluded = (item as any)?.isService
+        if (isSetIncluded || isServiceIncluded) return sum
         const unitPrice = isMember ? item.unitPriceMember : item.unitPriceGeneral
         return sum + unitPrice * qty
     }, 0)
     const freeSubtotal = (freeItems || []).reduce((sum, item, i) => {
         const qty = freeItemFields?.[i]?.qty ?? item.qty
-        return sum + item.unitPriceGeneral * qty
+        const unitPrice = freeItemFields?.[i]?.unitPriceGeneral ?? item.unitPriceGeneral
+        return sum + unitPrice * qty
     }, 0)
     const subtotal = regularSubtotal + freeSubtotal
     const tax = Math.round(subtotal * 0.1)

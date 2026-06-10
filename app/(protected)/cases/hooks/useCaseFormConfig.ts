@@ -15,6 +15,7 @@ export function getFormDefaultValues(): CaseFormData {
     const pad = (n: number) => String(n).padStart(2, '0')
     const defaultReceptionAt = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`
     return {
+        storeId: undefined,
         receptionAt: defaultReceptionAt,
         deceasedName: '',
         deceasedLastName: undefined,
@@ -49,6 +50,8 @@ export function getFormDefaultValues(): CaseFormData {
                 joinedAt: undefined,
                 memberName: '',
                 courseUnits: undefined,
+                maturityAmount: undefined,
+                paymentAmountOnce: 3000,
                 paymentTimes: undefined,
                 paymentAmount: undefined,
                 salesStaffName: '',
@@ -60,6 +63,8 @@ export function getFormDefaultValues(): CaseFormData {
                 joinedAt: undefined,
                 memberName: '',
                 courseUnits: undefined,
+                maturityAmount: undefined,
+                paymentAmountOnce: 3000,
                 paymentTimes: undefined,
                 paymentAmount: undefined,
                 salesStaffName: '',
@@ -71,6 +76,8 @@ export function getFormDefaultValues(): CaseFormData {
                 joinedAt: undefined,
                 memberName: '',
                 courseUnits: undefined,
+                maturityAmount: undefined,
+                paymentAmountOnce: 3000,
                 paymentTimes: undefined,
                 paymentAmount: undefined,
                 salesStaffName: '',
@@ -119,6 +126,8 @@ export function transformSubmitData(data: CaseFormData, formatDateForISO: (val: 
             rowNo: m.rowNo,
             joinedAt: m.joinedAt ? new Date(m.joinedAt).toISOString() : undefined,
             courseUnits: m.courseUnits ? parseInt(m.courseUnits.toString()) : undefined,
+            maturityAmount: m.maturityAmount ? parseInt(m.maturityAmount.toString()) : undefined,
+            paymentAmountOnce: m.paymentAmountOnce ? parseInt(m.paymentAmountOnce.toString()) : undefined,
             paymentTimes: m.paymentTimes ? parseInt(m.paymentTimes.toString()) : undefined,
             paymentAmount: m.paymentAmount ? parseInt(m.paymentAmount.toString()) : undefined,
         })),

@@ -7,7 +7,24 @@ export function ResetButton({ children = 'リセット', ...props }: ResetButton
         <Button
             type="button"
             {...props}
-            className={`rounded border-none text-xl py-6 bg-gray-600 text-white hover:bg-gray-700 ${props.className || ''}`}
+            className={`rounded-none border text-lg py-6 px-10 tracking-widest transition-colors ${props.className || ''}`}
+            style={{
+                backgroundColor: '#ffffff',
+                color: 'var(--brand-navy)',
+                borderColor: 'var(--brand-navy)',
+                fontFamily: 'var(--font-mincho)',
+                fontWeight: 500,
+                letterSpacing: '0.3em',
+                ...(props.style || {}),
+            }}
+            onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--brand-ivory)'
+                props.onMouseEnter?.(e)
+            }}
+            onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#ffffff'
+                props.onMouseLeave?.(e)
+            }}
         >
             {children}
         </Button>

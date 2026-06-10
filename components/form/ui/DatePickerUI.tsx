@@ -98,14 +98,7 @@ export function DatePickerUI({
 
     return (
         <div>
-            {label && (
-                <label className="mb-2 block font-medium">
-                    {label}
-                    <span className="text-red-600" style={{ display: label ? 'inline' : 'none' }}>
-                        {/* optional */}
-                    </span>
-                </label>
-            )}
+            {label && <label className="brand-label">{label}</label>}
             <Popover open={open} onOpenChange={setOpen}>
                 <PopoverAnchor asChild>
                     <div

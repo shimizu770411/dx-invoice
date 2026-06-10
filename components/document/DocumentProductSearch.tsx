@@ -9,6 +9,7 @@ import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from '@
 import { Popover, PopoverContent, PopoverAnchor } from '@/components/ui/popover'
 import Image from 'next/image'
 import { ProductItem, ProductVariant } from '@/lib/products'
+import { resolveProductImageUrl } from '@/lib/utils'
 
 /** items prop には productItemId を持つオブジェクトを受け取る（EstimateItem / InvoiceItem 両対応） */
 type DocumentItemRef = { productItemId?: string | null }
@@ -171,12 +172,12 @@ export function DocumentProductSearch({
                                                 className="h-full w-full cursor-zoom-in"
                                                 onClick={(e) => {
                                                     e.stopPropagation()
-                                                    setEnlargedImage(`/images/products/${v.imageUrl}`)
+                                                    setEnlargedImage(resolveProductImageUrl(v.imageUrl) || '')
                                                 }}
                                                 aria-label="画像を拡大"
                                             >
                                                 <Image
-                                                    src={`/images/products/${v.imageUrl}`}
+                                                    src={resolveProductImageUrl(v.imageUrl) || ''}
                                                     alt={v.name}
                                                     width={96}
                                                     height={96}

@@ -33,6 +33,7 @@ export interface SearchCustomersParams {
     salesStaffName?: string
     funeralPlace?: string
     estimateStatus?: string
+    noEstimate?: boolean
 }
 
 export async function searchCustomers(params: SearchCustomersParams): Promise<CustomerListItem[]> {

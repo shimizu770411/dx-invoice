@@ -12,7 +12,29 @@ module.exports = {
   			md: 'calc(var(--radius) - 2px)',
   			sm: 'calc(var(--radius) - 4px)'
   		},
+  		fontFamily: {
+  			mincho: 'var(--font-mincho)',
+  			gothic: 'var(--font-gothic)',
+  			garamond: 'var(--font-garamond)',
+  		},
   		colors: {
+  			// 玉泉院ブランドカラー
+  			brand: {
+  				navy: 'var(--brand-navy)',
+  				'navy-dark': 'var(--brand-navy-dark)',
+  				'navy-light': 'var(--brand-navy-light)',
+  				gold: 'var(--brand-gold)',
+  				'gold-light': 'var(--brand-gold-light)',
+  				'gold-soft': 'var(--brand-gold-soft)',
+  				red: 'var(--brand-red)',
+  				'red-accent': 'var(--brand-red-accent)',
+  				ivory: 'var(--brand-ivory)',
+  				'ivory-light': 'var(--brand-ivory-light)',
+  				border: 'var(--brand-border)',
+  				'input-border': 'var(--brand-input-border)',
+  				text: 'var(--brand-text)',
+  				'text-muted': 'var(--brand-text-muted)',
+  			},
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
   			card: {

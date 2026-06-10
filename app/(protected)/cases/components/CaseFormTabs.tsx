@@ -39,32 +39,69 @@ export function CaseFormTabs({ activeTab, onTabChange }: CaseFormTabsProps) {
         { key: 'funeralInfo', label: '葬儀情報' },
         { key: 'membership1', label: '互助会員１' },
         { key: 'membership2', label: '互助会員２' },
-        { key: 'membership3', label: 'その他' },
+        { key: 'membership3', label: '互助会員３' },
     ]
 
     const renderTab = (tab: { key: TabKey; label: string }) => {
         const hasError = hasErrorInTab(formState.errors, tab.key)
         const isActive = activeTab === tab.key
 
+        const baseStyle: React.CSSProperties = {
+            position: 'relative',
+            padding: '14px 22px',
+            fontSize: '15px',
+            fontWeight: isActive ? 600 : 500,
+            letterSpacing: '0.15em',
+            fontFamily: 'var(--font-mincho)',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            border: 'none',
+            borderBottom: '3px solid transparent',
+            backgroundColor: 'transparent',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+        }
+
+        const activeStyle: React.CSSProperties = {
+            ...baseStyle,
+            color: hasError ? 'var(--brand-red)' : 'var(--brand-navy)',
+            borderBottom: `3px solid ${hasError ? 'var(--brand-red)' : 'var(--brand-gold)'}`,
+            backgroundColor: '#ffffff',
+        }
+
+        const inactiveStyle: React.CSSProperties = {
+            ...baseStyle,
+            color: hasError ? 'var(--brand-red)' : 'var(--brand-text-muted)',
+        }
+
         return (
             <button
                 key={tab.key}
                 type="button"
                 onClick={() => onTabChange(tab.key)}
-                className={`relative flex cursor-pointer items-center border-none px-6 py-3 transition-colors ${
-                    isActive
-                        ? hasError
-                            ? 'border-b-2 border-red-600 bg-red-600 text-white'
-                            : 'border-b-2 border-blue-600 bg-blue-600 text-white'
-                        : `bg-transparent ${hasError ? 'font-semibold text-red-600' : 'text-gray-700'}`
-                }`}
+                style={isActive ? activeStyle : inactiveStyle}
                 title={hasError ? 'このタブにエラーがあります' : ''}
+                onMouseEnter={(e) => {
+                    if (!isActive) {
+                        e.currentTarget.style.color = hasError ? 'var(--brand-red)' : 'var(--brand-navy)'
+                        e.currentTarget.style.backgroundColor = 'var(--brand-ivory)'
+                    }
+                }}
+                onMouseLeave={(e) => {
+                    if (!isActive) {
+                        e.currentTarget.style.color = hasError
+                            ? 'var(--brand-red)'
+                            : 'var(--brand-text-muted)'
+                        e.currentTarget.style.backgroundColor = 'transparent'
+                    }
+                }}
             >
                 {tab.label}
-                {hasError && !isActive && (
+                {hasError && (
                     <span
                         className="material-symbols-outlined"
-                        style={{ fontSize: '1.2rem', marginLeft: '0.5rem', color: '#dc3545' }}
+                        style={{ fontSize: '18px', color: 'var(--brand-red)' }}
                     >
                         warning
                     </span>
@@ -73,5 +110,15 @@ export function CaseFormTabs({ activeTab, onTabChange }: CaseFormTabsProps) {
         )
     }
 
-    return <div className="mb-8 flex flex-wrap gap-2 border-b-2 border-gray-300">{primaryTabs.map(renderTab)}</div>
+    return (
+        <div
+            className="flex flex-wrap"
+            style={{
+                borderBottom: '2px solid var(--brand-border)',
+                backgroundColor: '#fbfaf7',
+            }}
+        >
+            {primaryTabs.map(renderTab)}
+        </div>
+    )
 }

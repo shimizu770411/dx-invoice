@@ -56,9 +56,9 @@ export function InputUI({
     return (
         <div>
             {label && (
-                <label className="mb-2 block font-medium">
+                <label className="brand-label">
                     {label}
-                    {required && <span className="text-red-600">*</span>}
+                    {required && <span className="brand-label-required">*</span>}
                 </label>
             )}
             <div className="flex w-full items-center">

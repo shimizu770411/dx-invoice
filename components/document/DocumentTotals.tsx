@@ -13,20 +13,77 @@ type Props = {
 }
 
 export function DocumentTotals({ totals }: Props) {
+    const labelStyle: React.CSSProperties = {
+        fontFamily: 'var(--font-mincho)',
+        fontSize: '15px',
+        color: 'var(--brand-text-muted)',
+        letterSpacing: '0.15em',
+        fontWeight: 500,
+    }
+    const valueStyle: React.CSSProperties = {
+        fontFamily: 'var(--font-garamond), var(--font-mincho)',
+        fontSize: '18px',
+        color: 'var(--brand-text)',
+        textAlign: 'right',
+        fontVariantNumeric: 'tabular-nums',
+    }
+    const finalLabelStyle: React.CSSProperties = {
+        ...labelStyle,
+        color: 'var(--brand-navy)',
+        fontSize: '17px',
+        fontWeight: 600,
+        letterSpacing: '0.25em',
+    }
+    const finalValueStyle: React.CSSProperties = {
+        ...valueStyle,
+        color: 'var(--brand-navy)',
+        fontSize: '28px',
+        fontWeight: 600,
+        letterSpacing: '0.02em',
+    }
+
     return (
-        <div className="mb-8 rounded-lg bg-gray-50 p-6">
-            <div className="grid text-2xl w-fit gap-x-8 gap-y-2 [grid-template-columns:auto_auto]">
-                <div>小計:</div>
-                <div className="text-right">¥{totals.subtotal.toLocaleString()}</div>
-                <div>消費税（10%）:</div>
-                <div className="text-right">¥{totals.tax.toLocaleString()}</div>
-                <div>合計:</div>
-                <div className="text-right">¥{totals.total.toLocaleString()}</div>
-                <div>会費入金額:</div>
-                <div className="text-right">¥-{totals.membershipPaidAmount.toLocaleString()}</div>
-                <div className="border-t border-gray-300 pt-2 font-bold">差引合計:</div>
-                <div className="border-t border-gray-300 pt-2 text-right font-bold">
-                    ¥{totals.grandTotal.toLocaleString()}
+        <div className="mt-6 mb-4 flex justify-end">
+            <div
+                style={{
+                    minWidth: '440px',
+                    backgroundColor: '#fbfaf7',
+                    border: '1px solid var(--brand-border)',
+                    borderTop: '2px solid var(--brand-navy)',
+                    padding: '24px 32px',
+                }}
+            >
+                <div className="grid gap-x-10 gap-y-3" style={{ gridTemplateColumns: 'auto 1fr' }}>
+                    <div style={labelStyle}>小　計</div>
+                    <div style={valueStyle}>¥{totals.subtotal.toLocaleString()}</div>
+                    <div style={labelStyle}>消費税（10%）</div>
+                    <div style={valueStyle}>¥{totals.tax.toLocaleString()}</div>
+                    <div style={labelStyle}>合　計</div>
+                    <div style={valueStyle}>¥{totals.total.toLocaleString()}</div>
+                    <div style={labelStyle}>会費入金額</div>
+                    <div style={valueStyle}>
+                        {totals.membershipPaidAmount > 0
+                            ? `−¥${totals.membershipPaidAmount.toLocaleString()}`
+                            : '¥0'}
+                    </div>
+                    <div
+                        style={{
+                            ...finalLabelStyle,
+                            paddingTop: '14px',
+                            borderTop: '1px solid var(--brand-border)',
+                        }}
+                    >
+                        差引合計
+                    </div>
+                    <div
+                        style={{
+                            ...finalValueStyle,
+                            paddingTop: '14px',
+                            borderTop: '1px solid var(--brand-border)',
+                        }}
+                    >
+                        ¥{totals.grandTotal.toLocaleString()}
+                    </div>
                 </div>
             </div>
         </div>

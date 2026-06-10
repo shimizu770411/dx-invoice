@@ -4,8 +4,9 @@ const path = require('path')
 const nextConfig = {
     reactStrictMode: true,
 
-    // Puppeteer / Chromium をWebpackでバンドルしない（サーバーサイド専用）
-    serverExternalPackages: ['puppeteer-core', '@sparticuz/chromium-min'],
+    // Puppeteer / Chromium / Prisma をWebpackでバンドルしない（サーバーサイド専用）
+    // Prisma は Query Engine の .so.node バイナリをバンドルできないため必須
+    serverExternalPackages: ['puppeteer-core', '@sparticuz/chromium-min', '@prisma/client', '.prisma/client'],
 
     // ワークスペースパッケージをトランスパイル
     transpilePackages: ['@phoenix-jpn/db'],
@@ -37,6 +38,18 @@ const nextConfig = {
         if (isServer) {
             // ワークスペースパッケージの解決
             config.resolve.alias['@phoenix-jpn/db'] = path.resolve(__dirname, './packages/db/src/index.ts')
+
+            // Prisma を bundle 対象から除外（.so.node バイナリ問題対策）
+            config.externals = Array.isArray(config.externals)
+                ? [...config.externals, '@prisma/client', '.prisma/client']
+                : [config.externals, '@prisma/client', '.prisma/client'].filter(Boolean)
+
+            // pnpm workspaces で @prisma/client がルート node_modules に無いため、
+            // packages/db 配下を resolve に追加
+            config.resolve.modules = [
+                ...(config.resolve.modules || ['node_modules']),
+                path.resolve(__dirname, 'packages/db/node_modules'),
+            ]
         }
 
         return config

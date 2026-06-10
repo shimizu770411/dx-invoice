@@ -14,6 +14,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
             include: {
                 chiefMournerCity: true,
                 chiefMournerTown: true,
+                store: true,
                 memberships: {
                     orderBy: { rowNo: 'asc' },
                 },
@@ -53,6 +54,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
                 id: customer.id.toString(),
                 chiefMournerCityId: customer.chiefMournerCityId?.toString(),
                 chiefMournerTownId: customer.chiefMournerTownId?.toString(),
+                storeId: customer.storeId?.toString(),
                 memberships: customer.memberships.map((m: any) => ({
                     ...m,
                     id: m.id.toString(),
@@ -113,6 +115,7 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
             age: toIntOrNull(data.age),
             religion: toNullIfEmpty(data.religion),
             receptionAt: data.receptionAt ? new Date(data.receptionAt) : null,
+            storeId: data.storeId ? BigInt(data.storeId) : null,
             chiefMournerName: toNullIfEmpty(data.chiefMournerName),
             chiefMournerRelation: toNullIfEmpty(data.chiefMournerRelation),
             chiefMournerCityId: data.chiefMournerCityId ? BigInt(data.chiefMournerCityId) : null,
@@ -168,6 +171,7 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
                                 memberName: toNullIfEmpty(membership.memberName),
                                 courseUnits: toIntOrNull(membership.courseUnits),
                                 maturityAmount: toIntOrNull(membership.maturityAmount),
+                                paymentAmountOnce: toIntOrNull(membership.paymentAmountOnce),
                                 paymentTimes: toIntOrNull(membership.paymentTimes),
                                 paymentAmount: toIntOrNull(membership.paymentAmount),
                                 salesStaffName: toNullIfEmpty(membership.salesStaffName),

@@ -1,6 +1,7 @@
 import { Fragment, RefObject } from 'react'
 import { PdfCompanyAd } from './PdfCompanyAd'
 import { PdfMembershipTable } from './PdfMembershipTable'
+import { resolveProductImageUrl } from '@/lib/utils'
 
 export type PdfProductItem = {
     id: string
@@ -11,13 +12,14 @@ export type PdfDocumentItem = {
     id?: string
     productItemId?: string
     productVariantId?: string | null
-    productItem?: { name?: string } | null
-    productVariant?: { name?: string } | null
+    productItem?: { name?: string; isSetChild?: boolean } | null
+    productVariant?: { name?: string; imageUrl?: string | null; isDefaultSet?: boolean; setPrice?: number } | null
     description?: string | null
     qty: number
     unitPriceGeneral: number
     unitPriceMember: number
     amount: number
+    isService?: boolean
     sortNo: number
 }
 
@@ -114,6 +116,9 @@ type DisplayRow = {
     label: string
     estimateItem?: PdfDocumentItem | null
     showProductVariantName: boolean // 霊柩車のように、品名の下に商品詳細を表示するかどうか
+    isFreeItem?: boolean // フリー項目（商品マスタ非連動）の場合に単価を表示
+    isMaturity?: boolean // 満期サービス（固定行）。qty=1なので単価表示はスキップ
+    isFixedRow?: boolean // 満期サービス・解約手数料など固定行（単価表示スキップ）
     deductionLabel?: string
     deductionItem?: PdfDocumentItem | null
 }
@@ -123,18 +128,23 @@ function buildDisplayRows(
     items: PdfDocumentItem[],
     freeItems?: PdfFreeItem[]
 ): DisplayRow[] {
-    const itemByProductId = new Map<string, PdfDocumentItem>()
+    // 実際に選択された明細だけを商品マスタの順に表示
+    // 未選択（qty=0 またはマスタに存在しても明細にない）商品は非表示
+    const selectedByProductId = new Map<string, PdfDocumentItem>()
     for (const item of items) {
+        if ((item.qty ?? 0) <= 0) continue
         const pid = item.productItemId ?? ''
-        if (pid && !itemByProductId.has(pid)) {
-            itemByProductId.set(pid, item)
+        if (pid && !selectedByProductId.has(pid)) {
+            selectedByProductId.set(pid, item)
         }
     }
 
     const rows: DisplayRow[] = []
 
+    // 商品マスタの並び順で、選択されたものだけ表示
     for (const product of products) {
-        const estimateItem = itemByProductId.get(product.id) ?? null
+        const estimateItem = selectedByProductId.get(product.id)
+        if (!estimateItem) continue
         rows.push({
             label: product.name,
             estimateItem,
@@ -142,8 +152,13 @@ function buildDisplayRows(
         })
     }
 
-    // フリー項目を末尾に追加
+    // フリー項目（数量>0のみ）を末尾に追加
+    // 解約手数料は明細には表示せず、合計欄で別行扱いにする
     for (const fi of freeItems ?? []) {
+        if ((fi.qty ?? 0) <= 0) continue
+        if (fi.productItemName === '解約手数料') continue
+        const isMaturity = fi.productItemName === '満期サービス'
+        const isCancellationFee = false
         rows.push({
             label: fi.productItemName,
             estimateItem: {
@@ -155,6 +170,9 @@ function buildDisplayRows(
                 sortNo: fi.sortNo,
             },
             showProductVariantName: false,
+            isFreeItem: true,
+            isMaturity,
+            isFixedRow: isMaturity || isCancellationFee,
         })
     }
 
@@ -194,25 +212,56 @@ function fmtTime(v?: string | Date | null): string {
     return `${String(d.getHours()).padStart(2, '0')}時${String(d.getMinutes()).padStart(2, '0')}分`
 }
 
+// 金額フォーマッタ。負値は会計表記に合わせて「▲ 1,234」のように出力する。
+function fmtAmount(n: number): string {
+    if (n < 0) return `▲${Math.abs(n).toLocaleString()}`
+    return n.toLocaleString()
+}
+
 export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc, products }: Props) {
     const { docNo, membershipPaidAmount, items } = doc
     const docAny = doc as any
     const isMember = doc.isMember === true
     // DB保存値ではなく実際のitems/freeItemsから合計を再計算
-    // フリー項目の小計
-    const freeSubtotal = (doc.freeItems ?? []).reduce((sum, fi) => sum + fi.unitPriceGeneral * fi.qty, 0)
-    // 会員価格
-    const itemsMemberSubtotal = items.reduce((sum, item) => sum + (item.unitPriceMember * item.qty || 0), 0)
+    // 解約手数料: qty>0 で登録されていれば、合計欄に「解約手数料」「値引」の2行を表示。
+    // 解約手数料は小計に含めない（消費税対象外）。値引で相殺するため差引合計にも影響しない。
+    const cancellationFee = (doc.freeItems ?? [])
+        .filter((fi) => fi.productItemName === '解約手数料' && (fi.qty ?? 0) > 0)
+        .reduce((sum, fi) => sum + fi.unitPriceGeneral * fi.qty, 0)
+    const showCancellationFee = cancellationFee >= 1
+    // フリー項目の小計（解約手数料を除く）
+    const freeSubtotal = (doc.freeItems ?? [])
+        .filter((fi) => fi.productItemName !== '解約手数料')
+        .reduce((sum, fi) => sum + fi.unitPriceGeneral * fi.qty, 0)
+    // セット扱いの行を判定するヘルパー（会員 + 子商品 + 初期セット種類）
+    const isSetIncluded = (item: PdfDocumentItem): boolean =>
+        !!(item.productItem?.isSetChild && item.productVariant?.isDefaultSet)
+    // サービス扱いの行を判定するヘルパー（サービス品フラグ ON）
+    const isServiceIncluded = (item: PdfDocumentItem): boolean => !!item.isService
+    // 会員列で「サービス」または「セット」として 0 円表示する行
+    const isMemberExcluded = (item: PdfDocumentItem): boolean =>
+        isSetIncluded(item) || isServiceIncluded(item)
+
+    // 会員価格（セット扱い / サービス扱いの行は除外）
+    const itemsMemberSubtotal = items.reduce((sum, item) => {
+        if (isMemberExcluded(item)) return sum
+        return sum + (item.unitPriceMember * item.qty || 0)
+    }, 0)
     const memberSubtotal = itemsMemberSubtotal + freeSubtotal
     const memberTax = Math.floor(memberSubtotal * 0.1) // 消費税は10%で固定、端数は切り捨て
     const memberTotal = memberSubtotal + memberTax
-    // 一般価格
-    const itemsGeneralSubtotal = items.reduce((sum, item) => sum + (item.unitPriceGeneral * item.qty || 0), 0)
+    // 一般価格（セット扱い / サービス扱いの行は除外、一般/会員共通の業務ルール）
+    const itemsGeneralSubtotal = items.reduce((sum, item) => {
+        if (isMemberExcluded(item)) return sum
+        return sum + (item.unitPriceGeneral * item.qty || 0)
+    }, 0)
     const generalSubtotal = itemsGeneralSubtotal + freeSubtotal
     const generalTax = Math.floor(generalSubtotal * 0.1)
     const generalTotal = generalSubtotal + generalTax
-    // 会員・一般どちらの価格からも、会費入金額を差し引いた金額を表示
-    const grandTotal = Math.max(0, (isMember ? memberTotal : generalTotal) - membershipPaidAmount)
+    // 差引合計: 解約手数料と値引（=解約手数料×-1）が相殺されるため、解約手数料分の影響は無い。
+    // 会費入金額のみ控除する。一般価格・会員価格それぞれの差引合計を表示する。
+    const generalGrandTotal = Math.max(0, generalTotal - membershipPaidAmount)
+    const memberGrandTotal = Math.max(0, memberTotal - membershipPaidAmount)
     const customer: PdfDocumentCustomer | undefined = docAny.customer
         ? {
               ...docAny.customer,
@@ -408,25 +457,53 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                                     {row.estimateItem?.description ?? ''}
                                                 </div>
                                                 <div>
-                                                    {/* 数量が1より大きい場合のみ表示 */}
+                                                    {/* 数量が1より大きい場合のみ表示。フリー項目は常に単価も表示 */}
                                                     {row.estimateItem && row.estimateItem.qty > 1
                                                         ? `数量: ${row.estimateItem.qty.toLocaleString()}`
+                                                        : ''}
+                                                    {row.isFreeItem && !row.isFixedRow && row.estimateItem
+                                                        ? `${row.estimateItem.qty > 1 ? '　' : ''}単価: ¥${fmtAmount(row.estimateItem.unitPriceGeneral)}`
                                                         : ''}
                                                 </div>
                                             </td>
                                             <td className="border border-black px-1 text-right">
-                                                {row.estimateItem
-                                                    ? (
-                                                          row.estimateItem.unitPriceGeneral * row.estimateItem.qty
-                                                      ).toLocaleString()
-                                                    : ''}
+                                                {row.estimateItem ? (
+                                                    isServiceIncluded(row.estimateItem) ? (
+                                                        <span style={{ color: '#8a7e5c', fontWeight: 600 }}>
+                                                            サービス
+                                                        </span>
+                                                    ) : isSetIncluded(row.estimateItem) ? (
+                                                        <span style={{ color: '#8a7e5c', fontWeight: 600 }}>
+                                                            セット
+                                                        </span>
+                                                    ) : (
+                                                        fmtAmount(
+                                                            row.estimateItem.unitPriceGeneral * row.estimateItem.qty
+                                                        )
+                                                    )
+                                                ) : (
+                                                    ''
+                                                )}
                                             </td>
                                             <td className="border border-r-0 border-black px-1 text-right">
-                                                {row.estimateItem
-                                                    ? (
-                                                          row.estimateItem.unitPriceMember * row.estimateItem.qty
-                                                      ).toLocaleString()
-                                                    : ''}
+                                                {row.estimateItem ? (
+                                                    isServiceIncluded(row.estimateItem) ? (
+                                                        <span style={{ color: '#8a7e5c', fontWeight: 600 }}>
+                                                            サービス
+                                                        </span>
+                                                    ) : isSetIncluded(row.estimateItem) ? (
+                                                        <span style={{ color: '#8a7e5c', fontWeight: 600 }}>
+                                                            セット
+                                                        </span>
+                                                    ) : (
+                                                        fmtAmount(
+                                                            row.estimateItem.unitPriceMember *
+                                                                row.estimateItem.qty
+                                                        )
+                                                    )
+                                                ) : (
+                                                    ''
+                                                )}
                                             </td>
                                         </tr>
                                     </Fragment>
@@ -446,10 +523,10 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                     </th>
                                     <td className="border border-black px-1 text-center">&nbsp;</td>
                                     <td className="border border-black px-1 text-right">
-                                        {generalSubtotal.toLocaleString()}
+                                        {fmtAmount(generalSubtotal)}
                                     </td>
                                     <td className="border border-black border-r-0 px-1 text-right">
-                                        {memberSubtotal.toLocaleString()}
+                                        {fmtAmount(memberSubtotal)}
                                     </td>
                                 </tr>
                                 <tr>
@@ -464,10 +541,10 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                     </th>
                                     <td className="border border-black text-center">&nbsp;</td>
                                     <td className="border border-black px-1 text-right">
-                                        {generalTax.toLocaleString()}
+                                        {fmtAmount(generalTax)}
                                     </td>
                                     <td className="border border-black border-r-0 px-1 text-right">
-                                        {memberTax.toLocaleString()}
+                                        {fmtAmount(memberTax)}
                                     </td>
                                 </tr>
                                 <tr>
@@ -482,10 +559,10 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                     </th>
                                     <td className="border border-black text-center">&nbsp;</td>
                                     <td className="border border-black px-1 text-right">
-                                        {generalTotal.toLocaleString()}
+                                        {fmtAmount(generalTotal)}
                                     </td>
                                     <td className="border border-black border-r-0 px-1 text-right">
-                                        {memberTotal.toLocaleString()}
+                                        {fmtAmount(memberTotal)}
                                     </td>
                                 </tr>
                                 <tr>
@@ -501,17 +578,66 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                     <td className="border border-black text-center">&nbsp;</td>
                                     <td className="border border-black px-1 text-left">&nbsp;</td>
                                     <td className="border border-black px-1  border-r-0 text-right">
-                                        <span className="mr-1">△</span>
+                                        <span className="mr-1">▲</span>
                                         {membershipPaidAmount.toLocaleString()}
+                                    </td>
+                                </tr>
+                                {showCancellationFee && (
+                                    <>
+                                        <tr>
+                                            <th className="border border-l-0 border-black text-center">
+                                                <div className="mx-auto flex w-[6rem] justify-between">
+                                                    {'解約手数料'.split('').map((char, i) => (
+                                                        <span key={i} className="text-center">
+                                                            {char}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </th>
+                                            <td className="border border-black text-center">&nbsp;</td>
+                                            <td className="border border-black px-1 text-right">&nbsp;</td>
+                                            <td className="border border-black px-1 border-r-0 text-right">
+                                                {cancellationFee.toLocaleString()}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <th className="border border-l-0 border-black text-center">
+                                                <div className="mx-auto flex w-[6rem] justify-between">
+                                                    {'値　引'.split('').map((char, i) => (
+                                                        <span key={i} className="text-center">
+                                                            {char}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </th>
+                                            <td className="border border-black text-center">&nbsp;</td>
+                                            <td className="border border-black px-1 text-right">&nbsp;</td>
+                                            <td className="border border-black px-1 border-r-0 text-right">
+                                                {fmtAmount(-cancellationFee)}
+                                            </td>
+                                        </tr>
+                                    </>
+                                )}
+                                <tr>
+                                    <th className="border border-t-2 border-l-0 border-black text-center font-bold">
+                                        <div className="mx-auto flex w-[6rem] justify-between">
+                                            {'差引合計額'.split('').map((char, i) => (
+                                                <span key={i} className="text-center">
+                                                    {char}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </th>
+                                    <td className="border border-t-2 border-black text-center">&nbsp;</td>
+                                    <td className="border border-t-2 border-black px-1 text-right font-bold">
+                                        {fmtAmount(generalGrandTotal)}
+                                    </td>
+                                    <td className="border border-t-2 border-black border-r-0 px-1 text-right font-bold">
+                                        {fmtAmount(memberGrandTotal)}
                                     </td>
                                 </tr>
                             </tfoot>
                         </table>
-                        <div className="border border-x-0 border-b-0 border-black p-1 text-right">
-                            <p className="text-lg font-bold">
-                                差引合計({isMember ? '会員価格' : '一般価格'}): ¥{grandTotal.toLocaleString()}
-                            </p>
-                        </div>
                     </div>
 
                     {/* 右ブロック */}
@@ -761,6 +887,93 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                     </div>
                 )}
             </div>
+
+            {/* 選択オプション画像ページ */}
+            {(() => {
+                const selectedWithImage = items.filter(
+                    (it) => it.qty > 0 && it.productVariant?.imageUrl
+                )
+                if (selectedWithImage.length === 0) return null
+
+                return (
+                    <div
+                        style={{
+                            breakBefore: 'page',
+                            pageBreakBefore: 'always',
+                        }}
+                        className="pt-4"
+                    >
+                        <div className="mb-4 border-b-2 border-black pb-2">
+                            <h2 className="text-center text-2xl font-black tracking-[0.3em]">
+                                選択オプション一覧
+                            </h2>
+                            <p className="mt-1 text-center text-xs tracking-widest">
+                                Selected Items
+                            </p>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            {selectedWithImage.map((it, i) => {
+                                const url = resolveProductImageUrl(it.productVariant?.imageUrl) || ''
+                                const unitPrice = isMember
+                                    ? it.unitPriceMember
+                                    : it.unitPriceGeneral
+                                return (
+                                    <div
+                                        key={i}
+                                        className="border border-black"
+                                        style={{
+                                            breakInside: 'avoid',
+                                            pageBreakInside: 'avoid',
+                                        }}
+                                    >
+                                        <div
+                                            className="flex items-center justify-center border-b border-black"
+                                            style={{
+                                                width: '100%',
+                                                height: '220px',
+                                                backgroundColor: '#f7f6f2',
+                                                padding: '6px',
+                                            }}
+                                        >
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img
+                                                src={url}
+                                                alt={it.productVariant?.name ?? ''}
+                                                style={{
+                                                    maxWidth: '100%',
+                                                    maxHeight: '100%',
+                                                    objectFit: 'contain',
+                                                }}
+                                            />
+                                        </div>
+                                        <div className="p-2 text-xs">
+                                            <div className="flex items-baseline justify-between border-b border-black pb-1 mb-1">
+                                                <span className="font-bold tracking-wider">
+                                                    {it.productItem?.name ?? ''}
+                                                </span>
+                                                {it.qty > 1 && (
+                                                    <span className="text-[0.7rem]">
+                                                        数量: {it.qty.toLocaleString()}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[0.8rem]">
+                                                    {it.productVariant?.name ?? ''}
+                                                </span>
+                                                <span className="font-bold text-sm">
+                                                    ¥{fmtAmount(unitPrice * it.qty)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </div>
+                )
+            })()}
         </div>
     )
 }

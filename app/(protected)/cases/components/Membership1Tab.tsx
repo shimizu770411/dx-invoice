@@ -1,4 +1,5 @@
-import { useFormContext } from 'react-hook-form'
+import { useEffect } from 'react'
+import { useFormContext, useWatch } from 'react-hook-form'
 import { useQuery } from '@tanstack/react-query'
 import { getUsers } from '@/lib/users'
 import { CaseFormData } from '../schemas/CaseFormSchema'
@@ -12,14 +13,26 @@ const INDEX = 0
 export function Membership1Tab() {
     const {
         control,
+        setValue,
         formState: { errors },
     } = useFormContext<CaseFormData>()
     const { data: users = [] } = useQuery({ queryKey: ['users'], queryFn: () => getUsers() })
     const userNameOptions = users.map((u) => u.name)
 
+    // 1回の入金額 × 入金回数 を自動計算して 入金額 にセット
+    const paymentAmountOnce = useWatch({ control, name: `memberships.${INDEX}.paymentAmountOnce` })
+    const paymentTimes = useWatch({ control, name: `memberships.${INDEX}.paymentTimes` })
+    useEffect(() => {
+        const once = Number(paymentAmountOnce) || 0
+        const times = Number(paymentTimes) || 0
+        const total = once * times
+        setValue(`memberships.${INDEX}.paymentAmount`, total > 0 ? total : undefined, {
+            shouldDirty: true,
+        })
+    }, [paymentAmountOnce, paymentTimes, setValue])
+
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            {/* 会員情報1 */}
             <div style={{ border: '1px solid #ddd', borderRadius: '8px', padding: '1.5rem' }}>
                 <h4 style={{ marginBottom: '1rem' }}>会員1</h4>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
@@ -52,34 +65,54 @@ export function Membership1Tab() {
                         />
                     </div>
 
-                    {/* コース口数 */}
-                    <FormInput<CaseFormData>
-                        name={`memberships.${INDEX}.courseUnits`}
-                        control={control}
-                        label="コース口数"
-                        type="number"
-                        suffix="万口"
-                        error={errors.memberships?.[INDEX]?.courseUnits}
-                    />
-
-                    {/* 入金回数 */}
-                    <FormInput<CaseFormData>
-                        name={`memberships.${INDEX}.paymentTimes`}
-                        control={control}
-                        label="入金回数"
-                        type="number"
-                        suffix="回"
-                        error={errors.memberships?.[INDEX]?.paymentTimes}
-                    />
-
-                    {/* 入金額 */}
-                    <FormCurrencyInput<CaseFormData>
-                        name={`memberships.${INDEX}.paymentAmount`}
-                        control={control}
-                        label="入金額"
-                        prefix="¥"
-                        error={errors.memberships?.[INDEX]?.paymentAmount}
-                    />
+                    {/* 金額情報を1行で表示: コース口数 / 満期額 / 1回の入金額 / 入金回数 / 入金額 */}
+                    <div
+                        style={{
+                            gridColumn: '1 / -1',
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(5, 1fr)',
+                            gap: '0.75rem',
+                        }}
+                    >
+                        <FormInput<CaseFormData>
+                            name={`memberships.${INDEX}.courseUnits`}
+                            control={control}
+                            label="コース口数"
+                            type="number"
+                            suffix="万口"
+                            error={errors.memberships?.[INDEX]?.courseUnits}
+                        />
+                        <FormCurrencyInput<CaseFormData>
+                            name={`memberships.${INDEX}.maturityAmount`}
+                            control={control}
+                            label="満期額"
+                            suffix="円"
+                            error={errors.memberships?.[INDEX]?.maturityAmount}
+                        />
+                        <FormCurrencyInput<CaseFormData>
+                            name={`memberships.${INDEX}.paymentAmountOnce`}
+                            control={control}
+                            label="1回の入金額"
+                            suffix="円"
+                            error={errors.memberships?.[INDEX]?.paymentAmountOnce}
+                        />
+                        <FormInput<CaseFormData>
+                            name={`memberships.${INDEX}.paymentTimes`}
+                            control={control}
+                            label="入金回数"
+                            type="number"
+                            suffix="回"
+                            error={errors.memberships?.[INDEX]?.paymentTimes}
+                        />
+                        <FormCurrencyInput<CaseFormData>
+                            name={`memberships.${INDEX}.paymentAmount`}
+                            control={control}
+                            label="入金額"
+                            suffix="円"
+                            disabled
+                            error={errors.memberships?.[INDEX]?.paymentAmount}
+                        />
+                    </div>
 
                     {/* 営業担当者名 */}
                     <div style={{ gridColumn: '1 / -1' }}>

@@ -1,19 +1,19 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useForm, FormProvider, useFieldArray, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Suspense } from 'react'
 import { estimateFormSchema, EstimateFormData, DEFAULT_FORM_VALUES } from '../schemas/EstimateFormSchema'
-import { useEstimateCreate, useEstimateFreeItems, calculateTotals } from '../hooks/useEstimateForm'
+import { useEstimateCreate, calculateTotals } from '../hooks/useEstimateForm'
 import { EstimateItemTable } from '../components/EstimateItemTable'
-import { EstimateTotals } from '../components/EstimateTotals'
+import { EstimateItemWizard } from '../components/EstimateItemWizard'
 import { EstimateOtherFields } from '../components/EstimateOtherFields'
 import { EstimateCustomerSummary } from '../components/EstimateCustomerSummary'
 import { EstimateBasicInfo } from '../components/EstimateBasicInfo'
-import { EstimateFreeItemInput } from '../components/EstimateFreeItemInput'
 import { ProductVariant } from '@/lib/products'
+import { resolveUnitPriceMember } from '@/lib/itemPricing'
 import { toast } from '@/hooks/use-toast'
 
 function EstimateNewPageInner() {
@@ -35,27 +35,21 @@ function EstimateNewPageInner() {
 
     const { fields: itemFields } = useFieldArray({ control, name: 'items' })
 
-    const {
-        fields: freeItemFields,
-        append: appendFreeItemField,
-        remove: removeFreeItemField,
-    } = useFieldArray({ control, name: 'freeItems' })
+    const { fields: freeItemFields } = useFieldArray({ control, name: 'freeItems' })
 
-    const { loading, customer, items, setItems, freeItems, setFreeItems, onSubmit } = useEstimateCreate(
-        customerId,
-        reset
-    )
-    const { handleAddFreeItem, handleRemoveFreeItem } = useEstimateFreeItems(
-        freeItems,
-        setFreeItems,
-        appendFreeItemField,
-        removeFreeItemField
-    )
+    const { loading, customer, items, setItems, freeItems, onSubmit } = useEstimateCreate(customerId, reset)
     const [activeTab, setActiveTab] = useState<'items' | 'other'>('items')
+    const [itemsViewMode, setItemsViewMode] = useState<'list' | 'card'>('list')
     const watchedItems = useWatch({ control, name: 'items' })
     const watchedIsMember = useWatch({ control, name: 'isMember' })
 
-    const handleVariantChange = (index: number, variant: ProductVariant) => {
+    const handleVariantChange = (
+        index: number,
+        variant: ProductVariant,
+        options?: { isService?: boolean }
+    ) => {
+        const isMember = watchedIsMember === 'true'
+        const isService = options?.isService ?? false
         setItems((prev) =>
             prev.map((item, i) =>
                 i !== index
@@ -65,14 +59,42 @@ function EstimateNewPageInner() {
                           productVariantId: variant.id,
                           productVariant: variant,
                           unitPriceGeneral: variant.priceGeneral,
-                          unitPriceMember: variant.priceMember,
+                          unitPriceMember: isService
+                              ? 0
+                              : resolveUnitPriceMember(item, variant, isMember),
+                          isService,
                       }
             )
         )
     }
 
+    // 会員/一般切替時に、各 item の unitPriceMember を再計算
+    // （会員時はセット品の setPrice、一般時は通常 priceMember）
+    useEffect(() => {
+        const isMember = watchedIsMember === 'true'
+        setItems((prev) =>
+            prev.map((item) => {
+                if (!item.productVariant) return item
+                const next = resolveUnitPriceMember(item, item.productVariant, isMember)
+                return next === item.unitPriceMember ? item : { ...item, unitPriceMember: next }
+            })
+        )
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [watchedIsMember])
+
     if (loading) {
-        return <div className="p-8">読み込み中...</div>
+        return (
+            <div
+                className="p-10"
+                style={{
+                    fontFamily: 'var(--font-mincho)',
+                    color: 'var(--brand-text-muted)',
+                    letterSpacing: '0.15em',
+                }}
+            >
+                読み込み中…
+            </div>
+        )
     }
 
     if (!customer) {
@@ -93,89 +115,338 @@ function EstimateNewPageInner() {
         }
     }
 
+    /** submit 前: 店舗不一致の variant を含む明細があれば確認ダイアログを出す */
+    const onSubmitWithStoreCheck = async (formValues: EstimateFormData) => {
+        const customerStoreId = customer?.storeId ? String(customer.storeId) : ''
+        const mismatches = items
+            .map((it, i) => {
+                const qty = formValues.items[i]?.qty ?? it.qty
+                if ((qty ?? 0) <= 0) return null
+                const variantStoreId = (it as any).productVariant?.storeId
+                if (!variantStoreId) return null
+                if (String(variantStoreId) === customerStoreId) return null
+                return (it as any).productItem?.name ?? '-'
+            })
+            .filter((n): n is string => !!n)
+        if (mismatches.length > 0) {
+            const ok = confirm(
+                `以下の明細は店舗変更により現在の顧客では利用できない種類が紐付いています:\n\n・${mismatches.join('\n・')}\n\n種類を選び直すことを推奨します。このまま登録してよろしいですか？`
+            )
+            if (!ok) return
+        }
+        return onSubmit(formValues)
+    }
+
+    const tabStyle = (active: boolean): React.CSSProperties => ({
+        padding: '14px 28px',
+        fontSize: '15px',
+        fontWeight: active ? 600 : 500,
+        letterSpacing: '0.15em',
+        fontFamily: 'var(--font-mincho)',
+        cursor: 'pointer',
+        transition: 'all 0.2s ease',
+        border: 'none',
+        borderBottom: `3px solid ${active ? 'var(--brand-gold)' : 'transparent'}`,
+        backgroundColor: active ? '#ffffff' : 'transparent',
+        color: active ? 'var(--brand-navy)' : 'var(--brand-text-muted)',
+    })
+
     return (
         <FormProvider {...methods}>
-            <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="flex flex-col p-8 pb-24">
-                <h1 className="mb-8 text-2xl font-bold">見積書 作成</h1>
+            <form
+                onSubmit={handleSubmit(onSubmitWithStoreCheck, onInvalid)}
+                className="flex flex-col px-10 py-8 pb-28"
+                style={{ backgroundColor: '#fbfaf7', minHeight: 'calc(100vh - 68px)' }}
+            >
+                {/* ページヘッダー */}
+                <div
+                    className="flex items-end justify-between mb-6 pb-5"
+                    style={{ borderBottom: '1px solid var(--brand-border)' }}
+                >
+                    <div>
+                        <p
+                            className="font-garamond mb-2"
+                            style={{
+                                fontSize: '12px',
+                                color: 'var(--brand-gold-soft)',
+                                letterSpacing: '0.3em',
+                                fontWeight: 500,
+                            }}
+                        >
+                            ESTIMATE · NEW
+                        </p>
+                        <h1
+                            className="font-mincho"
+                            style={{
+                                fontSize: '26px',
+                                fontWeight: 600,
+                                color: 'var(--brand-navy)',
+                                letterSpacing: '0.2em',
+                                lineHeight: 1.2,
+                            }}
+                        >
+                            見積書 作成
+                        </h1>
+                    </div>
+                </div>
 
                 {/* 顧客情報サマリー */}
                 <EstimateCustomerSummary customer={customer} />
 
                 {/* タブ */}
-                <div className="mb-4 flex border-b-2 border-gray-300">
+                <div
+                    className="flex"
+                    style={{
+                        borderBottom: '2px solid var(--brand-border)',
+                        backgroundColor: '#fbfaf7',
+                    }}
+                >
                     <button
                         type="button"
                         onClick={() => setActiveTab('items')}
-                        className={`cursor-pointer border-none px-6 py-3 ${
-                            activeTab === 'items'
-                                ? 'border-b-2 border-blue-600 bg-blue-600 text-white'
-                                : 'bg-transparent text-gray-700'
-                        }`}
+                        style={tabStyle(activeTab === 'items')}
                     >
-                        明細
+                        明　細
                     </button>
                     <button
                         type="button"
                         onClick={() => setActiveTab('other')}
-                        className={`cursor-pointer border-none px-6 py-3 ${
-                            activeTab === 'other'
-                                ? 'border-b-2 border-blue-600 bg-blue-600 text-white'
-                                : 'bg-transparent text-gray-700'
-                        }`}
+                        style={tabStyle(activeTab === 'other')}
                     >
                         その他
                     </button>
                 </div>
 
-                {/* 明細タブ */}
-                {activeTab === 'items' && (
-                    <>
-                        <EstimateBasicInfo control={control} isNew />
-                        {(errors.items?.root?.message ?? (errors.items as any)?.message) && (
-                            <p className="-mt-4 mb-4 text-sm text-red-600">
-                                {errors.items?.root?.message ?? (errors.items as any)?.message}
-                            </p>
-                        )}
-                        <EstimateFreeItemInput onAdd={handleAddFreeItem} count={freeItems.length} />
-                        <EstimateItemTable
-                            items={items}
-                            fields={itemFields}
-                            control={control}
-                            isMember={watchedIsMember === 'true'}
-                            freeItems={freeItems}
-                            freeFields={freeItemFields}
-                            handleRemoveFreeItem={handleRemoveFreeItem}
-                            onVariantChange={handleVariantChange}
-                            setValue={setValue}
-                        />
-                        <EstimateTotals totals={totals} />
-                    </>
-                )}
+                {/* タブコンテンツコンテナ */}
+                <div
+                    style={{
+                        backgroundColor: '#ffffff',
+                        border: '1px solid var(--brand-border)',
+                        borderTop: 'none',
+                        padding: '28px 32px',
+                    }}
+                >
+                    {/* 明細タブ */}
+                    {activeTab === 'items' && (
+                        <>
+                            <EstimateBasicInfo control={control} isNew />
+                            {(errors.items?.root?.message ?? (errors.items as any)?.message) && (
+                                <p
+                                    className="mb-4 font-mincho"
+                                    style={{
+                                        marginTop: '-8px',
+                                        fontSize: '14px',
+                                        color: 'var(--brand-red)',
+                                        letterSpacing: '0.05em',
+                                    }}
+                                >
+                                    {errors.items?.root?.message ?? (errors.items as any)?.message}
+                                </p>
+                            )}
 
-                {/* その他タブ */}
-                {activeTab === 'other' && <EstimateOtherFields control={control} />}
+                            {/* 明細入力モード切替 */}
+                            <div className="mb-5 flex items-center justify-between flex-wrap gap-3">
+                                <div className="flex items-center gap-1">
+                                    <span
+                                        className="font-garamond mr-3"
+                                        style={{
+                                            fontSize: '11px',
+                                            color: 'var(--brand-gold-soft)',
+                                            letterSpacing: '0.3em',
+                                        }}
+                                    >
+                                        MODE
+                                    </span>
+                                    {(
+                                        [
+                                            { value: 'list', label: '一覧から登録' },
+                                            { value: 'card', label: 'カード型で順番に選択' },
+                                        ] as const
+                                    ).map((opt) => {
+                                        const active = itemsViewMode === opt.value
+                                        return (
+                                            <button
+                                                key={opt.value}
+                                                type="button"
+                                                onClick={() => setItemsViewMode(opt.value)}
+                                                className="font-mincho transition-colors"
+                                                style={{
+                                                    padding: '8px 20px',
+                                                    fontSize: '13px',
+                                                    fontWeight: active ? 600 : 500,
+                                                    letterSpacing: '0.15em',
+                                                    backgroundColor: active
+                                                        ? 'var(--brand-navy)'
+                                                        : '#ffffff',
+                                                    color: active ? '#ffffff' : 'var(--brand-text-muted)',
+                                                    border: active
+                                                        ? '1px solid var(--brand-navy)'
+                                                        : '1px solid var(--brand-border)',
+                                                    cursor: 'pointer',
+                                                }}
+                                            >
+                                                {opt.label}
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+                            </div>
 
-                {/* 操作ボタン */}
-                <div className="fixed bottom-0 right-0 flex gap-4 p-2">
+                            {itemsViewMode === 'list' ? (
+                                <EstimateItemTable
+                                    items={items}
+                                    fields={itemFields}
+                                    control={control}
+                                    isMember={watchedIsMember === 'true'}
+                                    freeItems={freeItems}
+                                    freeFields={freeItemFields}
+                                    onVariantChange={handleVariantChange}
+                                    setValue={setValue}
+                                    currentStoreId={customer?.storeId ? String(customer.storeId) : null}
+                                />
+                            ) : (
+                                <EstimateItemWizard
+                                    items={items}
+                                    fields={itemFields}
+                                    control={control}
+                                    isMember={watchedIsMember === 'true'}
+                                    totals={totals}
+                                    onVariantChange={handleVariantChange}
+                                    setValue={setValue}
+                                    freeItems={freeItems}
+                                    freeFields={freeItemFields}
+                                    currentStoreId={customer?.storeId ? String(customer.storeId) : null}
+                                />
+                            )}
+                        </>
+                    )}
+
+                    {/* その他タブ */}
+                    {activeTab === 'other' && <EstimateOtherFields control={control} />}
+                </div>
+
+                {/* 操作ボタン（画面下部固定、合計と一緒に） */}
+                <div
+                    className="fixed bottom-0 left-0 right-0 flex items-center justify-between gap-6 px-10 py-3"
+                    style={{
+                        backgroundColor: '#ffffff',
+                        borderTop: '1px solid var(--brand-border)',
+                        boxShadow: '0 -4px 12px rgba(1, 8, 62, 0.06)',
+                        zIndex: 40,
+                    }}
+                >
+                    {/* 合計表示（左側） - カード型では右サイドバーに表示されるため非表示 */}
+                    {itemsViewMode === 'list' ? (
+                        <div
+                            className="flex items-center gap-x-8 flex-wrap"
+                            style={{
+                                fontFamily: 'var(--font-mincho)',
+                                color: 'var(--brand-text)',
+                            }}
+                        >
+                            {[
+                                { label: '小　計', value: totals.subtotal, sign: '¥' },
+                                { label: '消費税', value: totals.tax, sign: '¥' },
+                                { label: '合　計', value: totals.total, sign: '¥' },
+                                {
+                                    label: '会費入金',
+                                    value: totals.membershipPaidAmount,
+                                    sign: totals.membershipPaidAmount > 0 ? '−¥' : '¥',
+                                },
+                            ].map((t) => (
+                                <div key={t.label} className="flex items-baseline gap-2">
+                                    <span
+                                        style={{
+                                            fontSize: '12px',
+                                            color: 'var(--brand-text-muted)',
+                                            letterSpacing: '0.15em',
+                                        }}
+                                    >
+                                        {t.label}
+                                    </span>
+                                    <span
+                                        style={{
+                                            fontFamily: 'var(--font-garamond), var(--font-mincho)',
+                                            fontSize: '16px',
+                                            fontVariantNumeric: 'tabular-nums',
+                                        }}
+                                    >
+                                        {t.sign}
+                                        {t.value.toLocaleString()}
+                                    </span>
+                                </div>
+                            ))}
+                            <div
+                                className="flex items-baseline gap-2 pl-4"
+                                style={{ borderLeft: '1px solid var(--brand-border)' }}
+                            >
+                                <span
+                                    style={{
+                                        fontSize: '13px',
+                                        color: 'var(--brand-navy)',
+                                        letterSpacing: '0.25em',
+                                        fontWeight: 600,
+                                    }}
+                                >
+                                    差引合計
+                                </span>
+                                <span
+                                    style={{
+                                        fontFamily: 'var(--font-garamond), var(--font-mincho)',
+                                        fontSize: '24px',
+                                        fontWeight: 600,
+                                        color: 'var(--brand-navy)',
+                                        fontVariantNumeric: 'tabular-nums',
+                                    }}
+                                >
+                                    ¥{totals.grandTotal.toLocaleString()}
+                                </span>
+                            </div>
+                        </div>
+                    ) : (
+                        <div />
+                    )}
+
+                    {/* ボタン（右側） */}
+                    <div className="flex gap-3 flex-shrink-0">
                     <button
                         type="button"
                         onClick={() => {
                             router.push('/cases')
                             router.refresh()
                         }}
-                        className="cursor-pointer rounded border-0 bg-gray-500 px-6 py-3 text-white"
+                        className="font-mincho transition-colors"
+                        style={{
+                            padding: '12px 36px',
+                            backgroundColor: '#ffffff',
+                            color: 'var(--brand-text-muted)',
+                            border: '1px solid var(--brand-border)',
+                            fontSize: '15px',
+                            letterSpacing: '0.25em',
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                        }}
                     >
                         閉じる
                     </button>
                     <button
                         type="submit"
                         disabled={isSubmitting}
-                        className={`rounded border-0 px-6 py-3 text-white ${
-                            isSubmitting ? 'cursor-not-allowed bg-gray-300' : 'cursor-pointer bg-green-600'
-                        }`}
+                        className="font-mincho transition-colors text-white"
+                        style={{
+                            padding: '12px 48px',
+                            backgroundColor: isSubmitting ? '#7a7a7a' : 'var(--brand-navy)',
+                            border: 'none',
+                            fontSize: '15px',
+                            letterSpacing: '0.4em',
+                            fontWeight: 500,
+                            cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                            boxShadow: '0 2px 4px rgba(1, 8, 62, 0.15)',
+                        }}
                     >
-                        {isSubmitting ? '保存中...' : '登録'}
+                        {isSubmitting ? '保存中…' : '登　録'}
                     </button>
+                    </div>
                 </div>
             </form>
         </FormProvider>
@@ -184,7 +455,20 @@ function EstimateNewPageInner() {
 
 export default function EstimateNewPage() {
     return (
-        <Suspense fallback={<div className="p-8">読み込み中...</div>}>
+        <Suspense
+            fallback={
+                <div
+                    className="p-10"
+                    style={{
+                        fontFamily: 'var(--font-mincho)',
+                        color: 'var(--brand-text-muted)',
+                        letterSpacing: '0.15em',
+                    }}
+                >
+                    読み込み中…
+                </div>
+            }
+        >
             <EstimateNewPageInner />
         </Suspense>
     )
