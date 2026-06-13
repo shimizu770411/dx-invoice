@@ -2,6 +2,7 @@ import { Fragment, RefObject } from 'react'
 import { PdfCompanyAd } from './PdfCompanyAd'
 import { PdfMembershipTable } from './PdfMembershipTable'
 import { resolveProductImageUrl } from '@/lib/utils'
+import { scopeApplies } from '@/lib/productScope'
 
 export type PdfProductItem = {
     id: string
@@ -12,7 +13,13 @@ export type PdfDocumentItem = {
     id?: string
     productItemId?: string
     productVariantId?: string | null
-    productItem?: { name?: string; isSetChild?: boolean } | null
+    productItem?: {
+        name?: string
+        isSetChild?: boolean
+        serviceableScope?: 'NONE' | 'MEMBER_ONLY' | 'GENERAL_ONLY' | 'BOTH'
+        setableScope?: 'NONE' | 'MEMBER_ONLY' | 'GENERAL_ONLY' | 'BOTH'
+        isMaturityServiceable?: boolean
+    } | null
     productVariant?: { name?: string; imageUrl?: string | null; isDefaultSet?: boolean; setPrice?: number } | null
     description?: string | null
     qty: number
@@ -20,6 +27,7 @@ export type PdfDocumentItem = {
     unitPriceMember: number
     amount: number
     isService?: boolean
+    isMaturityService?: boolean
     sortNo: number
 }
 
@@ -233,26 +241,33 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
     const freeSubtotal = (doc.freeItems ?? [])
         .filter((fi) => fi.productItemName !== '解約手数料')
         .reduce((sum, fi) => sum + fi.unitPriceGeneral * fi.qty, 0)
-    // セット扱いの行を判定するヘルパー（会員 + 子商品 + 初期セット種類）
-    const isSetIncluded = (item: PdfDocumentItem): boolean =>
-        !!(item.productItem?.isSetChild && item.productVariant?.isDefaultSet)
-    // サービス扱いの行を判定するヘルパー（サービス品フラグ ON）
-    const isServiceIncluded = (item: PdfDocumentItem): boolean => !!item.isService
-    // 会員列で「サービス」または「セット」として 0 円表示する行
-    const isMemberExcluded = (item: PdfDocumentItem): boolean =>
-        isSetIncluded(item) || isServiceIncluded(item)
+    // 列ごとに「セット」「サービス」として 0 円扱いか判定するヘルパー
+    const isSetIncludedFor = (item: PdfDocumentItem, isMember: boolean): boolean =>
+        !!(
+            item.productItem?.isSetChild &&
+            item.productVariant?.isDefaultSet &&
+            scopeApplies(item.productItem?.setableScope, isMember)
+        )
+    const isServiceIncludedFor = (item: PdfDocumentItem, isMember: boolean): boolean =>
+        !!(item.isService && scopeApplies(item.productItem?.serviceableScope, isMember))
+    const isMaturityServiceIncludedFor = (item: PdfDocumentItem): boolean =>
+        !!(item.isMaturityService && item.productItem?.isMaturityServiceable)
+    const isExcludedFor = (item: PdfDocumentItem, isMember: boolean): boolean =>
+        isSetIncludedFor(item, isMember) ||
+        isServiceIncludedFor(item, isMember) ||
+        isMaturityServiceIncludedFor(item)
 
     // 会員価格（セット扱い / サービス扱いの行は除外）
     const itemsMemberSubtotal = items.reduce((sum, item) => {
-        if (isMemberExcluded(item)) return sum
+        if (isExcludedFor(item, true)) return sum
         return sum + (item.unitPriceMember * item.qty || 0)
     }, 0)
     const memberSubtotal = itemsMemberSubtotal + freeSubtotal
     const memberTax = Math.floor(memberSubtotal * 0.1) // 消費税は10%で固定、端数は切り捨て
     const memberTotal = memberSubtotal + memberTax
-    // 一般価格（セット扱い / サービス扱いの行は除外、一般/会員共通の業務ルール）
+    // 一般価格（一般モード時に該当する行のみ除外）
     const itemsGeneralSubtotal = items.reduce((sum, item) => {
-        if (isMemberExcluded(item)) return sum
+        if (isExcludedFor(item, false)) return sum
         return sum + (item.unitPriceGeneral * item.qty || 0)
     }, 0)
     const generalSubtotal = itemsGeneralSubtotal + freeSubtotal
@@ -468,11 +483,15 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                             </td>
                                             <td className="border border-black px-1 text-right">
                                                 {row.estimateItem ? (
-                                                    isServiceIncluded(row.estimateItem) ? (
+                                                    isMaturityServiceIncludedFor(row.estimateItem) ? (
+                                                        <span style={{ color: '#8a7e5c', fontWeight: 600 }}>
+                                                            満期サービス
+                                                        </span>
+                                                    ) : isServiceIncludedFor(row.estimateItem, false) ? (
                                                         <span style={{ color: '#8a7e5c', fontWeight: 600 }}>
                                                             サービス
                                                         </span>
-                                                    ) : isSetIncluded(row.estimateItem) ? (
+                                                    ) : isSetIncludedFor(row.estimateItem, false) ? (
                                                         <span style={{ color: '#8a7e5c', fontWeight: 600 }}>
                                                             セット
                                                         </span>
@@ -487,11 +506,15 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                             </td>
                                             <td className="border border-r-0 border-black px-1 text-right">
                                                 {row.estimateItem ? (
-                                                    isServiceIncluded(row.estimateItem) ? (
+                                                    isMaturityServiceIncludedFor(row.estimateItem) ? (
+                                                        <span style={{ color: '#8a7e5c', fontWeight: 600 }}>
+                                                            満期サービス
+                                                        </span>
+                                                    ) : isServiceIncludedFor(row.estimateItem, true) ? (
                                                         <span style={{ color: '#8a7e5c', fontWeight: 600 }}>
                                                             サービス
                                                         </span>
-                                                    ) : isSetIncluded(row.estimateItem) ? (
+                                                    ) : isSetIncludedFor(row.estimateItem, true) ? (
                                                         <span style={{ color: '#8a7e5c', fontWeight: 600 }}>
                                                             セット
                                                         </span>

@@ -59,13 +59,39 @@ export default function ProductEditPage() {
     const [name, setName] = useState('')
     const [isActive, setIsActive] = useState(true)
     const [kind, setKind] = useState<ProductKind>('NORMAL')
-    const [isServiceable, setIsServiceable] = useState(false)
+    const [serviceableScope, setServiceableScope] = useState<
+        'NONE' | 'MEMBER_ONLY' | 'GENERAL_ONLY' | 'BOTH'
+    >('NONE')
+    const [setableScope, setSetableScope] = useState<
+        'NONE' | 'MEMBER_ONLY' | 'GENERAL_ONLY' | 'BOTH'
+    >('NONE')
     const [isMaturityServiceable, setIsMaturityServiceable] = useState(false)
     const [defaultDescription, setDefaultDescription] = useState('')
     const [childIds, setChildIds] = useState<string[]>([])
     const [variants, setVariants] = useState<VariantRow[]>([])
+    // 複数行構成商品
+    const [isMultiRow, setIsMultiRow] = useState(false)
+    type MultiRowVariant = {
+        localId: string
+        label: string
+        imageUrl: string
+        unitPrice: number
+        isDefault: boolean
+    }
+    type MultiRow = {
+        localId: string
+        label: string
+        calcType: 'FIXED' | 'UNIT_PRICE_X_QTY'
+        defaultQty: number
+        hasReturn: boolean
+        variants: MultiRowVariant[]
+    }
+    const [multiRows, setMultiRows] = useState<MultiRow[]>([])
+    const genLocalId = () => `tmp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
     const [savingItem, setSavingItem] = useState(false)
     const [uploadingId, setUploadingId] = useState<string | null>(null)
+    const [uploadingRowVariantKey, setUploadingRowVariantKey] = useState<string | null>(null)
+    const [galleryRowVariantKey, setGalleryRowVariantKey] = useState<string | null>(null)
     const [galleryIndex, setGalleryIndex] = useState<number | null>(null)
     const [draggingVariantIndex, setDraggingVariantIndex] = useState<number | null>(null)
     const [variantDropTarget, setVariantDropTarget] = useState<number | null>(null)
@@ -106,10 +132,28 @@ export default function ProductEditPage() {
         if (product.isSetParent) setKind('PARENT')
         else if (product.isSetChild) setKind('CHILD')
         else setKind('NORMAL')
-        setIsServiceable(product.isServiceable ?? false)
+        setServiceableScope((product.serviceableScope as any) ?? 'NONE')
+        setSetableScope((product.setableScope as any) ?? 'NONE')
         setIsMaturityServiceable(product.isMaturityServiceable ?? false)
         setDefaultDescription(product.defaultDescription ?? '')
         setChildIds((product.children || []).map((c: any) => String(c.id)))
+        setIsMultiRow((product as any).isMultiRow ?? false)
+        setMultiRows(
+            ((product as any).rows || []).map((r: any) => ({
+                localId: String(r.id),
+                label: r.label ?? '',
+                calcType: r.calcType === 'FIXED' ? 'FIXED' : 'UNIT_PRICE_X_QTY',
+                defaultQty: typeof r.defaultQty === 'number' ? r.defaultQty : 1,
+                hasReturn: Boolean(r.hasReturn),
+                variants: (r.variants || []).map((v: any) => ({
+                    localId: String(v.id),
+                    label: v.label ?? '',
+                    imageUrl: v.imageUrl ?? '',
+                    unitPrice: Number(v.unitPrice) || 0,
+                    isDefault: Boolean(v.isDefault),
+                })),
+            }))
+        )
         setVariants(
             product.variants.map((v: ProductVariant) => ({
                 id: v.id,
@@ -159,10 +203,26 @@ export default function ProductEditPage() {
                 isActive,
                 isSetParent: kind === 'PARENT',
                 isSetChild: kind === 'CHILD',
-                isServiceable,
+                serviceableScope,
+                setableScope,
                 isMaturityServiceable,
                 defaultDescription: defaultDescription.trim() || null,
-            })
+                isMultiRow,
+                rows: isMultiRow
+                    ? multiRows.map((r) => ({
+                          label: r.label,
+                          calcType: r.calcType,
+                          defaultQty: r.defaultQty,
+                          hasReturn: r.hasReturn,
+                          variants: r.variants.map((v) => ({
+                              label: v.label,
+                              imageUrl: v.imageUrl || null,
+                              unitPrice: v.unitPrice,
+                              isDefault: v.isDefault,
+                          })),
+                      }))
+                    : [],
+            } as any)
             // 2) 親祭壇なら子商品の紐付け
             if (kind === 'PARENT') {
                 await setProductChildren(productId, childIds)
@@ -301,6 +361,46 @@ export default function ProductEditPage() {
             })
         } finally {
             setUploadingId(null)
+        }
+    }
+
+    const updateRowVariant = (
+        rIdx: number,
+        vIdx: number,
+        patch: Partial<MultiRowVariant>
+    ) => {
+        setMultiRows((prev) =>
+            prev.map((r, i) =>
+                i === rIdx
+                    ? {
+                          ...r,
+                          variants: r.variants.map((vv, j) =>
+                              j === vIdx ? { ...vv, ...patch } : vv
+                          ),
+                      }
+                    : r
+            )
+        )
+    }
+
+    const handleUploadRowVariantImage = async (
+        rIdx: number,
+        vIdx: number,
+        file: File
+    ) => {
+        const key = `${rIdx}-${vIdx}`
+        try {
+            setUploadingRowVariantKey(key)
+            const url = await uploadProductImage(file)
+            updateRowVariant(rIdx, vIdx, { imageUrl: url })
+        } catch (err: any) {
+            toast({
+                title: err?.response?.data?.error || err?.message || 'アップロードに失敗しました',
+                variant: 'destructive',
+                duration: 3000,
+            })
+        } finally {
+            setUploadingRowVariantKey(null)
         }
     }
 
@@ -549,22 +649,110 @@ export default function ProductEditPage() {
                     </p>
                 </div>
 
-                {/* サービス可否 */}
+                {/* セット可否（初期セット品の 0 円扱いの適用範囲） */}
                 <div className="mb-5">
-                    <label className="brand-label">サービス可否</label>
+                    <label className="brand-label">セット可否（初期セット品の 0 円扱いの適用範囲）</label>
                     <div className="grid grid-cols-2 gap-2">
                         {(
                             [
-                                { value: false, label: '不可', desc: '通常通り金額を請求' },
-                                { value: true, label: '可', desc: '見積で「サービス」（0円・無償）として出せる' },
-                            ] as { value: boolean; label: string; desc: string }[]
+                                { value: 'NONE', label: '不可', desc: '一般・会員ともに通常通り金額を加算' },
+                                {
+                                    value: 'MEMBER_ONLY',
+                                    label: '会員のみ',
+                                    desc: '会員のとき、初期セット種類は「セット」(0円)・合計除外',
+                                },
+                                {
+                                    value: 'GENERAL_ONLY',
+                                    label: '一般のみ',
+                                    desc: '一般顧客のとき、初期セット種類は「セット」(0円)・合計除外',
+                                },
+                                {
+                                    value: 'BOTH',
+                                    label: '両方',
+                                    desc: '一般・会員ともに、初期セット種類は「セット」(0円)・合計除外',
+                                },
+                            ] as {
+                                value: 'NONE' | 'MEMBER_ONLY' | 'GENERAL_ONLY' | 'BOTH'
+                                label: string
+                                desc: string
+                            }[]
                         ).map((opt) => {
-                            const active = isServiceable === opt.value
+                            const active = setableScope === opt.value
                             return (
                                 <button
-                                    key={String(opt.value)}
+                                    key={opt.value}
                                     type="button"
-                                    onClick={() => setIsServiceable(opt.value)}
+                                    onClick={() => setSetableScope(opt.value)}
+                                    className="font-mincho transition-colors text-left"
+                                    style={{
+                                        padding: '12px 18px',
+                                        border: active
+                                            ? '2px solid var(--brand-navy)'
+                                            : '1px solid var(--brand-border)',
+                                        backgroundColor: active ? '#f5f6fc' : '#ffffff',
+                                        cursor: 'pointer',
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            fontSize: '14px',
+                                            fontWeight: 600,
+                                            color: active ? 'var(--brand-navy)' : 'var(--brand-text)',
+                                            letterSpacing: '0.1em',
+                                            marginBottom: '4px',
+                                        }}
+                                    >
+                                        {opt.label}
+                                    </div>
+                                    <div
+                                        style={{
+                                            fontSize: '11px',
+                                            color: 'var(--brand-text-muted)',
+                                            letterSpacing: '0.05em',
+                                        }}
+                                    >
+                                        {opt.desc}
+                                    </div>
+                                </button>
+                            )
+                        })}
+                    </div>
+                </div>
+
+                {/* サービス可否 */}
+                <div className="mb-5">
+                    <label className="brand-label">サービス可否（無償提供の適用範囲）</label>
+                    <div className="grid grid-cols-2 gap-2">
+                        {(
+                            [
+                                { value: 'NONE', label: '不可', desc: '一般・会員ともに対象外' },
+                                {
+                                    value: 'MEMBER_ONLY',
+                                    label: '会員のみ',
+                                    desc: '互助会員のときだけ「サービス」(0円)として出せる',
+                                },
+                                {
+                                    value: 'GENERAL_ONLY',
+                                    label: '一般のみ',
+                                    desc: '一般顧客のときだけ「サービス」(0円)として出せる',
+                                },
+                                {
+                                    value: 'BOTH',
+                                    label: '両方',
+                                    desc: '一般・会員ともに「サービス」(0円)として出せる',
+                                },
+                            ] as {
+                                value: 'NONE' | 'MEMBER_ONLY' | 'GENERAL_ONLY' | 'BOTH'
+                                label: string
+                                desc: string
+                            }[]
+                        ).map((opt) => {
+                            const active = serviceableScope === opt.value
+                            return (
+                                <button
+                                    key={opt.value}
+                                    type="button"
+                                    onClick={() => setServiceableScope(opt.value)}
                                     className="font-mincho transition-colors text-left"
                                     style={{
                                         padding: '12px 18px',
@@ -655,6 +843,22 @@ export default function ProductEditPage() {
                             )
                         })}
                     </div>
+                </div>
+
+                {/* 複数行構成商品（会葬礼状、御供養 等） */}
+                <div className="mb-5">
+                    <label
+                        className="font-mincho cursor-pointer flex items-center gap-2"
+                        style={{ fontSize: '14px', color: 'var(--brand-text)' }}
+                    >
+                        <input
+                            type="checkbox"
+                            className="h-5 w-5 cursor-pointer"
+                            checked={isMultiRow}
+                            onChange={(e) => setIsMultiRow(e.target.checked)}
+                        />
+                        複数行構成商品（会葬礼状、御供養など、1商品で複数明細行＋符号制御）
+                    </label>
                 </div>
 
                 {/* 商品種別 */}
@@ -797,7 +1001,582 @@ export default function ProductEditPage() {
 
             </section>
 
-            {/* 種類 */}
+            {/* 明細行構成（isMultiRow=true のときのみ） */}
+            {isMultiRow && (
+                <section
+                    className="bg-white"
+                    style={{
+                        border: '1px solid var(--brand-border)',
+                        padding: '28px 32px',
+                    }}
+                >
+                    <div
+                        className="flex items-center justify-between mb-5 pb-3"
+                        style={{ borderBottom: '1px solid var(--brand-border)' }}
+                    >
+                        <h2
+                            className="font-mincho"
+                            style={{
+                                fontSize: '18px',
+                                fontWeight: 600,
+                                color: 'var(--brand-navy)',
+                                letterSpacing: '0.2em',
+                            }}
+                        >
+                            明細行構成
+                        </h2>
+                        <button
+                            type="button"
+                            onClick={() =>
+                                setMultiRows((prev) => [
+                                    ...prev,
+                                    {
+                                        localId: genLocalId(),
+                                        label: '',
+                                        calcType: 'UNIT_PRICE_X_QTY',
+                                        defaultQty: 1,
+                                        hasReturn: false,
+                                        variants: [],
+                                    },
+                                ])
+                            }
+                            className="font-mincho transition-colors"
+                            style={{
+                                padding: '8px 20px',
+                                backgroundColor: '#ffffff',
+                                color: 'var(--brand-navy)',
+                                border: '1px solid var(--brand-navy)',
+                                cursor: 'pointer',
+                            }}
+                        >
+                            ＋ 行を追加
+                        </button>
+                    </div>
+
+                    {multiRows.length === 0 ? (
+                        <p
+                            className="font-mincho"
+                            style={{
+                                fontSize: '13px',
+                                color: 'var(--brand-text-muted)',
+                                padding: '12px 0',
+                            }}
+                        >
+                            「＋ 行を追加」で明細行を作成してください。
+                        </p>
+                    ) : (
+                        <div className="flex flex-col gap-4">
+                            {multiRows.map((row, rIdx) => (
+                                <div
+                                    key={row.localId}
+                                    style={{
+                                        border: '1px solid var(--brand-border)',
+                                        borderLeft: `3px solid ${
+                                            row.hasReturn
+                                                ? 'var(--brand-red)'
+                                                : 'var(--brand-navy)'
+                                        }`,
+                                        padding: '16px 18px',
+                                        backgroundColor: 'var(--brand-ivory-light)',
+                                    }}
+                                >
+                                    <div className="grid grid-cols-12 gap-3 mb-3">
+                                        <div className="col-span-5">
+                                            <label className="brand-label" style={{ fontSize: 12 }}>
+                                                行ラベル
+                                            </label>
+                                            <input
+                                                type="text"
+                                                className="w-full"
+                                                placeholder="例: 礼状版代 / 枚数×単価 / 返品"
+                                                value={row.label}
+                                                onChange={(e) =>
+                                                    setMultiRows((prev) =>
+                                                        prev.map((r, i) =>
+                                                            i === rIdx
+                                                                ? { ...r, label: e.target.value }
+                                                                : r
+                                                        )
+                                                    )
+                                                }
+                                                style={{
+                                                    padding: '8px 12px',
+                                                    border: '1px solid var(--brand-input-border)',
+                                                    backgroundColor: '#ffffff',
+                                                }}
+                                            />
+                                        </div>
+                                        <div className="col-span-3">
+                                            <label className="brand-label" style={{ fontSize: 12 }}>
+                                                計算方式
+                                            </label>
+                                            <select
+                                                className="w-full"
+                                                value={row.calcType}
+                                                onChange={(e) =>
+                                                    setMultiRows((prev) =>
+                                                        prev.map((r, i) =>
+                                                            i === rIdx
+                                                                ? {
+                                                                      ...r,
+                                                                      calcType: e.target.value as any,
+                                                                      hasReturn:
+                                                                          e.target.value === 'FIXED'
+                                                                              ? false
+                                                                              : r.hasReturn,
+                                                                  }
+                                                                : r
+                                                        )
+                                                    )
+                                                }
+                                                style={{
+                                                    padding: '8px 12px',
+                                                    border: '1px solid var(--brand-input-border)',
+                                                    backgroundColor: '#ffffff',
+                                                }}
+                                            >
+                                                <option value="UNIT_PRICE_X_QTY">単価×数量</option>
+                                                <option value="FIXED">固定額（数量無視）</option>
+                                            </select>
+                                        </div>
+                                        <div className="col-span-2">
+                                            <label className="brand-label" style={{ fontSize: 12 }}>
+                                                既定数量
+                                            </label>
+                                            <input
+                                                type="number"
+                                                className="w-full text-right"
+                                                value={row.defaultQty}
+                                                onChange={(e) =>
+                                                    setMultiRows((prev) =>
+                                                        prev.map((r, i) =>
+                                                            i === rIdx
+                                                                ? {
+                                                                      ...r,
+                                                                      defaultQty:
+                                                                          Number(e.target.value) ||
+                                                                          0,
+                                                                  }
+                                                                : r
+                                                        )
+                                                    )
+                                                }
+                                                style={{
+                                                    padding: '8px 12px',
+                                                    border: '1px solid var(--brand-input-border)',
+                                                    backgroundColor: '#ffffff',
+                                                }}
+                                            />
+                                        </div>
+                                        <div className="col-span-2">
+                                            <label className="brand-label" style={{ fontSize: 12 }}>
+                                                返品行
+                                            </label>
+                                            <label
+                                                className="flex items-center gap-2"
+                                                style={{
+                                                    padding: '8px 12px',
+                                                    border: '1px solid var(--brand-input-border)',
+                                                    backgroundColor:
+                                                        row.calcType === 'FIXED'
+                                                            ? 'var(--brand-ivory-light)'
+                                                            : '#ffffff',
+                                                    opacity: row.calcType === 'FIXED' ? 0.5 : 1,
+                                                    cursor:
+                                                        row.calcType === 'FIXED'
+                                                            ? 'not-allowed'
+                                                            : 'pointer',
+                                                }}
+                                                title={
+                                                    row.calcType === 'FIXED'
+                                                        ? '固定額の行は返品設定できません'
+                                                        : '同じ種類で返品（減算）行を自動生成'
+                                                }
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={row.hasReturn}
+                                                    disabled={row.calcType === 'FIXED'}
+                                                    onChange={(e) =>
+                                                        setMultiRows((prev) =>
+                                                            prev.map((r, i) =>
+                                                                i === rIdx
+                                                                    ? {
+                                                                          ...r,
+                                                                          hasReturn: e.target.checked,
+                                                                      }
+                                                                    : r
+                                                            )
+                                                        )
+                                                    }
+                                                    className="h-4 w-4"
+                                                />
+                                                <span style={{ fontSize: 13 }}>返品あり</span>
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    {/* 行内の種類リスト */}
+                                    <div
+                                        className="mt-2 pt-2"
+                                        style={{ borderTop: '1px dashed var(--brand-border)' }}
+                                    >
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span
+                                                className="font-mincho"
+                                                style={{ fontSize: 12, color: 'var(--brand-navy)' }}
+                                            >
+                                                行内の種類
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setMultiRows((prev) =>
+                                                        prev.map((r, i) =>
+                                                            i === rIdx
+                                                                ? {
+                                                                      ...r,
+                                                                      variants: [
+                                                                          ...r.variants,
+                                                                          {
+                                                                              localId: genLocalId(),
+                                                                              label: '',
+                                                                              imageUrl: '',
+                                                                              unitPrice: 0,
+                                                                              isDefault:
+                                                                                  r.variants.length ===
+                                                                                  0,
+                                                                          },
+                                                                      ],
+                                                                  }
+                                                                : r
+                                                        )
+                                                    )
+                                                }
+                                                className="font-mincho"
+                                                style={{
+                                                    fontSize: 12,
+                                                    padding: '4px 10px',
+                                                    border: '1px solid var(--brand-border)',
+                                                    backgroundColor: '#ffffff',
+                                                    color: 'var(--brand-text-muted)',
+                                                    cursor: 'pointer',
+                                                }}
+                                            >
+                                                ＋ 種類を追加
+                                            </button>
+                                        </div>
+                                        {row.variants.length === 0 ? (
+                                            <p
+                                                className="font-mincho"
+                                                style={{
+                                                    fontSize: 12,
+                                                    color: 'var(--brand-text-muted)',
+                                                }}
+                                            >
+                                                種類がありません。
+                                            </p>
+                                        ) : (
+                                            <div className="flex flex-col gap-3">
+                                                {row.variants.map((v, vIdx) => (
+                                                    <div
+                                                        key={v.localId}
+                                                        className="grid grid-cols-[180px_1fr_auto] gap-5 items-start p-4"
+                                                        style={{
+                                                            border: '1px solid var(--brand-border)',
+                                                            backgroundColor: '#ffffff',
+                                                        }}
+                                                    >
+                                                        {/* 画像 */}
+                                                        <div>
+                                                            <div
+                                                                className="relative flex items-center justify-center mb-2 overflow-hidden"
+                                                                style={{
+                                                                    width: '180px',
+                                                                    height: '135px',
+                                                                    backgroundColor: 'var(--brand-ivory)',
+                                                                    border: '1px solid var(--brand-border)',
+                                                                }}
+                                                            >
+                                                                {v.imageUrl ? (
+                                                                    // eslint-disable-next-line @next/next/no-img-element
+                                                                    <img
+                                                                        src={v.imageUrl}
+                                                                        alt={v.label}
+                                                                        style={{
+                                                                            width: '100%',
+                                                                            height: '100%',
+                                                                            objectFit: 'contain',
+                                                                            padding: '4px',
+                                                                        }}
+                                                                    />
+                                                                ) : (
+                                                                    <span
+                                                                        className="material-symbols-outlined"
+                                                                        style={{
+                                                                            fontSize: '40px',
+                                                                            color: 'var(--brand-gold-soft)',
+                                                                            opacity: 0.5,
+                                                                        }}
+                                                                    >
+                                                                        image
+                                                                    </span>
+                                                                )}
+                                                                {uploadingRowVariantKey ===
+                                                                    `${rIdx}-${vIdx}` && (
+                                                                    <div
+                                                                        className="absolute inset-0 flex items-center justify-center"
+                                                                        style={{
+                                                                            backgroundColor:
+                                                                                'rgba(255,255,255,0.85)',
+                                                                            fontFamily:
+                                                                                'var(--font-mincho)',
+                                                                            fontSize: '13px',
+                                                                            color: 'var(--brand-navy)',
+                                                                            letterSpacing: '0.15em',
+                                                                        }}
+                                                                    >
+                                                                        アップロード中…
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <label
+                                                                className="font-mincho flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                                                                style={{
+                                                                    padding: '6px 12px',
+                                                                    border: '1px solid var(--brand-gold)',
+                                                                    color: 'var(--brand-gold-soft)',
+                                                                    backgroundColor: '#ffffff',
+                                                                    fontSize: '12px',
+                                                                    letterSpacing: '0.15em',
+                                                                }}
+                                                            >
+                                                                <span
+                                                                    className="material-symbols-outlined"
+                                                                    style={{ fontSize: '14px' }}
+                                                                >
+                                                                    upload
+                                                                </span>
+                                                                画像をアップロード
+                                                                <input
+                                                                    type="file"
+                                                                    accept="image/*"
+                                                                    className="hidden"
+                                                                    onChange={(e) => {
+                                                                        const f =
+                                                                            e.target.files?.[0]
+                                                                        if (f)
+                                                                            handleUploadRowVariantImage(
+                                                                                rIdx,
+                                                                                vIdx,
+                                                                                f
+                                                                            )
+                                                                        e.target.value = ''
+                                                                    }}
+                                                                />
+                                                            </label>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    setGalleryRowVariantKey(
+                                                                        `${rIdx}-${vIdx}`
+                                                                    )
+                                                                }
+                                                                className="w-full mt-2 font-mincho flex items-center justify-center gap-1 transition-colors"
+                                                                style={{
+                                                                    padding: '6px 12px',
+                                                                    border: '1px solid var(--brand-navy)',
+                                                                    color: 'var(--brand-navy)',
+                                                                    backgroundColor: '#ffffff',
+                                                                    fontSize: '12px',
+                                                                    letterSpacing: '0.15em',
+                                                                    cursor: 'pointer',
+                                                                }}
+                                                            >
+                                                                <span
+                                                                    className="material-symbols-outlined"
+                                                                    style={{ fontSize: '14px' }}
+                                                                >
+                                                                    collections
+                                                                </span>
+                                                                既存画像から選択
+                                                            </button>
+                                                            {v.imageUrl && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        updateRowVariant(
+                                                                            rIdx,
+                                                                            vIdx,
+                                                                            { imageUrl: '' }
+                                                                        )
+                                                                    }
+                                                                    className="w-full mt-2 font-mincho"
+                                                                    style={{
+                                                                        padding: '4px 8px',
+                                                                        fontSize: '11px',
+                                                                        color: 'var(--brand-text-muted)',
+                                                                        border: '1px dashed var(--brand-border)',
+                                                                        backgroundColor: 'transparent',
+                                                                        letterSpacing: '0.15em',
+                                                                        cursor: 'pointer',
+                                                                    }}
+                                                                >
+                                                                    画像をクリア
+                                                                </button>
+                                                            )}
+                                                        </div>
+
+                                                        {/* フォーム */}
+                                                        <div className="grid grid-cols-[1fr_140px_80px] gap-3 items-start">
+                                                            <div>
+                                                                <label
+                                                                    className="brand-label"
+                                                                    style={{ fontSize: 12 }}
+                                                                >
+                                                                    ラベル
+                                                                </label>
+                                                                <input
+                                                                    type="text"
+                                                                    className="w-full"
+                                                                    placeholder="例: 基本 / 独自文章 / コーヒー"
+                                                                    value={v.label}
+                                                                    onChange={(e) =>
+                                                                        updateRowVariant(rIdx, vIdx, {
+                                                                            label: e.target.value,
+                                                                        })
+                                                                    }
+                                                                    style={inputStyle}
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label
+                                                                    className="brand-label"
+                                                                    style={{ fontSize: 12 }}
+                                                                >
+                                                                    単価
+                                                                </label>
+                                                                <input
+                                                                    type="number"
+                                                                    className="w-full text-right"
+                                                                    value={v.unitPrice}
+                                                                    onChange={(e) =>
+                                                                        updateRowVariant(rIdx, vIdx, {
+                                                                            unitPrice:
+                                                                                Number(
+                                                                                    e.target.value
+                                                                                ) || 0,
+                                                                        })
+                                                                    }
+                                                                    style={inputStyle}
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label
+                                                                    className="brand-label text-center block"
+                                                                    style={{ fontSize: 12 }}
+                                                                >
+                                                                    既定
+                                                                </label>
+                                                                <div className="flex items-center justify-center h-[42px]">
+                                                                    <input
+                                                                        type="radio"
+                                                                        name={`default-${row.localId}`}
+                                                                        checked={v.isDefault}
+                                                                        onChange={() =>
+                                                                            setMultiRows((prev) =>
+                                                                                prev.map((r, i) =>
+                                                                                    i === rIdx
+                                                                                        ? {
+                                                                                              ...r,
+                                                                                              variants:
+                                                                                                  r.variants.map(
+                                                                                                      (vv, j) => ({
+                                                                                                          ...vv,
+                                                                                                          isDefault:
+                                                                                                              j === vIdx,
+                                                                                                      })
+                                                                                                  ),
+                                                                                          }
+                                                                                        : r
+                                                                                )
+                                                                            )
+                                                                        }
+                                                                        className="h-5 w-5 cursor-pointer"
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* 削除 */}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                setMultiRows((prev) =>
+                                                                    prev.map((r, i) =>
+                                                                        i === rIdx
+                                                                            ? {
+                                                                                  ...r,
+                                                                                  variants:
+                                                                                      r.variants.filter(
+                                                                                          (_, j) =>
+                                                                                              j !== vIdx
+                                                                                      ),
+                                                                              }
+                                                                            : r
+                                                                    )
+                                                                )
+                                                            }
+                                                            className="font-mincho"
+                                                            style={{
+                                                                padding: '6px 12px',
+                                                                border: '1px solid var(--brand-red)',
+                                                                backgroundColor: '#ffffff',
+                                                                color: 'var(--brand-red)',
+                                                                fontSize: 12,
+                                                                letterSpacing: '0.15em',
+                                                                cursor: 'pointer',
+                                                            }}
+                                                        >
+                                                            この種類を削除
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* 行削除ボタン */}
+                                    <div className="flex justify-end mt-3">
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setMultiRows((prev) =>
+                                                    prev.filter((_, i) => i !== rIdx)
+                                                )
+                                            }
+                                            className="font-mincho"
+                                            style={{
+                                                fontSize: 12,
+                                                padding: '4px 14px',
+                                                border: '1px solid var(--brand-red)',
+                                                backgroundColor: '#ffffff',
+                                                color: 'var(--brand-red)',
+                                                cursor: 'pointer',
+                                            }}
+                                        >
+                                            この行を削除
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </section>
+            )}
+
+            {/* 種類（バリエーション）: 複数行構成商品OFF時のみ表示 */}
+            {!isMultiRow && (
             <section
                 className="bg-white"
                 style={{
@@ -1260,6 +2039,7 @@ export default function ProductEditPage() {
                     </div>
                 )}
             </section>
+            )}
 
             {/* 全体保存ボタン（画面下部固定） */}
             <div
@@ -1339,7 +2119,7 @@ export default function ProductEditPage() {
                 </button>
             </div>
 
-            {/* 既存画像ギャラリーダイアログ */}
+            {/* 既存画像ギャラリーダイアログ（ProductVariant 用） */}
             <ImageGalleryDialog
                 open={galleryIndex !== null}
                 onOpenChange={(open) => {
@@ -1355,6 +2135,28 @@ export default function ProductEditPage() {
                 currentVariantId={
                     galleryIndex !== null ? variants[galleryIndex]?.id : undefined
                 }
+            />
+
+            {/* 既存画像ギャラリーダイアログ（ProductRowVariant 用） */}
+            <ImageGalleryDialog
+                open={galleryRowVariantKey !== null}
+                onOpenChange={(open) => {
+                    if (!open) setGalleryRowVariantKey(null)
+                }}
+                onSelect={(url) => {
+                    if (galleryRowVariantKey !== null) {
+                        const [rs, vs] = galleryRowVariantKey.split('-')
+                        const rIdx = Number(rs)
+                        const vIdx = Number(vs)
+                        updateRowVariant(rIdx, vIdx, { imageUrl: url })
+                    }
+                }}
+                currentUrl={(() => {
+                    if (galleryRowVariantKey === null) return null
+                    const [rs, vs] = galleryRowVariantKey.split('-')
+                    return multiRows[Number(rs)]?.variants[Number(vs)]?.imageUrl || null
+                })()}
+                currentProductId={productId}
             />
         </div>
     )

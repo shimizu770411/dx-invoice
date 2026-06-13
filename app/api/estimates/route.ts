@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
                 },
                 items: {
                     include: {
-                        productItem: true,
+                        productItem: { include: { rows: { include: { variants: true } } } },
                         productVariant: true,
                     },
                     orderBy: { sortNo: 'asc' },
@@ -188,12 +188,22 @@ export async function POST(request: NextRequest) {
                     create: (data.items || []).map((item: any, index: number) => ({
                         productItemId: item.productItemId ? BigInt(item.productItemId) : null,
                         productVariantId: item.productVariantId ? BigInt(item.productVariantId) : null,
+                        productRowId: item.productRowId ? BigInt(item.productRowId) : null,
+                        productRowVariantId: item.productRowVariantId
+                            ? BigInt(item.productRowVariantId)
+                            : null,
+                        calcType:
+                            item.calcType === 'FIXED' || item.calcType === 'UNIT_PRICE_X_QTY'
+                                ? item.calcType
+                                : null,
+                        sign: Number(item.sign) === -1 ? -1 : 1,
                         description: item.description,
                         unitPriceGeneral: item.unitPriceGeneral || 0,
                         unitPriceMember: item.unitPriceMember || 0,
                         qty: item.qty || 0,
                         amount: item.amount || 0,
                         isService: Boolean(item.isService),
+                        isMaturityService: Boolean(item.isMaturityService),
                         sortNo: item.sortNo ?? index,
                     })),
                 },
@@ -202,7 +212,7 @@ export async function POST(request: NextRequest) {
                 customer: true,
                 items: {
                     include: {
-                        productItem: true,
+                        productItem: { include: { rows: { include: { variants: true } } } },
                         productVariant: true,
                     },
                 },

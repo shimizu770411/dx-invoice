@@ -165,20 +165,35 @@ model CustomerMembership {
   @@map("customer_memberships")
 }
 
+enum AppliesTo {
+  NONE
+  MEMBER_ONLY
+  GENERAL_ONLY
+  BOTH
+}
+
+enum RowCalcType {
+  FIXED            // 数量無視・固定額（例: 礼状版代）
+  UNIT_PRICE_X_QTY // 単価 × 数量
+}
+
 model ProductItem {
   id                 BigInt   @id @default(autoincrement())
   name               String   @db.VarChar(120)
   defaultDescription String?  @db.VarChar(255) @map("default_description")
   sortNo             Int      @default(0) @map("sort_no")
-  isSetParent           Boolean  @default(false) @map("is_set_parent")
-  isSetChild            Boolean  @default(false) @map("is_set_child")
-  isServiceable         Boolean  @default(false) @map("is_serviceable")
-  isMaturityServiceable Boolean  @default(false) @map("is_maturity_serviceable")
-  isActive              Boolean  @default(true) @map("is_active")
+  isSetParent           Boolean   @default(false) @map("is_set_parent")
+  isSetChild            Boolean   @default(false) @map("is_set_child")
+  serviceableScope      AppliesTo @default(NONE) @map("serviceable_scope")
+  setableScope          AppliesTo @default(NONE) @map("setable_scope")
+  isMaturityServiceable Boolean   @default(false) @map("is_maturity_serviceable")
+  isMultiRow            Boolean   @default(false) @map("is_multi_row")
+  isActive              Boolean   @default(true) @map("is_active")
   createdAt     DateTime @default(now()) @db.Timestamptz(6) @map("created_at")
   updatedAt     DateTime @updatedAt @db.Timestamptz(6) @map("updated_at")
 
   variants  ProductVariant[]
+  rows      ProductRow[]
   estimateItems EstimateItem[]
   invoiceItems  InvoiceItem[]
   setParentLinks ProductSet[] @relation("SetParent")
@@ -188,6 +203,43 @@ model ProductItem {
   @@index([isSetParent])
   @@index([isSetChild])
   @@map("product_items")
+}
+
+model ProductRow {
+  id              BigInt       @id @default(autoincrement())
+  productItemId   BigInt       @map("product_item_id")
+  label           String       @db.VarChar(100)
+  calcType        RowCalcType  @default(UNIT_PRICE_X_QTY) @map("calc_type")
+  defaultQty      Int          @default(1) @map("default_qty")
+  hasReturn       Boolean      @default(false) @map("has_return")
+  sortNo          Int          @default(0) @map("sort_no")
+  isActive        Boolean      @default(true) @map("is_active")
+  createdAt       DateTime     @default(now()) @db.Timestamptz(6) @map("created_at")
+  updatedAt       DateTime     @updatedAt @db.Timestamptz(6) @map("updated_at")
+
+  productItem     ProductItem  @relation(fields: [productItemId], references: [id], onDelete: Cascade)
+  variants        ProductRowVariant[]
+
+  @@index([productItemId, sortNo])
+  @@map("product_rows")
+}
+
+model ProductRowVariant {
+  id              BigInt       @id @default(autoincrement())
+  productRowId    BigInt       @map("product_row_id")
+  label           String       @db.VarChar(100)
+  imageUrl        String?      @db.VarChar(500) @map("image_url")
+  unitPrice       Int          @default(0) @map("unit_price")
+  isDefault       Boolean      @default(false) @map("is_default")
+  sortNo          Int          @default(0) @map("sort_no")
+  isActive        Boolean      @default(true) @map("is_active")
+  createdAt       DateTime     @default(now()) @db.Timestamptz(6) @map("created_at")
+  updatedAt       DateTime     @updatedAt @db.Timestamptz(6) @map("updated_at")
+
+  productRow      ProductRow   @relation(fields: [productRowId], references: [id], onDelete: Cascade)
+
+  @@index([productRowId, sortNo])
+  @@map("product_row_variants")
 }
 
 model ProductSet {
@@ -278,19 +330,24 @@ model Estimate {
 }
 
 model EstimateItem {
-  id                BigInt   @id @default(autoincrement())
-  estimateId        BigInt   @map("estimate_id")
-  productItemId     BigInt?  @map("product_item_id")
-  productVariantId  BigInt?  @map("product_variant_id")
-  description       String?  @db.VarChar(255)
-  unitPriceGeneral  Int      @default(0) @map("unit_price_general")
-  unitPriceMember   Int      @default(0) @map("unit_price_member")
-  qty               Int      @default(0)
-  amount            Int      @default(0)
-  isService         Boolean  @default(false) @map("is_service")
-  sortNo            Int      @default(0) @map("sort_no")
-  createdAt         DateTime @default(now()) @db.Timestamptz(6) @map("created_at")
-  updatedAt         DateTime @updatedAt @db.Timestamptz(6) @map("updated_at")
+  id                   BigInt        @id @default(autoincrement())
+  estimateId           BigInt        @map("estimate_id")
+  productItemId        BigInt?       @map("product_item_id")
+  productVariantId     BigInt?       @map("product_variant_id")
+  productRowId         BigInt?       @map("product_row_id")
+  productRowVariantId  BigInt?       @map("product_row_variant_id")
+  calcType             RowCalcType?  @map("calc_type")
+  sign                 Int           @default(1)
+  description          String?       @db.VarChar(255)
+  unitPriceGeneral     Int           @default(0) @map("unit_price_general")
+  unitPriceMember      Int           @default(0) @map("unit_price_member")
+  qty                  Int           @default(0)
+  amount               Int           @default(0)
+  isService            Boolean       @default(false) @map("is_service")
+  isMaturityService    Boolean       @default(false) @map("is_maturity_service")
+  sortNo               Int           @default(0) @map("sort_no")
+  createdAt            DateTime      @default(now()) @db.Timestamptz(6) @map("created_at")
+  updatedAt            DateTime      @updatedAt @db.Timestamptz(6) @map("updated_at")
 
   estimate          Estimate      @relation(fields: [estimateId], references: [id], onDelete: Cascade)
   productItem       ProductItem?  @relation(fields: [productItemId], references: [id])
@@ -351,19 +408,24 @@ model Invoice {
 }
 
 model InvoiceItem {
-  id                BigInt   @id @default(autoincrement())
-  invoiceId         BigInt   @map("invoice_id")
-  productItemId     BigInt?  @map("product_item_id")
-  productVariantId  BigInt?  @map("product_variant_id")
-  description       String?  @db.VarChar(255)
-  unitPriceGeneral  Int      @default(0) @map("unit_price_general")
-  unitPriceMember   Int      @default(0) @map("unit_price_member")
-  qty               Int      @default(0)
-  amount            Int      @default(0)
-  isService         Boolean  @default(false) @map("is_service")
-  sortNo            Int      @default(0) @map("sort_no")
-  createdAt         DateTime @default(now()) @db.Timestamptz(6) @map("created_at")
-  updatedAt         DateTime @updatedAt @db.Timestamptz(6) @map("updated_at")
+  id                   BigInt        @id @default(autoincrement())
+  invoiceId            BigInt        @map("invoice_id")
+  productItemId        BigInt?       @map("product_item_id")
+  productVariantId     BigInt?       @map("product_variant_id")
+  productRowId         BigInt?       @map("product_row_id")
+  productRowVariantId  BigInt?       @map("product_row_variant_id")
+  calcType             RowCalcType?  @map("calc_type")
+  sign                 Int           @default(1)
+  description          String?       @db.VarChar(255)
+  unitPriceGeneral     Int           @default(0) @map("unit_price_general")
+  unitPriceMember      Int           @default(0) @map("unit_price_member")
+  qty                  Int           @default(0)
+  amount               Int           @default(0)
+  isService            Boolean       @default(false) @map("is_service")
+  isMaturityService    Boolean       @default(false) @map("is_maturity_service")
+  sortNo               Int           @default(0) @map("sort_no")
+  createdAt            DateTime      @default(now()) @db.Timestamptz(6) @map("created_at")
+  updatedAt            DateTime      @updatedAt @db.Timestamptz(6) @map("updated_at")
 
   invoice           Invoice          @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   productItem       ProductItem?     @relation(fields: [productItemId], references: [id])

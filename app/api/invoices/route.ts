@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
                 },
                 items: {
                     include: {
-                        productItem: true,
+                        productItem: { include: { rows: { include: { variants: true } } } },
                         productVariant: true,
                     },
                     orderBy: { sortNo: 'asc' },

@@ -24,6 +24,16 @@ export async function GET(request: NextRequest) {
                     include: { store: true },
                     orderBy: [{ sortNo: 'asc' }, { id: 'asc' }],
                 },
+                rows: {
+                    where: includeInactive ? {} : { isActive: true },
+                    include: {
+                        variants: {
+                            where: includeInactive ? {} : { isActive: true },
+                            orderBy: [{ sortNo: 'asc' }, { id: 'asc' }],
+                        },
+                    },
+                    orderBy: [{ sortNo: 'asc' }, { id: 'asc' }],
+                },
                 setParentLinks: {
                     include: { child: { select: { id: true, name: true, sortNo: true } } },
                     orderBy: { sortNo: 'asc' },
@@ -55,17 +65,54 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'name is required' }, { status: 400 })
         }
 
+        const SCOPE_VALUES = ['NONE', 'MEMBER_ONLY', 'GENERAL_ONLY', 'BOTH'] as const
+        const normalizeScope = (v: unknown) =>
+            SCOPE_VALUES.includes(v as any) ? (v as (typeof SCOPE_VALUES)[number]) : 'NONE'
+
         const created = await prisma.productItem.create({
             data: {
                 name: body.name,
                 isActive: body.isActive !== false,
                 isSetParent: Boolean(body.isSetParent),
                 isSetChild: Boolean(body.isSetChild),
-                isServiceable: Boolean(body.isServiceable),
+                serviceableScope: normalizeScope(body.serviceableScope),
+                setableScope: normalizeScope(body.setableScope),
                 isMaturityServiceable: Boolean(body.isMaturityServiceable),
+                isMultiRow: Boolean(body.isMultiRow),
                 defaultDescription: body.defaultDescription || null,
+                rows: Array.isArray(body.rows)
+                    ? {
+                          create: body.rows.map((row: any, rowIdx: number) => ({
+                              label: typeof row.label === 'string' ? row.label : '',
+                              calcType: row.calcType === 'FIXED' ? 'FIXED' : 'UNIT_PRICE_X_QTY',
+                              defaultQty: Number.isFinite(Number(row.defaultQty))
+                                  ? Number(row.defaultQty)
+                                  : 1,
+                              hasReturn: Boolean(row.hasReturn),
+                              sortNo: rowIdx,
+                              isActive: row.isActive !== false,
+                              variants: {
+                                  create: (Array.isArray(row.variants) ? row.variants : []).map(
+                                      (v: any, vIdx: number) => ({
+                                          label: typeof v.label === 'string' ? v.label : '',
+                                          imageUrl:
+                                              typeof v.imageUrl === 'string' && v.imageUrl
+                                                  ? v.imageUrl
+                                                  : null,
+                                          unitPrice: Number.isFinite(Number(v.unitPrice))
+                                              ? Number(v.unitPrice)
+                                              : 0,
+                                          isDefault: Boolean(v.isDefault),
+                                          sortNo: vIdx,
+                                          isActive: v.isActive !== false,
+                                      })
+                                  ),
+                              },
+                          })),
+                      }
+                    : undefined,
             },
-            include: { variants: true },
+            include: { variants: true, rows: { include: { variants: true } } },
         })
 
         return NextResponse.json(serializeBigInt(created), { status: 201 })

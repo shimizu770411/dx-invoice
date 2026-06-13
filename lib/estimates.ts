@@ -15,15 +15,22 @@ export interface EstimateItem {
     id?: string
     productItemId?: string
     productVariantId?: string
+    productRowId?: string | null
+    productRowVariantId?: string | null
+    calcType?: 'FIXED' | 'UNIT_PRICE_X_QTY' | null
+    sign?: number
     description?: string
     unitPriceGeneral: number
     unitPriceMember: number
     qty: number
     amount: number
     isService?: boolean
+    isMaturityService?: boolean
     sortNo: number
     productItem?: any
     productVariant?: any
+    productRow?: any
+    productRowVariant?: any
 }
 
 export interface Estimate {

@@ -11,6 +11,8 @@ import Image from 'next/image'
 import { ImageOff, X } from 'lucide-react'
 import { ProductVariant } from '@/lib/products'
 import { resolveProductImageUrl } from '@/lib/utils'
+import { scopeApplies } from '@/lib/productScope'
+import { computeMultiRowAmount } from '@/lib/expandMultiRow'
 
 /**
  * EstimateFormData と InvoiceFormData は構造が完全に一致するため、
@@ -34,6 +36,23 @@ export type DocumentFormData = {
     freeItems: { productItemName: string; description: string; unitPriceGeneral: number; qty: number }[]
 }
 
+type DocumentRowVariant = {
+    id: string
+    label: string
+    imageUrl?: string | null
+    unitPrice: number
+    isDefault?: boolean
+}
+
+type DocumentRow = {
+    id: string
+    label: string
+    calcType: 'FIXED' | 'UNIT_PRICE_X_QTY'
+    defaultQty?: number
+    hasReturn?: boolean
+    variants: DocumentRowVariant[]
+}
+
 type DocumentItem = {
     productItemId?: string | null
     productItem?: {
@@ -41,7 +60,11 @@ type DocumentItem = {
         variants?: ProductVariant[]
         isSetParent?: boolean
         isSetChild?: boolean
-        isServiceable?: boolean
+        serviceableScope?: 'NONE' | 'MEMBER_ONLY' | 'GENERAL_ONLY' | 'BOTH'
+        setableScope?: 'NONE' | 'MEMBER_ONLY' | 'GENERAL_ONLY' | 'BOTH'
+        isMaturityServiceable?: boolean
+        isMultiRow?: boolean
+        rows?: DocumentRow[]
         children?: { id: string; name: string }[]
     } | null
     productVariantId?: string | null
@@ -52,10 +75,17 @@ type DocumentItem = {
         setPrice?: number
         storeId?: string | null
     } | null
+    productRowId?: string | null
+    productRowVariantId?: string | null
+    calcType?: 'FIXED' | 'UNIT_PRICE_X_QTY' | null
+    sign?: number
+    productRow?: DocumentRow | null
+    productRowVariant?: DocumentRowVariant | null
     unitPriceGeneral: number
     unitPriceMember: number
     qty: number
     isService?: boolean
+    isMaturityService?: boolean
 }
 
 type DocumentFreeItem = {
@@ -72,7 +102,15 @@ type Props = {
     freeItems?: DocumentFreeItem[]
     freeFields?: FieldArrayWithId<DocumentFormData, 'freeItems', 'id'>[]
     handleRemoveFreeItem?: (index: number) => void
-    onVariantChange?: (index: number, variant: ProductVariant, options?: { isService?: boolean }) => void
+    onVariantChange?: (
+        index: number,
+        variant: ProductVariant,
+        options?: {
+            isService?: boolean
+            isMaturityService?: boolean
+            rowVariant?: DocumentRowVariant
+        }
+    ) => void
     setValue?: UseFormSetValue<DocumentFormData>
     readOnly?: boolean
     /** 顧客の現在の担当店舗 ID。保存済み variant の店舗と異なる場合に警告表示 */
@@ -100,7 +138,13 @@ export function DocumentItemTable({
     }
     const [variantDialogIndex, setVariantDialogIndex] = useState<number | null>(null)
     const [pendingVariant, setPendingVariant] = useState<ProductVariant | null>(null)
+    const [pendingRowVariant, setPendingRowVariant] = useState<DocumentRowVariant | null>(null)
+    // 複数行構成商品で「商品単位」ダイアログ用: rowId -> 選択中の variant
+    const [pendingRowVariantsMap, setPendingRowVariantsMap] = useState<
+        Record<string, DocumentRowVariant>
+    >({})
     const [pendingIsService, setPendingIsService] = useState(false)
+    const [pendingIsMaturityService, setPendingIsMaturityService] = useState(false)
     const [enlargedImage, setEnlargedImage] = useState<string | null>(null)
     const [checkedItems, setCheckedItems] = useState<boolean[]>([])
     const [prevQtySignature, setPrevQtySignature] = useState('')
@@ -133,24 +177,93 @@ export function DocumentItemTable({
 
     const openVariantDialog = (index: number) => {
         const item = items[index]
-        const variants = item?.productItem?.variants || []
-        const current = variants.find((v) => v.id === item?.productVariantId) || variants[0] || null
-        setPendingVariant(current)
+        const isMulti = !!item?.productRowId
+        if (isMulti && item?.productItemId) {
+            // 複数行構成商品: 商品単位モード（同じ productItem の全行の variants を初期化）
+            const productItemId = String(item.productItemId)
+            const initialMap: Record<string, DocumentRowVariant> = {}
+            items.forEach((it) => {
+                if (String(it.productItemId) === productItemId && it.productRowId && it.productItem?.rows) {
+                    const row = it.productItem.rows.find(
+                        (r) => String(r.id) === String(it.productRowId)
+                    )
+                    if (!row) return
+                    const current =
+                        row.variants.find(
+                            (v) => String(v.id) === String(it.productRowVariantId)
+                        ) ||
+                        row.variants.find((v) => v.isDefault) ||
+                        row.variants[0]
+                    if (current) initialMap[String(row.id)] = current
+                }
+            })
+            setPendingRowVariantsMap(initialMap)
+            setPendingRowVariant(null)
+            setPendingVariant(null)
+        } else {
+            const variants = item?.productItem?.variants || []
+            const current =
+                variants.find((v) => v.id === item?.productVariantId) || variants[0] || null
+            setPendingVariant(current)
+            setPendingRowVariant(null)
+            setPendingRowVariantsMap({})
+        }
         setPendingIsService(!!item?.isService)
+        setPendingIsMaturityService(!!item?.isMaturityService)
         setVariantDialogIndex(index)
     }
 
     const confirmVariant = () => {
-        if (variantDialogIndex !== null && pendingVariant) {
-            onVariantChange?.(variantDialogIndex, pendingVariant, { isService: pendingIsService })
-            setValue?.(`items.${variantDialogIndex}.qty` as `items.${number}.qty`, 1, {
-                shouldDirty: true,
-            })
-            // 種類変更を dirty 化（同じ qty でもフォームを汚す）
+        if (variantDialogIndex !== null) {
+            const item = items[variantDialogIndex]
+            const isMulti = !!item?.productRowId
+            if (isMulti && item?.productItemId) {
+                // 商品単位モード: 同じ productItem の全行に対して、選択された rowVariant を反映
+                const productItemId = String(item.productItemId)
+                items.forEach((it, idx) => {
+                    if (
+                        String(it.productItemId) === productItemId &&
+                        it.productRowId
+                    ) {
+                        const rv = pendingRowVariantsMap[String(it.productRowId)]
+                        if (!rv) return
+                        onVariantChange?.(idx, null as unknown as ProductVariant, {
+                            isService: pendingIsService,
+                            isMaturityService: pendingIsMaturityService,
+                            rowVariant: rv,
+                        })
+                        // 加算行のみ qty=0 を defaultQty に上げる（返品行は0のまま）
+                        const isReturnRow = Number(it.sign ?? 1) === -1
+                        if (!isReturnRow && !(it.qty && it.qty > 0)) {
+                            const row = it.productItem?.rows?.find(
+                                (r) => String(r.id) === String(it.productRowId)
+                            )
+                            const initQty = row?.defaultQty ?? 1
+                            setValue?.(
+                                `items.${idx}.qty` as `items.${number}.qty`,
+                                initQty,
+                                { shouldDirty: true }
+                            )
+                        }
+                    }
+                })
+            } else if (pendingVariant) {
+                onVariantChange?.(variantDialogIndex, pendingVariant, {
+                    isService: pendingIsService,
+                    isMaturityService: pendingIsMaturityService,
+                })
+                setValue?.(
+                    `items.${variantDialogIndex}.qty` as `items.${number}.qty`,
+                    item?.qty || 1,
+                    { shouldDirty: true }
+                )
+            }
             setValue?.('_changeMarker' as any, String(Date.now()), { shouldDirty: true })
         }
         setVariantDialogIndex(null)
         setPendingVariant(null)
+        setPendingRowVariant(null)
+        setPendingRowVariantsMap({})
         setPendingIsService(false)
     }
 
@@ -169,6 +282,33 @@ export function DocumentItemTable({
             ? (items[selectedParentIndex]?.productItem?.children || []).map((c) => String(c.id))
             : []
     )
+
+    // 複数行構成商品グループ: 連続する同 productItemId の行を1まとまりとして扱う
+    // 各 index に対して、グループ先頭の index を記録（先頭なら自分自身）
+    const groupStartIndexOf = (idx: number): number => {
+        const item = items[idx]
+        if (!item?.productRowId) return idx // 通常商品は単独グループ
+        const pid = String(item.productItemId)
+        let start = idx
+        while (start > 0) {
+            const prev = items[start - 1]
+            if (!prev?.productRowId || String(prev.productItemId) !== pid) break
+            start--
+        }
+        return start
+    }
+    const groupSizeOf = (startIdx: number): number => {
+        const item = items[startIdx]
+        if (!item?.productRowId) return 1
+        const pid = String(item.productItemId)
+        let count = 0
+        for (let i = startIdx; i < items.length; i++) {
+            const it = items[i]
+            if (!it?.productRowId || String(it.productItemId) !== pid) break
+            count++
+        }
+        return count
+    }
 
     // 行の表示判定（一般・会員共通）
     // 親祭壇は排他（1つだけ選択可）、子セット品は選択中親祭壇に紐づくものだけ表示
@@ -197,7 +337,7 @@ export function DocumentItemTable({
                         <th className="w-16 border border-gray-300 p-1 text-center">有無</th>
                         <th className="w-64 border border-gray-300 p-3 text-center">品目</th>
                         <th className="w-16 border border-gray-300 p-3 text-center">操作</th>
-                        <th className="w-20 border border-gray-300 p-3 text-center">数量</th>
+                        <th className="w-28 border border-gray-300 p-3 text-center">数量</th>
                         <th className="w-56 border border-gray-300 p-3 text-center">種類</th>
                         <th className="border border-gray-300 p-3 text-center">摘要</th>
                     </tr>
@@ -224,13 +364,22 @@ export function DocumentItemTable({
                                 }
                                 const isParent = item?.productItem?.isSetParent
                                 const isChild = item?.productItem?.isSetChild
-                                // 子商品 + 初期セット種類: セット扱い（金額0、合計対象外、一般/会員共通）
+                                // 子商品 + 初期セット種類 + setableScope が現在モードに適用: セット扱い
                                 const isSetIncluded = !!(
-                                    isChild && item?.productVariant?.isDefaultSet
+                                    isChild &&
+                                    item?.productVariant?.isDefaultSet &&
+                                    scopeApplies(item?.productItem?.setableScope, isMember)
                                 )
-                                // サービス品フラグON: サービス扱い（金額0、合計対象外、一般/会員共通）
-                                const isServiceIncluded = !!item?.isService
-                                const isExcludedFromMember = isSetIncluded || isServiceIncluded
+                                // サービス品フラグON + serviceableScope が現在モードに適用: サービス扱い
+                                const isServiceIncluded = !!(
+                                    item?.isService &&
+                                    scopeApplies(item?.productItem?.serviceableScope, isMember)
+                                )
+                                // 満期サービスフラグON + 商品の満期サービス可否が「可」: 満期サービス扱い
+                                const isMaturityServiceIncluded = !!(
+                                    item?.isMaturityService && item?.productItem?.isMaturityServiceable
+                                )
+                                const isExcluded = isSetIncluded || isServiceIncluded || isMaturityServiceIncluded
                                 // 選択中の親祭壇に紐づく子セット行は qty=0 でも種類選択を許可（一般/会員共通）
                                 const isLinkedChildOfSelectedParent =
                                     !!isChild &&
@@ -240,165 +389,251 @@ export function DocumentItemTable({
                                 const unitPrice =
                                     item != null ? (isMember ? item.unitPriceMember : item.unitPriceGeneral) : 0
                                 const liveQty = watchedItems?.[index]?.qty ?? item?.qty ?? 0
-                                const amount = isExcludedFromMember ? 0 : unitPrice * liveQty
+                                // 複数行構成商品: calcType と sign を考慮
+                                const isMultiRowItem = !!(item?.productRowId && item?.calcType)
+                                const amount = isExcluded
+                                    ? 0
+                                    : isMultiRowItem
+                                      ? computeMultiRowAmount({
+                                            calcType: item?.calcType,
+                                            sign: item?.sign,
+                                            unitPrice,
+                                            qty: liveQty,
+                                        })
+                                      : unitPrice * liveQty
+                                // 複数行構成商品グループの先頭か判定
+                                const groupStart = groupStartIndexOf(index)
+                                const isGroupStart = groupStart === index
+                                const groupSize = isGroupStart ? groupSizeOf(index) : 0
+                                // グループ内で1つでもチェックされているか（商品単位の表示状態）
+                                const groupAnyChecked = (() => {
+                                    if (!isMultiRowItem) return checkedItems[index] ?? false
+                                    const start = groupStart
+                                    const size = groupSizeOf(start)
+                                    for (let i = start; i < start + size; i++) {
+                                        if (checkedItems[i]) return true
+                                    }
+                                    return false
+                                })()
                                 return (
                                     <tr
                                         key={field.id}
                                         style={isChild ? { backgroundColor: '#fcfaf2' } : undefined}
                                     >
-                                        <td className="border border-gray-300 p-1 text-center">
-                                            {!readOnly && (
-                                                <input
-                                                    type="checkbox"
-                                                    checked={checkedItems[index] ?? false}
-                                                    onChange={(e) => {
-                                                        const checked = e.target.checked
-                                                        const currentItem = items[index]
-                                                        const isSetParent = !!currentItem?.productItem?.isSetParent
+                                        {(!isMultiRowItem || isGroupStart) && (
+                                            <td
+                                                className="border border-gray-300 p-1 text-center"
+                                                rowSpan={isMultiRowItem ? groupSize : undefined}
+                                            >
+                                                {!readOnly && (
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isMultiRowItem ? groupAnyChecked : (checkedItems[index] ?? false)}
+                                                        onChange={(e) => {
+                                                            const checked = e.target.checked
+                                                            const currentItem = items[index]
+                                                            const isSetParent = !!currentItem?.productItem?.isSetParent
 
-                                                        // 親祭壇なら、紐づく子商品 index を計算（自動チェック・一般/会員共通）
-                                                        let childIndexes: number[] = []
-                                                        if (isSetParent) {
-                                                            const childIds = new Set<string>(
-                                                                (currentItem!.productItem!.children || []).map((c) =>
-                                                                    String(c.id)
+                                                            // 親祭壇なら、紐づく子商品 index を計算（自動チェック・一般/会員共通）
+                                                            let childIndexes: number[] = []
+                                                            if (isSetParent) {
+                                                                const childIds = new Set<string>(
+                                                                    (currentItem!.productItem!.children || []).map((c) =>
+                                                                        String(c.id)
+                                                                    )
                                                                 )
-                                                            )
-                                                            items.forEach((it, i) => {
-                                                                if (
-                                                                    it?.productItem?.isSetChild &&
-                                                                    childIds.has(String(it.productItemId))
-                                                                ) {
-                                                                    childIndexes.push(i)
-                                                                }
-                                                            })
-                                                        }
-
-                                                        // checkedItems を一括更新
-                                                        setCheckedItems((prev) => {
-                                                            const next = [...prev]
-                                                            next[index] = checked
-                                                            for (const ci of childIndexes) {
-                                                                next[ci] = checked
+                                                                items.forEach((it, i) => {
+                                                                    if (
+                                                                        it?.productItem?.isSetChild &&
+                                                                        childIds.has(String(it.productItemId))
+                                                                    ) {
+                                                                        childIndexes.push(i)
+                                                                    }
+                                                                })
                                                             }
-                                                            return next
-                                                        })
 
-                                                        // qty を一括更新（フォームを dirty 化）
-                                                        setValue?.(
-                                                            `items.${index}.qty` as `items.${number}.qty`,
-                                                            checked ? 1 : 0,
-                                                            { shouldDirty: true }
-                                                        )
-                                                        for (const ci of childIndexes) {
-                                                            setValue?.(
-                                                                `items.${ci}.qty` as `items.${number}.qty`,
-                                                                checked ? 1 : 0,
-                                                                { shouldDirty: true }
-                                                            )
-                                                        }
-                                                    }}
-                                                    className="h-5 w-5 cursor-pointer"
-                                                />
-                                            )}
-                                        </td>
-                                        <td className="border border-gray-300 p-3">
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                {isChild && (
-                                                    <span
-                                                        className="font-mincho"
-                                                        style={{
-                                                            fontSize: '10px',
-                                                            padding: '2px 6px',
-                                                            backgroundColor: 'var(--brand-gold)',
-                                                            color: 'var(--brand-navy-dark)',
-                                                            letterSpacing: '0.1em',
+                                                            // 複数行構成商品: 同グループの全行 index を取得
+                                                            const groupIndexes: number[] = isMultiRowItem
+                                                                ? Array.from({ length: groupSize }, (_, k) => groupStart + k)
+                                                                : [index]
+
+                                                            // checkedItems を一括更新
+                                                            setCheckedItems((prev) => {
+                                                                const next = [...prev]
+                                                                for (const gi of groupIndexes) {
+                                                                    next[gi] = checked
+                                                                }
+                                                                for (const ci of childIndexes) {
+                                                                    next[ci] = checked
+                                                                }
+                                                                return next
+                                                            })
+
+                                                            // qty を一括更新（フォームを dirty 化）
+                                                            for (const gi of groupIndexes) {
+                                                                const gItem = items[gi]
+                                                                const defaultQty = gItem?.productRow?.defaultQty ?? 1
+                                                                setValue?.(
+                                                                    `items.${gi}.qty` as `items.${number}.qty`,
+                                                                    checked ? defaultQty : 0,
+                                                                    { shouldDirty: true }
+                                                                )
+                                                            }
+                                                            for (const ci of childIndexes) {
+                                                                setValue?.(
+                                                                    `items.${ci}.qty` as `items.${number}.qty`,
+                                                                    checked ? 1 : 0,
+                                                                    { shouldDirty: true }
+                                                                )
+                                                            }
                                                         }}
-                                                    >
-                                                        セット
-                                                    </span>
+                                                        className="h-5 w-5 cursor-pointer"
+                                                    />
                                                 )}
-                                                {isParent && (
-                                                    <span
-                                                        className="font-mincho"
-                                                        style={{
-                                                            fontSize: '10px',
-                                                            padding: '2px 6px',
-                                                            backgroundColor: 'var(--brand-navy)',
-                                                            color: '#ffffff',
-                                                            letterSpacing: '0.1em',
-                                                        }}
+                                            </td>
+                                        )}
+                                        {(!isMultiRowItem || isGroupStart) && (
+                                            <td
+                                                className="border border-gray-300 p-3"
+                                                rowSpan={isMultiRowItem ? groupSize : undefined}
+                                            >
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    {isChild && (
+                                                        <span
+                                                            className="font-mincho"
+                                                            style={{
+                                                                fontSize: '10px',
+                                                                padding: '2px 6px',
+                                                                backgroundColor: 'var(--brand-gold)',
+                                                                color: 'var(--brand-navy-dark)',
+                                                                letterSpacing: '0.1em',
+                                                            }}
+                                                        >
+                                                            セット
+                                                        </span>
+                                                    )}
+                                                    {isParent && (
+                                                        <span
+                                                            className="font-mincho"
+                                                            style={{
+                                                                fontSize: '10px',
+                                                                padding: '2px 6px',
+                                                                backgroundColor: 'var(--brand-navy)',
+                                                                color: '#ffffff',
+                                                                letterSpacing: '0.1em',
+                                                            }}
+                                                        >
+                                                            親祭壇
+                                                        </span>
+                                                    )}
+                                                    <span>{item?.productItem?.name ?? '-'}</span>
+                                                    {isStoreMismatch(item) && (liveQty ?? 0) > 0 && (
+                                                        <span
+                                                            className="font-mincho"
+                                                            title="保存済みの種類が現在の顧客の担当店舗で利用できません。種類を選び直してください。"
+                                                            style={{
+                                                                fontSize: '10px',
+                                                                padding: '2px 6px',
+                                                                backgroundColor: 'var(--brand-red)',
+                                                                color: '#ffffff',
+                                                                letterSpacing: '0.1em',
+                                                                fontWeight: 600,
+                                                            }}
+                                                        >
+                                                            ⚠ 店舗変更により利用不可
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        )}
+                                        {(!isMultiRowItem || isGroupStart) && (
+                                            <td
+                                                className="border border-gray-300 p-3 text-center"
+                                                rowSpan={isMultiRowItem ? groupSize : undefined}
+                                            >
+                                                {!readOnly && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => openVariantDialog(index)}
+                                                        disabled={!canSelectVariant}
+                                                        className="cursor-pointer rounded border-0 bg-transparent p-1 text-gray-600 disabled:cursor-not-allowed disabled:opacity-30"
+                                                        title="種類選択"
                                                     >
-                                                        親祭壇
-                                                    </span>
+                                                        <span
+                                                            className="material-symbols-outlined"
+                                                            style={{ fontSize: '2rem' }}
+                                                        >
+                                                            feature_search
+                                                        </span>
+                                                    </button>
                                                 )}
-                                                <span>{item?.productItem?.name ?? '-'}</span>
-                                                {isStoreMismatch(item) && (liveQty ?? 0) > 0 && (
-                                                    <span
-                                                        className="font-mincho"
-                                                        title="保存済みの種類が現在の顧客の担当店舗で利用できません。種類を選び直してください。"
-                                                        style={{
-                                                            fontSize: '10px',
-                                                            padding: '2px 6px',
-                                                            backgroundColor: 'var(--brand-red)',
-                                                            color: '#ffffff',
-                                                            letterSpacing: '0.1em',
-                                                            fontWeight: 600,
-                                                        }}
-                                                    >
-                                                        ⚠ 店舗変更により利用不可
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="border border-gray-300 p-3 text-center">
-                                            {!readOnly && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => openVariantDialog(index)}
-                                                    disabled={!canSelectVariant}
-                                                    className="cursor-pointer rounded border-0 bg-transparent p-1 text-gray-600 disabled:cursor-not-allowed disabled:opacity-30"
-                                                    title="種類選択"
-                                                >
-                                                    <span
-                                                        className="material-symbols-outlined"
-                                                        style={{ fontSize: '2rem' }}
-                                                    >
-                                                        feature_search
-                                                    </span>
-                                                </button>
-                                            )}
-                                        </td>
+                                            </td>
+                                        )}
                                         <td className="border border-gray-300 p-3">
                                             <FormInput
                                                 name={`items.${index}.qty`}
                                                 control={control}
                                                 type="number"
-                                                disabled={!checkedItems[index]}
+                                                disabled={isMultiRowItem ? !groupAnyChecked : !checkedItems[index]}
                                             />
                                         </td>
                                         <td className="border border-gray-300 p-3 text-right">
-                                            <div className="text-sm">{item?.productVariant?.name ?? '-'}</div>
-                                            {isServiceIncluded ? (
-                                                <div
-                                                    style={{
-                                                        color: 'var(--brand-gold-soft)',
-                                                        fontWeight: 600,
-                                                    }}
-                                                >
-                                                    サービス
-                                                </div>
-                                            ) : isSetIncluded ? (
-                                                <div
-                                                    style={{
-                                                        color: 'var(--brand-gold-soft)',
-                                                        fontWeight: 600,
-                                                    }}
-                                                >
-                                                    セット
-                                                </div>
+                                            {isMultiRowItem ? (
+                                                <>
+                                                    <div
+                                                        className="text-xs"
+                                                        style={{
+                                                            color:
+                                                                (item?.sign ?? 1) === -1
+                                                                    ? 'var(--brand-red)'
+                                                                    : 'var(--brand-text-muted)',
+                                                        }}
+                                                    >
+                                                        {item?.productRow?.label ?? ''}
+                                                        {item?.calcType === 'FIXED' ? '（固定）' : ''}
+                                                        {(item?.sign ?? 1) === -1 ? '（返品）' : ''}
+                                                    </div>
+                                                    <div>
+                                                        {(item?.sign ?? 1) === -1 ? '- ' : ''}¥
+                                                        {Math.abs(amount).toLocaleString()}
+                                                    </div>
+                                                </>
                                             ) : (
-                                                <div>¥{amount.toLocaleString()}</div>
+                                                <>
+                                                    <div className="text-sm">
+                                                        {item?.productVariant?.name ?? '-'}
+                                                    </div>
+                                                    {isMaturityServiceIncluded ? (
+                                                        <div
+                                                            style={{
+                                                                color: 'var(--brand-gold-soft)',
+                                                                fontWeight: 600,
+                                                            }}
+                                                        >
+                                                            満期サービス
+                                                        </div>
+                                                    ) : isServiceIncluded ? (
+                                                        <div
+                                                            style={{
+                                                                color: 'var(--brand-gold-soft)',
+                                                                fontWeight: 600,
+                                                            }}
+                                                        >
+                                                            サービス
+                                                        </div>
+                                                    ) : isSetIncluded ? (
+                                                        <div
+                                                            style={{
+                                                                color: 'var(--brand-gold-soft)',
+                                                                fontWeight: 600,
+                                                            }}
+                                                        >
+                                                            セット
+                                                        </div>
+                                                    ) : (
+                                                        <div>¥{amount.toLocaleString()}</div>
+                                                    )}
+                                                </>
                                             )}
                                         </td>
                                         <td className="border border-gray-300 p-3">
@@ -408,7 +643,7 @@ export function DocumentItemTable({
                                                 rows={2}
                                                 noResize
                                                 maxRows={2}
-                                                disabled={!checkedItems[index]}
+                                                disabled={isMultiRowItem ? !groupAnyChecked : !checkedItems[index]}
                                             />
                                         </td>
                                     </tr>
@@ -590,8 +825,19 @@ export function DocumentItemTable({
                             const item = items[variantDialogIndex]
                             const variants = item?.productItem?.variants || []
                             const isChildItem = !!item?.productItem?.isSetChild
-                            // サービス可フラグが立っていれば一般/会員問わずチェック可能
-                            const canBeService = !!item?.productItem?.isServiceable
+                            // 複数行構成行か（productRowId あり）
+                            const isMultiRowItem = !!item?.productRowId
+                            // 商品単位モード: 同じ商品の全行を取得し、各行の ProductRow を表示
+                            const productRows = isMultiRowItem
+                                ? item?.productItem?.rows || []
+                                : []
+                            // serviceableScope が現在モードに適用される商品のみチェック可能
+                            const canBeService = scopeApplies(
+                                item?.productItem?.serviceableScope,
+                                isMember
+                            )
+                            // 満期サービス可否が「可」の商品のみチェック可能
+                            const canBeMaturityService = !!item?.productItem?.isMaturityServiceable
                             // 子商品の場合はセット価格モードで表示（一般/会員共通、setPrice は会員のみ参照）
                             const showSetPrice = isMember && isChildItem
                             return (
@@ -613,7 +859,12 @@ export function DocumentItemTable({
                                             <input
                                                 type="checkbox"
                                                 checked={pendingIsService}
-                                                onChange={(e) => setPendingIsService(e.target.checked)}
+                                                onChange={(e) => {
+                                                    const next = e.target.checked
+                                                    setPendingIsService(next)
+                                                    // 排他: サービス品 ON 時は満期サービスを OFF
+                                                    if (next) setPendingIsMaturityService(false)
+                                                }}
                                                 className="h-5 w-5 cursor-pointer"
                                             />
                                             <span
@@ -627,7 +878,157 @@ export function DocumentItemTable({
                                             </span>
                                         </label>
                                     )}
-                                    {variants.length === 0 ? (
+                                    {canBeMaturityService && (
+                                        <label
+                                            className="mb-4 flex items-center gap-2 font-mincho cursor-pointer select-none"
+                                            style={{
+                                                padding: '10px 14px',
+                                                border: pendingIsMaturityService
+                                                    ? '1px solid var(--brand-gold)'
+                                                    : '1px solid var(--brand-border)',
+                                                backgroundColor: pendingIsMaturityService
+                                                    ? 'rgba(196, 174, 106, 0.1)'
+                                                    : '#ffffff',
+                                            }}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={pendingIsMaturityService}
+                                                onChange={(e) => {
+                                                    const next = e.target.checked
+                                                    setPendingIsMaturityService(next)
+                                                    // 排他: 満期サービス ON 時はサービス品を OFF
+                                                    if (next) setPendingIsService(false)
+                                                }}
+                                                className="h-5 w-5 cursor-pointer"
+                                            />
+                                            <span
+                                                style={{
+                                                    fontSize: '14px',
+                                                    color: 'var(--brand-navy)',
+                                                    letterSpacing: '0.1em',
+                                                }}
+                                            >
+                                                満期サービスとする（会員価格を 0 円扱い、合計から除外）
+                                            </span>
+                                        </label>
+                                    )}
+                                    {isMultiRowItem ? (
+                                        productRows.length === 0 ? (
+                                            <p className="text-gray-500">明細行が登録されていません</p>
+                                        ) : (
+                                            <div className="flex flex-col gap-5">
+                                                {productRows.map((pRow) => {
+                                                    return (
+                                                        <div key={pRow.id}>
+                                                            <p
+                                                                className="mb-2 font-mincho"
+                                                                style={{
+                                                                    fontSize: 13,
+                                                                    color: 'var(--brand-text-muted)',
+                                                                    letterSpacing: '0.1em',
+                                                                }}
+                                                            >
+                                                                {pRow.label}
+                                                                {pRow.calcType === 'FIXED'
+                                                                    ? '（固定額）'
+                                                                    : '（単価×数量）'}
+                                                                {pRow.hasReturn && (
+                                                                    <span
+                                                                        style={{
+                                                                            marginLeft: 8,
+                                                                            color: 'var(--brand-red)',
+                                                                            fontSize: 11,
+                                                                        }}
+                                                                    >
+                                                                        ＋返品行あり
+                                                                    </span>
+                                                                )}
+                                                            </p>
+                                                            {pRow.variants.length === 0 ? (
+                                                                <p className="text-gray-500">
+                                                                    この行に種類が登録されていません
+                                                                </p>
+                                                            ) : (
+                                                                <div className="grid grid-cols-3 gap-3">
+                                                                    {pRow.variants.map((v) => {
+                                                                        const selected =
+                                                                            pendingRowVariantsMap[
+                                                                                String(pRow.id)
+                                                                            ]
+                                                                        const isSelected =
+                                                                            String(selected?.id) ===
+                                                                            String(v.id)
+                                                                        return (
+                                                                            <button
+                                                                                key={v.id}
+                                                                                type="button"
+                                                                                onClick={() =>
+                                                                                    setPendingRowVariantsMap(
+                                                                                        (prev) => ({
+                                                                                            ...prev,
+                                                                                            [String(
+                                                                                                pRow.id
+                                                                                            )]: v,
+                                                                                        })
+                                                                                    )
+                                                                                }
+                                                                                className={`flex flex-col items-center rounded-lg border-2 p-3 transition-colors ${
+                                                                                    isSelected
+                                                                                        ? 'border-blue-500 bg-blue-100'
+                                                                                        : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
+                                                                                }`}
+                                                                            >
+                                                                                <div className="mb-2 flex h-24 w-full items-center justify-center overflow-hidden rounded">
+                                                                                    {v.imageUrl ? (
+                                                                                        <div
+                                                                                            role="button"
+                                                                                            tabIndex={-1}
+                                                                                            className="h-full w-full cursor-zoom-in"
+                                                                                            onClick={(e) => {
+                                                                                                e.stopPropagation()
+                                                                                                setEnlargedImage(
+                                                                                                    resolveProductImageUrl(
+                                                                                                        v.imageUrl
+                                                                                                    ) || ''
+                                                                                                )
+                                                                                            }}
+                                                                                            aria-label="画像を拡大"
+                                                                                        >
+                                                                                            <Image
+                                                                                                src={
+                                                                                                    resolveProductImageUrl(
+                                                                                                        v.imageUrl
+                                                                                                    ) || ''
+                                                                                                }
+                                                                                                alt={v.label}
+                                                                                                width={96}
+                                                                                                height={96}
+                                                                                                className="h-full w-full object-contain"
+                                                                                            />
+                                                                                        </div>
+                                                                                    ) : (
+                                                                                        <ImageOff className="h-10 w-10 text-gray-300" />
+                                                                                    )}
+                                                                                </div>
+                                                                                <p className="mb-1 text-center text-base font-medium leading-snug">
+                                                                                    {v.label || '(無名)'}
+                                                                                </p>
+                                                                                <p className="text-sm text-gray-600">
+                                                                                    ¥
+                                                                                    {v.unitPrice.toLocaleString()}
+                                                                                </p>
+                                                                            </button>
+                                                                        )
+                                                                    })}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        )
+                                    ) : variants.length === 0 ? (
                                         <p className="text-gray-500">種類がありません</p>
                                     ) : (
                                         <div className="grid grid-cols-3 gap-3">
@@ -712,7 +1113,11 @@ export function DocumentItemTable({
                         <button
                             type="button"
                             onClick={confirmVariant}
-                            disabled={!pendingVariant}
+                            disabled={
+                                !pendingVariant &&
+                                !pendingRowVariant &&
+                                Object.keys(pendingRowVariantsMap).length === 0
+                            }
                             className="cursor-pointer rounded border-0 bg-blue-600 px-4 py-2 text-white disabled:cursor-not-allowed disabled:bg-gray-300"
                         >
                             確定

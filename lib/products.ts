@@ -15,6 +15,48 @@ export interface ProductVariant {
     sortNo?: number
 }
 
+/**
+ * 互助会員/一般顧客のどちらでも適用するかの範囲。
+ * - NONE: 適用しない（チェックボックス・「セット」表示も出ない）
+ * - MEMBER_ONLY: 互助会員のときのみ適用
+ * - GENERAL_ONLY: 一般顧客のときのみ適用（レアケース）
+ * - BOTH: 一般・会員両方で適用
+ */
+export type AppliesTo = 'NONE' | 'MEMBER_ONLY' | 'GENERAL_ONLY' | 'BOTH'
+
+/**
+ * 明細行の計算方式
+ * - FIXED: 数量を無視し、unitPrice を 1 回だけ計上
+ * - UNIT_PRICE_X_QTY: 単価 × 数量
+ */
+export type RowCalcType = 'FIXED' | 'UNIT_PRICE_X_QTY'
+
+/** 明細行内の種類選択肢 */
+export interface ProductRowVariant {
+    id: string
+    productRowId?: string
+    label: string
+    imageUrl?: string | null
+    unitPrice: number
+    isDefault?: boolean
+    sortNo?: number
+    isActive?: boolean
+}
+
+/** 1商品を構成する明細行（複数行構成商品で利用） */
+export interface ProductRow {
+    id: string
+    productItemId?: string
+    label: string
+    calcType: RowCalcType
+    defaultQty: number
+    /** true の場合、明細展開時に加算行と返品（減算）行の2行を生成 */
+    hasReturn: boolean
+    sortNo?: number
+    isActive?: boolean
+    variants: ProductRowVariant[]
+}
+
 export interface ProductItem {
     id: string
     name: string
@@ -22,10 +64,13 @@ export interface ProductItem {
     sortNo?: number
     isSetParent?: boolean
     isSetChild?: boolean
-    isServiceable?: boolean
+    serviceableScope?: AppliesTo
+    setableScope?: AppliesTo
     isMaturityServiceable?: boolean
+    isMultiRow?: boolean
     isActive: boolean
     variants: ProductVariant[]
+    rows?: ProductRow[]
     children?: { id: string; name: string; sortNo?: number }[]
 }
 
@@ -36,7 +81,9 @@ export interface ProductItemInput {
     sortNo?: number
     isSetParent?: boolean
     isSetChild?: boolean
-    isServiceable?: boolean
+    serviceableScope?: AppliesTo
+    setableScope?: AppliesTo
+    isMultiRow?: boolean
     isMaturityServiceable?: boolean
 }
 

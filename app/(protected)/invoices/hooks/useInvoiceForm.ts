@@ -7,6 +7,8 @@ import { getCustomer } from '@/lib/customers'
 import { getEstimates } from '@/lib/estimates'
 import { getProducts, ProductItem, ProductVariant } from '@/lib/products'
 import { InvoiceItem, InvoiceFreeItem } from '@/lib/invoices'
+import { scopeApplies } from '@/lib/productScope'
+import { expandMultiRowToItems, computeMultiRowAmount } from '@/lib/expandMultiRow'
 import { toast } from '@/hooks/use-toast'
 import {
     InvoiceFormData,
@@ -109,9 +111,20 @@ export function useInvoiceCreate(customerId: string, reset: UseFormReset<Invoice
                 ),
             }))
 
-            const initialItems: InvoiceItem[] = filteredProducts.map((product) => {
+            const initialItems: InvoiceItem[] = []
+            for (const product of filteredProducts as any[]) {
+                // 複数行構成商品: ProductRow ごとに1行ずつ展開（初期は qty=0）
+                if (product.isMultiRow && product.rows && product.rows.length > 0) {
+                    const expanded = expandMultiRowToItems<InvoiceItem>(
+                        product,
+                        initialItems.length,
+                        product.defaultDescription ?? ''
+                    ).map((it) => ({ ...it, qty: 0, amount: 0 }))
+                    initialItems.push(...expanded)
+                    continue
+                }
                 const firstVariant = product.variants[0] ?? null
-                return {
+                initialItems.push({
                     productItemId: product.id,
                     productVariantId: firstVariant?.id ?? undefined,
                     description: product.defaultDescription ?? '',
@@ -119,11 +132,11 @@ export function useInvoiceCreate(customerId: string, reset: UseFormReset<Invoice
                     unitPriceMember: firstVariant?.priceMember || 0,
                     qty: 0,
                     amount: 0,
-                    sortNo: 0,
+                    sortNo: initialItems.length,
                     productItem: { ...product },
                     productVariant: firstVariant,
-                }
-            })
+                })
+            }
             setItems(initialItems)
 
             const initialFreeItems = padInvoiceFreeItems([])
@@ -274,13 +287,60 @@ export function useInvoiceEdit(invoiceId: string, reset: UseFormReset<InvoiceFor
             }))
 
             // 全アクティブ品目と既存請求明細をマージ
-            const mergedItems: InvoiceItem[] = filteredProducts.map((product) => {
-                const existing = existingItems.find((item) => item.productItemId === product.id)
+            const mergedItems: InvoiceItem[] = []
+            for (const product of filteredProducts as any[]) {
+                // 複数行構成商品: ProductRow ごとに既存明細とマージ
+                // hasReturn=true の行は加算/減算の2行に展開
+                if (product.isMultiRow && product.rows && product.rows.length > 0) {
+                    for (const row of product.rows as any[]) {
+                        const def =
+                            row.variants?.find((v: any) => v.isDefault) ?? row.variants?.[0]
+                        const unitPrice = def?.unitPrice ?? 0
+                        const signs: (1 | -1)[] = row.hasReturn ? [1, -1] : [1]
+                        for (const sign of signs) {
+                            const existing = existingItems.find(
+                                (item) =>
+                                    String((item as any).productRowId ?? '') === String(row.id) &&
+                                    Number((item as any).sign ?? 1) === sign
+                            )
+                            if (existing) {
+                                mergedItems.push({
+                                    ...existing,
+                                    productItem: { ...product },
+                                    productRow: row,
+                                } as InvoiceItem)
+                                continue
+                            }
+                            mergedItems.push({
+                                productItemId: product.id,
+                                productRowId: String(row.id),
+                                productRowVariantId: def ? String(def.id) : null,
+                                calcType: row.calcType,
+                                sign,
+                                description: product.defaultDescription ?? '',
+                                unitPriceGeneral: unitPrice,
+                                unitPriceMember: unitPrice,
+                                qty: 0,
+                                amount: 0,
+                                sortNo: mergedItems.length,
+                                productItem: { ...product },
+                                productRow: row,
+                                productRowVariant: def,
+                            } as InvoiceItem)
+                        }
+                    }
+                    continue
+                }
+                const existing = existingItems.find(
+                    (item) =>
+                        item.productItemId === product.id && !(item as any).productRowId
+                )
                 if (existing) {
-                    return { ...existing, productItem: { ...product } }
+                    mergedItems.push({ ...existing, productItem: { ...product } })
+                    continue
                 }
                 const firstVariant = product.variants[0] ?? null
-                return {
+                mergedItems.push({
                     productItemId: product.id,
                     productVariantId: firstVariant?.id ?? undefined,
                     description: product.defaultDescription ?? '',
@@ -288,11 +348,11 @@ export function useInvoiceEdit(invoiceId: string, reset: UseFormReset<InvoiceFor
                     unitPriceMember: firstVariant?.priceMember || 0,
                     qty: 0,
                     amount: 0,
-                    sortNo: 0,
+                    sortNo: mergedItems.length,
                     productItem: { ...product },
                     productVariant: firstVariant,
-                }
-            })
+                })
+            }
 
             const loadedFreeItems: InvoiceFreeItem[] = (invoiceData as any).freeItems || []
             const paddedFreeItems = padInvoiceFreeItems(loadedFreeItems)
@@ -427,12 +487,44 @@ export function useInvoiceProductSearch(
     }
 
     const handleAddItem = () => {
-        if (!selectedProduct || !selectedVariant) {
-            toast({ title: '商品と種類を選択してください', variant: 'destructive', duration: 3000 })
+        if (!selectedProduct) {
+            toast({ title: '商品を選択してください', variant: 'destructive', duration: 3000 })
             return
         }
 
         const defaultDescription = selectedProduct.defaultDescription ?? ''
+
+        // 複数行構成商品: ProductRow ごとに1行ずつ展開
+        if (selectedProduct.isMultiRow) {
+            const expanded = expandMultiRowToItems<InvoiceItem>(
+                selectedProduct,
+                items.length,
+                defaultDescription
+            )
+            if (expanded.length === 0) {
+                toast({
+                    title: 'この商品には明細行が登録されていません。商品マスタで設定してください。',
+                    variant: 'destructive',
+                    duration: 4000,
+                })
+                return
+            }
+            const sortedItems = sortByProductItemId([...items, ...expanded])
+            setItems(sortedItems)
+            expanded.forEach((e) =>
+                appendItemField({ qty: e.qty ?? 1, description: e.description ?? '' })
+            )
+            setSelectedProduct(null)
+            setSelectedVariant(null)
+            setSearchProductName('')
+            setProducts([])
+            return
+        }
+
+        if (!selectedVariant) {
+            toast({ title: '種類を選択してください', variant: 'destructive', duration: 3000 })
+            return
+        }
 
         const newItem: InvoiceItem = {
             productItemId: selectedProduct.id,
@@ -509,13 +601,32 @@ export function calculateInvoiceTotals(
 ) {
     const regularSubtotal = items.reduce((sum, item, i) => {
         const qty = itemFields?.[i]?.qty ?? item.qty
-        // 子商品 + 初期セット種類の場合は合計対象外（一般/会員共通）
+        const pi = (item as any)?.productItem
+        const pv = (item as any)?.productVariant
+        // 子商品 + 初期セット種類 + setableScope が現在モードに該当: 合計対象外
         const isSetIncluded =
-            (item as any)?.productItem?.isSetChild &&
-            (item as any)?.productVariant?.isDefaultSet
-        // サービス品フラグ ON の場合も合計対象外（一般/会員共通）
-        const isServiceIncluded = (item as any)?.isService
-        if (isSetIncluded || isServiceIncluded) return sum
+            pi?.isSetChild &&
+            pv?.isDefaultSet &&
+            scopeApplies(pi?.setableScope, isMember)
+        // サービス品フラグON + serviceableScope が現在モードに該当: 合計対象外
+        const isServiceIncluded =
+            (item as any)?.isService && scopeApplies(pi?.serviceableScope, isMember)
+        // 満期サービスフラグON + 商品の満期サービス可否が「可」: 合計対象外
+        const isMaturityServiceIncluded =
+            (item as any)?.isMaturityService && pi?.isMaturityServiceable
+        if (isSetIncluded || isServiceIncluded || isMaturityServiceIncluded) return sum
+        // 複数行構成商品: calcType と sign を考慮（一般/会員ともに同一単価）
+        if ((item as any)?.productRowId && (item as any)?.calcType) {
+            return (
+                sum +
+                computeMultiRowAmount({
+                    calcType: (item as any).calcType,
+                    sign: (item as any).sign,
+                    unitPrice: item.unitPriceGeneral,
+                    qty,
+                })
+            )
+        }
         const unitPrice = isMember ? item.unitPriceMember : item.unitPriceGeneral
         return sum + unitPrice * qty
     }, 0)

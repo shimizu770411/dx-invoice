@@ -48,26 +48,40 @@ export default function EstimateEditPage() {
 
     const handleVariantChange = (
         index: number,
-        variant: ProductVariant,
-        options?: { isService?: boolean }
+        variant: ProductVariant | null,
+        options?: { isService?: boolean; isMaturityService?: boolean; rowVariant?: any }
     ) => {
         const isMember = watchedIsMember === 'true'
         const isService = options?.isService ?? false
+        const isMaturityService = options?.isMaturityService ?? false
         setItems((prev) =>
-            prev.map((item, i) =>
-                i !== index
-                    ? item
-                    : {
-                          ...item,
-                          productVariantId: variant.id,
-                          productVariant: variant,
-                          unitPriceGeneral: variant.priceGeneral,
-                          unitPriceMember: isService
-                              ? 0
-                              : resolveUnitPriceMember(item, variant, isMember),
-                          isService,
-                      }
-            )
+            prev.map((item, i) => {
+                if (i !== index) return item
+                if (options?.rowVariant && (item as any).productRowId) {
+                    const rv = options.rowVariant
+                    return {
+                        ...item,
+                        productRowVariantId: String(rv.id),
+                        productRowVariant: rv,
+                        unitPriceGeneral: rv.unitPrice,
+                        unitPriceMember: rv.unitPrice,
+                        isService,
+                        isMaturityService,
+                    }
+                }
+                if (!variant) return item
+                return {
+                    ...item,
+                    productVariantId: variant.id,
+                    productVariant: variant,
+                    unitPriceGeneral: variant.priceGeneral,
+                    unitPriceMember: isService || isMaturityService
+                        ? 0
+                        : resolveUnitPriceMember(item, variant, isMember),
+                    isService,
+                    isMaturityService,
+                }
+            })
         )
     }
 
