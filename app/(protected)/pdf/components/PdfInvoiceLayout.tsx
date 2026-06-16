@@ -256,7 +256,7 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
     const isExcludedFor = (item: PdfDocumentItem, isMember: boolean): boolean =>
         isSetIncludedFor(item, isMember) ||
         isServiceIncludedFor(item, isMember) ||
-        isMaturityServiceIncludedFor(item)
+        (isMaturityServiceIncludedFor(item) && isMember)
 
     // 会員価格（セット扱い / サービス扱いの行は除外）
     const itemsMemberSubtotal = items.reduce((sum, item) => {
@@ -275,8 +275,8 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
     const generalTax = Math.floor(generalSubtotal * 0.1)
     const generalTotal = generalSubtotal + generalTax
     // 差引合計: 解約手数料と値引（=解約手数料×-1）が相殺されるため、解約手数料分の影響は無い。
-    // 会費入金額のみ控除する。一般価格・会員価格それぞれの差引合計を表示する。
-    const generalGrandTotal = Math.max(0, generalTotal - membershipPaidAmount)
+    // 会費入金額は互助会員のみ持つ事前積立なので、会員価格列のみ控除する。一般価格列は控除しない。
+    const generalGrandTotal = Math.max(0, generalTotal)
     const memberGrandTotal = Math.max(0, memberTotal - membershipPaidAmount)
     const customer: PdfDocumentCustomer | undefined = docAny.customer
         ? {
@@ -484,11 +484,7 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                             </td>
                                             <td className="border border-black px-1 text-right">
                                                 {row.estimateItem ? (
-                                                    isMaturityServiceIncludedFor(row.estimateItem) ? (
-                                                        <span style={{ color: '#8a7e5c', fontWeight: 600 }}>
-                                                            満期サービス
-                                                        </span>
-                                                    ) : isServiceIncludedFor(row.estimateItem, false) ? (
+                                                    isServiceIncludedFor(row.estimateItem, false) ? (
                                                         <span style={{ color: '#8a7e5c', fontWeight: 600 }}>
                                                             サービス
                                                         </span>
