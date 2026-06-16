@@ -10,10 +10,17 @@ RUN apk add --no-cache \
     openssl \
     openssl-dev \
     libc6-compat \
-    postgresql-client
+    postgresql-client \
+    chromium \
+    nss \
+    freetype \
+    harfbuzz \
+    ca-certificates \
+    ttf-freefont \
+    font-noto-cjk
 
-# pnpmをグローバルにインストール
-RUN npm install -g pnpm@latest
+# pnpmをグローバルにインストール（Node 20系と互換のあるバージョンに固定）
+RUN npm install -g pnpm@10.28.0
 
 # pnpmのパスを確認
 RUN which pnpm && pnpm --version

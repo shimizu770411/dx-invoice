@@ -38,6 +38,7 @@ export type PdfMembership = {
     maturityAmount?: number | null
     paymentTimes?: number | null
     paymentAmount?: number | null
+    paymentAmountOnce?: number | null
     salesStaffName?: string | null
     relationToDeceased?: string | null
 }
@@ -588,23 +589,37 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                         {fmtAmount(memberTotal)}
                                     </td>
                                 </tr>
-                                <tr>
-                                    <th className="border border-l-0 border-black text-center">
-                                        <div className="mx-auto flex w-[6rem] justify-between">
-                                            {'会費入金額'.split('').map((char, i) => (
-                                                <span key={i} className="text-center">
-                                                    {char}
-                                                </span>
-                                            ))}
-                                        </div>
-                                    </th>
-                                    <td className="border border-black text-center">&nbsp;</td>
-                                    <td className="border border-black px-1 text-left">&nbsp;</td>
-                                    <td className="border border-black px-1  border-r-0 text-right">
-                                        <span className="mr-1">▲</span>
-                                        {membershipPaidAmount.toLocaleString()}
-                                    </td>
-                                </tr>
+                                {(customer?.memberships ?? [])
+                                    .filter((m) => m.paymentAmountOnce != null && m.paymentTimes != null)
+                                    .map((m, idx) => {
+                                        const subtotal =
+                                            (m.paymentAmountOnce ?? 0) * (m.paymentTimes ?? 0)
+                                        return (
+                                            <tr key={`membership-${idx}`}>
+                                                <th className="border border-l-0 border-black text-center">
+                                                    {idx === 0 ? (
+                                                        <div className="mx-auto flex w-[6rem] justify-between">
+                                                            {'会費入金額'.split('').map((char, i) => (
+                                                                <span key={i} className="text-center">
+                                                                    {char}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <>&nbsp;</>
+                                                    )}
+                                                </th>
+                                                <td className="border border-black text-center">
+                                                    {`${(m.paymentAmountOnce ?? 0).toLocaleString()}円×${m.paymentTimes ?? 0}回`}
+                                                </td>
+                                                <td className="border border-black px-1 text-left">&nbsp;</td>
+                                                <td className="border border-black px-1 border-r-0 text-right">
+                                                    <span className="mr-1">▲</span>
+                                                    {subtotal.toLocaleString()}
+                                                </td>
+                                            </tr>
+                                        )
+                                    })}
                                 {showCancellationFee && (
                                     <>
                                         <tr>

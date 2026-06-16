@@ -36,9 +36,10 @@ function buildDisplayRows(
         })
     }
     // フリー項目を末尾に追加
+    // 解約手数料は明細には表示せず、合計欄で別行扱いにする
     for (const fi of freeItems ?? []) {
+        if (fi.productItemName === '解約手数料') continue
         const isMaturity = fi.productItemName === '満期サービス'
-        const isCancellationFee = fi.productItemName === '解約手数料'
         rows.push({
             label: fi.productItemName,
             estimateItem: {
@@ -52,7 +53,7 @@ function buildDisplayRows(
             showProductVariantName: false,
             isFreeItem: true,
             isMaturity,
-            isFixedRow: isMaturity || isCancellationFee,
+            isFixedRow: isMaturity,
         })
     }
     return rows
@@ -79,9 +80,19 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
     const docAny = doc as any
     const customer: PdfDocumentCustomer | undefined = docAny.customer ?? undefined
 
+    // 解約手数料: qty>0 で登録されていれば、合計欄に「解約手数料」「値引」の2行を表示。
+    // 解約手数料は小計に含めない（消費税対象外）。値引で相殺するため差引合計にも影響しない。
+    const cancellationFee = (doc.freeItems ?? [])
+        .filter((fi) => fi.productItemName === '解約手数料' && (fi.qty ?? 0) > 0)
+        .reduce((sum, fi) => sum + fi.unitPriceGeneral * fi.qty, 0)
+    const showCancellationFee = cancellationFee >= 1
+
     // DB保存値ではなく実際のitems/freeItemsから合計を再計算
     const itemsSubtotal = doc.items.reduce((sum, item) => sum + (item.amount || 0), 0)
-    const freeSubtotal = (doc.freeItems ?? []).reduce((sum, fi) => sum + fi.unitPriceGeneral * fi.qty, 0)
+    // フリー項目の小計（解約手数料を除く）
+    const freeSubtotal = (doc.freeItems ?? [])
+        .filter((fi) => fi.productItemName !== '解約手数料')
+        .reduce((sum, fi) => sum + fi.unitPriceGeneral * fi.qty, 0)
     const subtotal = itemsSubtotal + freeSubtotal
     const tax = Math.round(subtotal * 0.1)
     const total = subtotal + tax
@@ -294,25 +305,73 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
                                         {doc.total.toLocaleString()}
                                     </td>
                                 </tr>
-                                {doc.membershipPaidAmount > 0 && (
-                                    <tr>
-                                        <th className="border border-l-0 border-black text-center">
-                                            <div className="mx-auto flex w-[6rem] justify-between">
-                                                {'会費入金額'.split('').map((char, i) => (
-                                                    <span key={i} className="text-center">
-                                                        {char}
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        </th>
-                                        <td className="border border-black text-center">&nbsp;</td>
-                                        <td className="border border-black px-1 text-left">&nbsp;</td>
-                                        <td className="border border-r-0 border-black px-1 text-right">
-                                            <span className="mr-1">△</span>
-                                            {doc.membershipPaidAmount.toLocaleString()}
-                                        </td>
-                                    </tr>
+                                {showCancellationFee && (
+                                    <>
+                                        <tr>
+                                            <th className="border border-l-0 border-black text-center">
+                                                <div className="mx-auto flex w-[6rem] justify-between">
+                                                    {'解約手数料'.split('').map((char, i) => (
+                                                        <span key={i} className="text-center">
+                                                            {char}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </th>
+                                            <td className="border border-black text-center">&nbsp;</td>
+                                            <td className="border border-black px-1 text-right">&nbsp;</td>
+                                            <td className="border border-r-0 border-black px-1 text-right">
+                                                {cancellationFee.toLocaleString()}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <th className="border border-l-0 border-black text-center">
+                                                <div className="mx-auto flex w-[6rem] justify-between">
+                                                    {'値　引'.split('').map((char, i) => (
+                                                        <span key={i} className="text-center">
+                                                            {char}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </th>
+                                            <td className="border border-black text-center">&nbsp;</td>
+                                            <td className="border border-black px-1 text-right">&nbsp;</td>
+                                            <td className="border border-r-0 border-black px-1 text-right">
+                                                -{cancellationFee.toLocaleString()}
+                                            </td>
+                                        </tr>
+                                    </>
                                 )}
+                                {(customer?.memberships ?? [])
+                                    .filter((m) => m.paymentAmountOnce != null && m.paymentTimes != null)
+                                    .map((m, idx) => {
+                                        const subtotal =
+                                            (m.paymentAmountOnce ?? 0) * (m.paymentTimes ?? 0)
+                                        return (
+                                            <tr key={`membership-${idx}`}>
+                                                <th className="border border-l-0 border-black text-center">
+                                                    {idx === 0 ? (
+                                                        <div className="mx-auto flex w-[6rem] justify-between">
+                                                            {'会費入金額'.split('').map((char, i) => (
+                                                                <span key={i} className="text-center">
+                                                                    {char}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <>&nbsp;</>
+                                                    )}
+                                                </th>
+                                                <td className="border border-black text-center">
+                                                    {`${(m.paymentAmountOnce ?? 0).toLocaleString()}円×${m.paymentTimes ?? 0}回`}
+                                                </td>
+                                                <td className="border border-black px-1 text-left">&nbsp;</td>
+                                                <td className="border border-r-0 border-black px-1 text-right">
+                                                    <span className="mr-1">△</span>
+                                                    {subtotal.toLocaleString()}
+                                                </td>
+                                            </tr>
+                                        )
+                                    })}
                             </tfoot>
                         </table>
                         <div className="border border-x-0 border-black px-4 py-1 text-right">
