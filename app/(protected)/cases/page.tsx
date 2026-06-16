@@ -465,7 +465,7 @@ export default function CasesPage() {
                                 <button
                                     onClick={() => {
                                         if (recDisabled || !item.invoiceId) return
-                                        router.push(`/pdf/receipt/${item.invoiceId}`)
+                                        window.open(`/api/pdf/receipt/${item.invoiceId}`, '_blank')
                                     }}
                                     disabled={recDisabled}
                                     style={btnStyle(recVariant, recDisabled)}

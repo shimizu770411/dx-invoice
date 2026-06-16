@@ -184,7 +184,7 @@ export default function FlowersListPage() {
                 actions={
                     <>
                         <button
-                            onClick={() => router.push(`/pdf/flower/${customerId}`)}
+                            onClick={() => window.open(`/api/pdf/flower/${customerId}`, '_blank')}
                             style={{
                                 ...actionButtonStyle('accent'),
                                 padding: '10px 22px',

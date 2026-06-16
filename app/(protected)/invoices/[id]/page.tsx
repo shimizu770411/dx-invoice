@@ -406,7 +406,7 @@ export default function InvoiceEditPage() {
                         <button
                             type="button"
                             disabled={isDirty}
-                            onClick={() => router.push(`/pdf/invoice/${invoice.id}`)}
+                            onClick={() => window.open(`/api/pdf/invoice/${invoice.id}`, '_blank')}
                             className="font-mincho transition-colors"
                             style={{
                                 padding: '12px 28px',

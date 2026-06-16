@@ -298,7 +298,7 @@ export default function EstimateEditPage() {
                         <button
                             type="button"
                             disabled={isDirty}
-                            onClick={() => router.push(`/pdf/estimate/${estimate.id}`)}
+                            onClick={() => window.open(`/api/pdf/estimate/${estimate.id}`, '_blank')}
                             className={`rounded border-0 px-6 py-3 text-white ${
                                 isDirty ? 'cursor-not-allowed bg-gray-300' : 'cursor-pointer bg-cyan-600'
                             }`}
