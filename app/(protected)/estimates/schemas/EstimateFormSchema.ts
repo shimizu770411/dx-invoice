@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 export const estimateItemFieldSchema = z.object({
-    qty: z.coerce.number().min(0).max(99, '数量オーバー'),
+    qty: z.coerce.number().min(0).max(1000, '数量オーバー'),
     description: z.string(),
 })
 
@@ -11,7 +11,7 @@ export const estimateFreeItemFieldSchema = z
         productItemName: z.string(),
         description: z.string(),
         unitPriceGeneral: z.coerce.number(),
-        qty: z.coerce.number().min(0).max(99, '数量オーバー'),
+        qty: z.coerce.number().min(0).max(1000, '数量オーバー'),
     })
     .superRefine((data, ctx) => {
         if (data.productItemName === '満期サービス') {

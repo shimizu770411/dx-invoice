@@ -337,7 +337,7 @@ export function DocumentItemTable({
                         <th className="w-16 border border-gray-300 p-1 text-center">有無</th>
                         <th className="w-64 border border-gray-300 p-3 text-center">品目</th>
                         <th className="w-16 border border-gray-300 p-3 text-center">操作</th>
-                        <th className="w-28 border border-gray-300 p-3 text-center">数量</th>
+                        <th className="w-36 border border-gray-300 p-3 text-center">数量</th>
                         <th className="w-56 border border-gray-300 p-3 text-center">種類</th>
                         <th className="border border-gray-300 p-3 text-center">摘要</th>
                     </tr>
@@ -574,6 +574,8 @@ export function DocumentItemTable({
                                                 name={`items.${index}.qty`}
                                                 control={control}
                                                 type="number"
+                                                min={0}
+                                                max={1000}
                                                 disabled={isMultiRowItem ? !groupAnyChecked : !checkedItems[index]}
                                             />
                                         </td>
@@ -748,6 +750,8 @@ export function DocumentItemTable({
                                                         name={`freeItems.${index}.qty`}
                                                         control={control}
                                                         type="number"
+                                                        min={0}
+                                                        max={1000}
                                                         disabled={inputsDisabled}
                                                     />
                                                 </td>

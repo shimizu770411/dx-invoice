@@ -26,7 +26,10 @@ export async function GET(request: NextRequest, props: { params: Promise<{ estim
 
     // アプリの Origin と PDF ページ URL を構築
     const origin = request.nextUrl.origin
-    const pageUrl = `${origin}/pdf/estimate/${estimateId}`
+    const showOptions = request.nextUrl.searchParams.get('showOptions')
+    const pageUrl = `${origin}/pdf/estimate/${estimateId}${
+        showOptions !== null ? `?showOptions=${showOptions}` : ''
+    }`
 
     // access_token クッキーを取得し Puppeteer に引き渡す
     const cookieHeader = request.headers.get('cookie') ?? ''

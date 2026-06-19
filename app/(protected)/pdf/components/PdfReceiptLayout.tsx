@@ -29,6 +29,8 @@ function buildDisplayRows(
     const rows: DisplayRow[] = []
     for (const product of products) {
         const estimateItem = itemByProductId.get(product.id) ?? null
+        // 未選択の親セットは非表示
+        if (!estimateItem && product.isSetParent) continue
         rows.push({
             label: product.name,
             estimateItem,
@@ -374,7 +376,7 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
                                     })}
                             </tfoot>
                         </table>
-                        <div className="border border-x-0 border-black px-4 py-1 text-right">
+                        <div className="border border-x-0 border-black px-4 py-1 text-right bg-black text-white">
                             <p className="text-lg font-bold">差引合計: ¥{grandTotal.toLocaleString()}</p>
                         </div>
                     </div>

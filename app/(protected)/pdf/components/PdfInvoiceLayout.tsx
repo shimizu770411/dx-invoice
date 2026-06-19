@@ -7,6 +7,7 @@ import { scopeApplies } from '@/lib/productScope'
 export type PdfProductItem = {
     id: string
     name: string
+    isSetParent?: boolean
 }
 
 export type PdfDocumentItem = {
@@ -116,6 +117,7 @@ type Props = {
     title: string
     document: PdfDocument
     products: PdfProductItem[]
+    hideSelectedOptions?: boolean
 }
 
 // ──────────────────────────────────────────────────────────
@@ -150,10 +152,19 @@ function buildDisplayRows(
 
     const rows: DisplayRow[] = []
 
-    // 商品マスタの並び順で、選択されたものだけ表示
+    // 商品マスタの並び順で表示。
+    // 未選択商品も品名のみ表示（金額は空欄）、ただし親セットは非表示。
     for (const product of products) {
         const estimateItem = selectedByProductId.get(product.id)
-        if (!estimateItem) continue
+        if (!estimateItem) {
+            if (product.isSetParent) continue
+            rows.push({
+                label: product.name,
+                estimateItem: null,
+                showProductVariantName: false,
+            })
+            continue
+        }
         rows.push({
             label: product.name,
             estimateItem,
@@ -227,7 +238,7 @@ function fmtAmount(n: number): string {
     return n.toLocaleString()
 }
 
-export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc, products }: Props) {
+export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc, products, hideSelectedOptions }: Props) {
     const { docNo, membershipPaidAmount, items } = doc
     const docAny = doc as any
     const isMember = doc.isMember === true
@@ -652,8 +663,8 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                         </tr>
                                     </>
                                 )}
-                                <tr>
-                                    <th className="border border-t-2 border-l-0 border-black text-center font-bold">
+                                <tr style={{ fontSize: 'calc(0.75rem + 2pt)' }}>
+                                    <th className="border border-t-2 border-l-0 border-black text-center font-bold bg-black text-white">
                                         <div className="mx-auto flex w-[6rem] justify-between">
                                             {'差引合計額'.split('').map((char, i) => (
                                                 <span key={i} className="text-center">
@@ -924,6 +935,7 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
 
             {/* 選択オプション画像ページ */}
             {(() => {
+                if (hideSelectedOptions) return null
                 const selectedWithImage = items.filter(
                     (it) => it.qty > 0 && it.productVariant?.imageUrl
                 )

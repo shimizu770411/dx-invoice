@@ -96,15 +96,8 @@ export default function NewCustomerPage() {
                         {activeTab === 'membership3' && <Membership3Tab />}
                     </div>
 
-                    {/* 操作ボタン */}
-                    <div className="sticky bottom-0 flex justify-end gap-4 border-t border-gray-300 bg-white px-8 py-6">
-                        <button
-                            type="button"
-                            onClick={() => router.back()}
-                            className="cursor-pointer rounded bg-gray-500 px-6 py-3 text-white hover:bg-gray-600"
-                        >
-                            閉じる
-                        </button>
+                    {/* 操作ボタン: 登録=左、閉じる=右 */}
+                    <div className="sticky bottom-0 flex justify-between gap-4 border-t border-gray-300 bg-white px-8 py-6">
                         <button
                             type="submit"
                             disabled={createMutation.isPending}
@@ -115,6 +108,13 @@ export default function NewCustomerPage() {
                             }`}
                         >
                             {createMutation.isPending ? '登録中...' : '登録'}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => router.back()}
+                            className="cursor-pointer rounded bg-gray-500 px-6 py-3 text-white hover:bg-gray-600"
+                        >
+                            閉じる
                         </button>
                     </div>
                 </div>

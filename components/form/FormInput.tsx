@@ -44,7 +44,19 @@ export function FormInput<T extends FieldValues>({
             render={({ field, fieldState }) => (
                 <InputUI
                     value={field.value || ''}
-                    onChange={field.onChange}
+                    onChange={(value) => {
+                        // type="number" で min/max が指定されている場合、範囲外の値は強制的にクリップする
+                        // HTML の max 属性はスピンボタンだけ制限し手入力では超えられるため、ここで明示的に制限する
+                        let v = value
+                        if (type === 'number' && v !== '') {
+                            const num = Number(v)
+                            if (!isNaN(num)) {
+                                if (max !== undefined && num > Number(max)) v = String(max)
+                                else if (min !== undefined && num < Number(min)) v = String(min)
+                            }
+                        }
+                        field.onChange(v)
+                    }}
                     onBlur={field.onBlur}
                     label={label}
                     placeholder={placeholder}

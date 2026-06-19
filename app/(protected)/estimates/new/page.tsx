@@ -422,45 +422,48 @@ function EstimateNewPageInner() {
                         <div />
                     )}
 
-                    {/* ボタン（右側） */}
-                    <div className="flex gap-3 flex-shrink-0">
-                    <button
-                        type="button"
-                        onClick={() => {
-                            router.push('/cases')
-                            router.refresh()
-                        }}
-                        className="font-mincho transition-colors"
-                        style={{
-                            padding: '12px 36px',
-                            backgroundColor: '#ffffff',
-                            color: 'var(--brand-text-muted)',
-                            border: '1px solid var(--brand-border)',
-                            fontSize: '15px',
-                            letterSpacing: '0.25em',
-                            fontWeight: 500,
-                            cursor: 'pointer',
-                        }}
-                    >
-                        閉じる
-                    </button>
-                    <button
-                        type="submit"
-                        disabled={isSubmitting}
-                        className="font-mincho transition-colors text-white"
-                        style={{
-                            padding: '12px 48px',
-                            backgroundColor: isSubmitting ? '#7a7a7a' : 'var(--brand-navy)',
-                            border: 'none',
-                            fontSize: '15px',
-                            letterSpacing: '0.4em',
-                            fontWeight: 500,
-                            cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                            boxShadow: '0 2px 4px rgba(1, 8, 62, 0.15)',
-                        }}
-                    >
-                        {isSubmitting ? '保存中…' : '登　録'}
-                    </button>
+                </div>
+
+                {/* 操作ボタン（画面下固定: 登録=左、閉じる=右） */}
+                <div className="fixed bottom-0 left-0 right-0 p-2 bg-white">
+                    <div className="flex justify-between gap-3">
+                        <button
+                            type="submit"
+                            disabled={isSubmitting}
+                            className="font-mincho transition-colors text-white"
+                            style={{
+                                padding: '12px 48px',
+                                backgroundColor: isSubmitting ? '#7a7a7a' : 'var(--brand-navy)',
+                                border: 'none',
+                                fontSize: '15px',
+                                letterSpacing: '0.4em',
+                                fontWeight: 500,
+                                cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                                boxShadow: '0 2px 4px rgba(1, 8, 62, 0.15)',
+                            }}
+                        >
+                            {isSubmitting ? '保存中…' : '登　録'}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                router.push('/cases')
+                                router.refresh()
+                            }}
+                            className="font-mincho transition-colors"
+                            style={{
+                                padding: '12px 36px',
+                                backgroundColor: '#ffffff',
+                                color: 'var(--brand-text-muted)',
+                                border: '1px solid var(--brand-border)',
+                                fontSize: '15px',
+                                letterSpacing: '0.25em',
+                                fontWeight: 500,
+                                cursor: 'pointer',
+                            }}
+                        >
+                            閉じる
+                        </button>
                     </div>
                 </div>
             </form>

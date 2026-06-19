@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { getEstimate } from '@/lib/estimates'
 import { getProducts } from '@/lib/products'
 import { CreateButton } from '@/components/button/CreateButton'
@@ -12,7 +12,9 @@ import { PdfInvoiceLayout } from '@/app/(protected)/pdf/components/PdfInvoiceLay
 export default function EstimatePdfPage() {
     const router = useRouter()
     const params = useParams()
+    const searchParams = useSearchParams()
     const estimateId = params.estimateId as string
+    const hideSelectedOptions = searchParams.get('showOptions') === 'false'
     const [loading, setLoading] = useState(true)
     const [estimate, setEstimate] = useState<any>(null)
     const [products, setProducts] = useState<any[]>([])
@@ -83,6 +85,7 @@ export default function EstimatePdfPage() {
                 title="家御葬儀見積書"
                 document={estimate}
                 products={products}
+                hideSelectedOptions={hideSelectedOptions}
             />
         </div>
     )

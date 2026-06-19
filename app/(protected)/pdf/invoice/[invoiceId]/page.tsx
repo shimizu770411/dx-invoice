@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { getInvoice } from '@/lib/invoices'
 import { getProducts } from '@/lib/products'
 import { CreateButton } from '@/components/button/CreateButton'
@@ -12,7 +12,9 @@ import { PdfInvoiceLayout } from '@/app/(protected)/pdf/components/PdfInvoiceLay
 export default function InvoicePdfPage() {
     const router = useRouter()
     const params = useParams()
+    const searchParams = useSearchParams()
     const invoiceId = params.invoiceId as string
+    const hideSelectedOptions = searchParams.get('showOptions') === 'false'
     const [loading, setLoading] = useState(true)
     const [invoice, setInvoice] = useState<any>(null)
     const [products, setProducts] = useState<any[]>([])
@@ -84,6 +86,7 @@ export default function InvoicePdfPage() {
                 title="家御葬儀請求書"
                 document={invoice}
                 products={products}
+                hideSelectedOptions={hideSelectedOptions}
             />
         </div>
     )

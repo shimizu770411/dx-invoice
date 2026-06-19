@@ -318,28 +318,11 @@ export default function EditCustomerPage() {
                         {activeTab === 'membership3' && <Membership3Tab />}
                     </div>
 
-                    {/* 操作ボタン */}
+                    {/* 操作ボタン: 更新=左、閉じる=右 */}
                     <div
-                        className="flex justify-end gap-3 pt-5 mt-5"
+                        className="flex justify-between gap-3 pt-5 mt-5"
                         style={{ borderTop: '1px solid var(--brand-border)' }}
                     >
-                        <button
-                            onClick={() => router.back()}
-                            type="button"
-                            className="font-mincho transition-colors"
-                            style={{
-                                padding: '12px 36px',
-                                backgroundColor: '#ffffff',
-                                color: 'var(--brand-text-muted)',
-                                border: '1px solid var(--brand-border)',
-                                fontSize: '15px',
-                                letterSpacing: '0.25em',
-                                fontWeight: 500,
-                                cursor: 'pointer',
-                            }}
-                        >
-                            閉じる
-                        </button>
                         <button
                             type="submit"
                             disabled={updateMutation.isPending}
@@ -358,6 +341,23 @@ export default function EditCustomerPage() {
                             }}
                         >
                             {updateMutation.isPending ? '更新中…' : '更　新'}
+                        </button>
+                        <button
+                            onClick={() => router.back()}
+                            type="button"
+                            className="font-mincho transition-colors"
+                            style={{
+                                padding: '12px 36px',
+                                backgroundColor: '#ffffff',
+                                color: 'var(--brand-text-muted)',
+                                border: '1px solid var(--brand-border)',
+                                fontSize: '15px',
+                                letterSpacing: '0.25em',
+                                fontWeight: 500,
+                                cursor: 'pointer',
+                            }}
+                        >
+                            閉じる
                         </button>
                     </div>
                 </div>

@@ -98,6 +98,8 @@ export default function EstimateEditPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [watchedIsMember])
 
+    const [showSelectedOptions, setShowSelectedOptions] = useState(true)
+
     if (loading) {
         return <div className="p-8">読み込み中...</div>
     }
@@ -281,10 +283,92 @@ export default function EstimateEditPage() {
                     {activeTab === 'other' && <EstimateOtherFields control={control} disabled={isConfirmed} />}
                 </fieldset>
 
-                {/* 操作ボタン（画面右下固定） */}
-                <div className="fixed bottom-0 right-0 p-2">
+                {/* 操作ボタン（画面下固定: 更新=左、PDFプレビュー=中央、閉じる=右） */}
+                <div className="fixed bottom-0 left-0 right-0 p-2">
                     {isDirty && <div className="text-red-600 text-right pb-1 text-sm">未保存の変更があります</div>}
-                    <div className="flex gap-4 bg-white">
+                    <div className="flex justify-between items-center gap-4 bg-white">
+                        <div className="flex gap-4">
+                            {!isConfirmed && (
+                                <button
+                                    type="submit"
+                                    disabled={isSubmitting}
+                                    className={`rounded border-0 px-6 py-3 text-white ${
+                                        isSubmitting ? 'cursor-not-allowed bg-gray-300' : 'cursor-pointer bg-green-600'
+                                    }`}
+                                >
+                                    {isSubmitting ? '保存中...' : watchedStatus === 'CONFIRMED' ? '確定' : '更新'}
+                                </button>
+                            )}
+                            {isConfirmed && (
+                                <button
+                                    type="button"
+                                    onClick={async () => {
+                                        if (
+                                            !confirm(
+                                                '本見積（確定）を解除して編集可能に戻します。\n客先と合意済みの見積を変更することになります。よろしいですか？'
+                                            )
+                                        )
+                                            return
+                                        try {
+                                            await unconfirmEstimate(estimate.id)
+                                            toast({
+                                                title: '確定を解除しました',
+                                                variant: 'success',
+                                                duration: 2000,
+                                            })
+                                            router.refresh()
+                                        } catch (e: any) {
+                                            toast({
+                                                title: '確定解除に失敗しました',
+                                                variant: 'destructive',
+                                                duration: 3000,
+                                            })
+                                        }
+                                    }}
+                                    className="cursor-pointer rounded border-0 bg-orange-600 px-6 py-3 text-white"
+                                    title="本見積を編集可能な状態（事前相談見積）に戻す"
+                                >
+                                    確定解除
+                                </button>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-3 text-sm">
+                                <label className="flex items-center gap-1 cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        name="showOptions-estimate"
+                                        checked={showSelectedOptions}
+                                        onChange={() => setShowSelectedOptions(true)}
+                                    />
+                                    選択オプション表示
+                                </label>
+                                <label className="flex items-center gap-1 cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        name="showOptions-estimate"
+                                        checked={!showSelectedOptions}
+                                        onChange={() => setShowSelectedOptions(false)}
+                                    />
+                                    非表示
+                                </label>
+                            </div>
+                            <button
+                                type="button"
+                                disabled={isDirty}
+                                onClick={() =>
+                                    window.open(
+                                        `/api/pdf/estimate/${estimate.id}${!showSelectedOptions ? '?showOptions=false' : ''}`,
+                                        '_blank'
+                                    )
+                                }
+                                className={`rounded border-0 px-6 py-3 text-white ${
+                                    isDirty ? 'cursor-not-allowed bg-gray-300' : 'cursor-pointer bg-cyan-600'
+                                }`}
+                            >
+                                PDFプレビュー
+                            </button>
+                        </div>
                         <button
                             type="button"
                             onClick={() => {
@@ -295,59 +379,6 @@ export default function EstimateEditPage() {
                         >
                             閉じる
                         </button>
-                        <button
-                            type="button"
-                            disabled={isDirty}
-                            onClick={() => window.open(`/api/pdf/estimate/${estimate.id}`, '_blank')}
-                            className={`rounded border-0 px-6 py-3 text-white ${
-                                isDirty ? 'cursor-not-allowed bg-gray-300' : 'cursor-pointer bg-cyan-600'
-                            }`}
-                        >
-                            PDFプレビュー
-                        </button>
-                        {!isConfirmed && (
-                            <button
-                                type="submit"
-                                disabled={isSubmitting}
-                                className={`rounded border-0 px-6 py-3 text-white ${
-                                    isSubmitting ? 'cursor-not-allowed bg-gray-300' : 'cursor-pointer bg-green-600'
-                                }`}
-                            >
-                                {isSubmitting ? '保存中...' : watchedStatus === 'CONFIRMED' ? '確定' : '更新'}
-                            </button>
-                        )}
-                        {isConfirmed && (
-                            <button
-                                type="button"
-                                onClick={async () => {
-                                    if (
-                                        !confirm(
-                                            '本見積（確定）を解除して編集可能に戻します。\n客先と合意済みの見積を変更することになります。よろしいですか？'
-                                        )
-                                    )
-                                        return
-                                    try {
-                                        await unconfirmEstimate(estimate.id)
-                                        toast({
-                                            title: '確定を解除しました',
-                                            variant: 'success',
-                                            duration: 2000,
-                                        })
-                                        router.refresh()
-                                    } catch (e: any) {
-                                        toast({
-                                            title: '確定解除に失敗しました',
-                                            variant: 'destructive',
-                                            duration: 3000,
-                                        })
-                                    }
-                                }}
-                                className="cursor-pointer rounded border-0 bg-orange-600 px-6 py-3 text-white"
-                                title="本見積を編集可能な状態（事前相談見積）に戻す"
-                            >
-                                確定解除
-                            </button>
-                        )}
                     </div>
                 </div>
             </form>
