@@ -78,8 +78,10 @@ export const caseFormSchema = z.object({
     // 葬儀情報
     pickupPlace: z.string().optional(),
     wakeAt: z.string().optional(),
+    wakeAtTimeUnspecified: z.boolean().optional(),
     wakePlace: z.string().optional(),
     departureAt: z.string().optional(),
+    departureAtTimeUnspecified: z.boolean().optional(),
     departurePlace: z.string().optional(),
     funeralFrom: z.string().optional(),
     funeralTo: z.string().optional(),

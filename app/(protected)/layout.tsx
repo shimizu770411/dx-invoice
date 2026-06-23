@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
     return (
-        <html lang="ja" translate="no">
+        <html lang="ja" translate="no" suppressHydrationWarning>
             <head>
                 {/* マテリアルアイコン */}
                 <link

@@ -25,7 +25,7 @@ const apiClient = axios.create({
     },
     // Include credentials so HttpOnly cookie set by server is sent with requests
     withCredentials: true,
-    timeout: 30000, // 30秒のタイムアウト
+    timeout: 60000, // 60秒のタイムアウト（dev サーバーの初回コンパイル考慮）
 })
 
 // リクエストインターセプター: トークンを自動付与
