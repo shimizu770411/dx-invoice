@@ -3,6 +3,7 @@ import apiClient from './api'
 export interface EstimateFreeItem {
     id?: string
     estimateItemId?: string
+    parentProductItemId?: string | null
     productItemName: string
     description?: string
     unitPriceGeneral: number
@@ -26,6 +27,7 @@ export interface EstimateItem {
     amount: number
     isService?: boolean
     isMaturityService?: boolean
+    adhocSetScope?: 'NONE' | 'MEMBER_ONLY' | 'GENERAL_ONLY' | 'BOTH'
     sortNo: number
     productItem?: any
     productVariant?: any

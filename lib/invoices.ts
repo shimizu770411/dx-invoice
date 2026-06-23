@@ -3,6 +3,7 @@ import apiClient from './api';
 export interface InvoiceFreeItem {
     id?: string
     invoiceItemId?: string
+    parentProductItemId?: string | null
     productItemName: string
     description?: string
     unitPriceGeneral: number
@@ -26,6 +27,7 @@ export interface InvoiceItem {
   amount: number;
   isService?: boolean;
   isMaturityService?: boolean;
+  adhocSetScope?: 'NONE' | 'MEMBER_ONLY' | 'GENERAL_ONLY' | 'BOTH';
   sortNo: number;
   productItem?: any;
   productVariant?: any;

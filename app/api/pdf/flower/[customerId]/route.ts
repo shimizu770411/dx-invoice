@@ -48,7 +48,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ custo
         }
 
         // PDF ページに遷移しレンダリングを待つ
-        await page.goto(pageUrl, { waitUntil: 'networkidle0', timeout: 30000 })
+        await page.goto(pageUrl, { waitUntil: 'networkidle0', timeout: 60000 })
 
         // ボタン類を非表示にし、PDF コンテンツ部分だけ body に残す
         await page.evaluate(() => {

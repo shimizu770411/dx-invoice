@@ -8,6 +8,7 @@ export type PdfProductItem = {
     id: string
     name: string
     isSetParent?: boolean
+    canAddFreeRow?: boolean
 }
 
 export type PdfDocumentItem = {
@@ -29,6 +30,7 @@ export type PdfDocumentItem = {
     amount: number
     isService?: boolean
     isMaturityService?: boolean
+    adhocSetScope?: 'NONE' | 'MEMBER_ONLY' | 'GENERAL_ONLY' | 'BOTH'
     sortNo: number
 }
 
@@ -90,6 +92,7 @@ const genderLabel: Record<string, string> = {
 
 export type PdfFreeItem = {
     id?: string
+    parentProductItemId?: string | null
     productItemName: string
     description?: string | null
     unitPriceGeneral: number
@@ -130,6 +133,8 @@ type DisplayRow = {
     isFreeItem?: boolean // フリー項目（商品マスタ非連動）の場合に単価を表示
     isMaturity?: boolean // 満期サービス（固定行）。qty=1なので単価表示はスキップ
     isFixedRow?: boolean // 満期サービス・解約手数料など固定行（単価表示スキップ）
+    hideDescription?: boolean // 複数行構成商品の2行目以降は摘要を非表示
+    isSecondaryRow?: boolean // 複数行構成商品の2行目以降（品名空・上罫線なし）
     deductionLabel?: string
     deductionItem?: PdfDocumentItem | null
 }
@@ -139,42 +144,79 @@ function buildDisplayRows(
     items: PdfDocumentItem[],
     freeItems?: PdfFreeItem[]
 ): DisplayRow[] {
-    // 実際に選択された明細だけを商品マスタの順に表示
-    // 未選択（qty=0 またはマスタに存在しても明細にない）商品は非表示
-    const selectedByProductId = new Map<string, PdfDocumentItem>()
+    // 実際に選択された明細を商品IDごとにグループ化（複数行構成商品も全行保持）
+    const itemsByProductId = new Map<string, PdfDocumentItem[]>()
     for (const item of items) {
         if ((item.qty ?? 0) <= 0) continue
         const pid = item.productItemId ?? ''
-        if (pid && !selectedByProductId.has(pid)) {
-            selectedByProductId.set(pid, item)
+        if (!pid) continue
+        if (!itemsByProductId.has(pid)) {
+            itemsByProductId.set(pid, [])
         }
+        itemsByProductId.get(pid)!.push(item)
     }
 
     const rows: DisplayRow[] = []
 
-    // 商品マスタの並び順で表示。
+    // 親付きフリー行を商品IDで引けるよう Map 化
+    const linkedFreeByProductId = new Map<string, any>()
+    for (const fi of freeItems ?? []) {
+        if (fi.parentProductItemId) {
+            linkedFreeByProductId.set(String(fi.parentProductItemId), fi)
+        }
+    }
+
+    // 商品マスタの並び順で表示。複数行構成商品は同一 product から複数行を出す。
     // 未選択商品も品名のみ表示（金額は空欄）、ただし親セットは非表示。
     for (const product of products) {
-        const estimateItem = selectedByProductId.get(product.id)
-        if (!estimateItem) {
+        const itemsForProduct = itemsByProductId.get(product.id) ?? []
+        if (itemsForProduct.length === 0) {
             if (product.isSetParent) continue
             rows.push({
                 label: product.name,
                 estimateItem: null,
                 showProductVariantName: false,
             })
-            continue
+        } else {
+            // 複数行構成商品（同じ productItemId の複数行）は、1行目のみ品名と摘要を表示し
+            // 2行目以降は品名・摘要を空にしてセル結合風の見た目にする
+            itemsForProduct.forEach((estimateItem, idx) => {
+                const isFirstRow = idx === 0
+                rows.push({
+                    label: isFirstRow ? product.name : '',
+                    estimateItem,
+                    showProductVariantName: isFirstRow && product.name.includes('霊柩車'),
+                    hideDescription: !isFirstRow,
+                    isSecondaryRow: !isFirstRow,
+                })
+            })
         }
-        rows.push({
-            label: product.name,
-            estimateItem,
-            showProductVariantName: product.name.includes('霊柩車') ? true : false,
-        })
+        // canAddFreeRow=ON の商品はフリー行を直下に追加表示（入力が空でも表示）
+        if (product.canAddFreeRow) {
+            const linkedFi = linkedFreeByProductId.get(String(product.id))
+            rows.push({
+                label: linkedFi?.productItemName || '　',
+                estimateItem: {
+                    description: linkedFi?.description ?? null,
+                    qty: linkedFi?.qty ?? 0,
+                    unitPriceGeneral: linkedFi?.unitPriceGeneral ?? 0,
+                    unitPriceMember: linkedFi?.unitPriceGeneral ?? 0,
+                    amount: (linkedFi?.unitPriceGeneral ?? 0) * (linkedFi?.qty ?? 0),
+                    sortNo: 9999,
+                } as any,
+                showProductVariantName: false,
+                isFreeItem: true,
+                // 「単価: ¥XX」表示をスキップし、qty>1 のときの「数量: XX」のみ表示させる
+                isFixedRow: true,
+            })
+        }
     }
 
     // フリー項目（数量>0のみ）を末尾に追加
     // 解約手数料は明細には表示せず、合計欄で別行扱いにする
+    // 親付きフリー行（parentProductItemId あり）は商品直下で既に表示済みのため除外
     for (const fi of freeItems ?? []) {
+        if (fi.parentProductItemId) continue
         if ((fi.qty ?? 0) <= 0) continue
         if (fi.productItemName === '解約手数料') continue
         const isMaturity = fi.productItemName === '満期サービス'
@@ -253,12 +295,22 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
     const freeSubtotal = (doc.freeItems ?? [])
         .filter((fi) => fi.productItemName !== '解約手数料')
         .reduce((sum, fi) => sum + fi.unitPriceGeneral * fi.qty, 0)
+    // 見積/請求書単位の任意セット扱い（adhocSetScope）。
+    // 'BOTH' は一般・会員ともにセット、'MEMBER_ONLY' は会員のみ、'GENERAL_ONLY' は一般のみ。
+    const isAdhocSetFor = (item: PdfDocumentItem, isMember: boolean): boolean => {
+        const scope = (item as any).adhocSetScope
+        if (scope === 'BOTH') return true
+        if (scope === 'MEMBER_ONLY' && isMember) return true
+        if (scope === 'GENERAL_ONLY' && !isMember) return true
+        return false
+    }
     // 列ごとに「セット」「サービス」として 0 円扱いか判定するヘルパー
     const isSetIncludedFor = (item: PdfDocumentItem, isMember: boolean): boolean =>
         !!(
-            item.productItem?.isSetChild &&
-            item.productVariant?.isDefaultSet &&
-            scopeApplies(item.productItem?.setableScope, isMember)
+            (item.productItem?.isSetChild &&
+                item.productVariant?.isDefaultSet &&
+                scopeApplies(item.productItem?.setableScope, isMember)) ||
+            isAdhocSetFor(item, isMember)
         )
     const isServiceIncludedFor = (item: PdfDocumentItem, isMember: boolean): boolean =>
         !!(item.isService && scopeApplies(item.productItem?.serviceableScope, isMember))
@@ -452,12 +504,19 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                 </tr>
                             </thead>
                             <tbody>
-                                {displayRows.map((row, index) => (
+                                {displayRows.map((row, index) => {
+                                    const isNextSecondary = displayRows[index + 1]?.isSecondaryRow
+                                    const mergeCls = `${row.isSecondaryRow ? 'border-t-0' : ''} ${isNextSecondary ? 'border-b-0' : ''}`
+                                    return (
                                     <Fragment key={index}>
                                         <tr key={`main-${index}`}>
-                                            <td className="border border-l-0 border-black px-2">
+                                            <td
+                                                className={`border border-l-0 border-black px-2 ${mergeCls}`}
+                                            >
                                                 {(() => {
-                                                    const chars = (row.label || '-').split('')
+                                                    const chars = row.isSecondaryRow
+                                                        ? []
+                                                        : (row.label || '-').split('')
 
                                                     return (
                                                         <>
@@ -471,21 +530,27 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                                                 ))}
                                                             </div>
                                                             <div className="text-center">
-                                                                {row.estimateItem && row.showProductVariantName
-                                                                    ? `(${row.estimateItem?.productVariant?.name})`
+                                                                {row.estimateItem &&
+                                                                row.showProductVariantName &&
+                                                                row.estimateItem?.productVariant?.name
+                                                                    ? `(${row.estimateItem.productVariant.name})`
                                                                     : ''}
                                                             </div>
                                                         </>
                                                     )
                                                 })()}
                                             </td>
-                                            <td className="border border-l-0 border-black px-0.5 text-left">
+                                            <td
+                                                className={`border border-l-0 border-black px-0.5 text-left ${mergeCls}`}
+                                            >
                                                 <div className="whitespace-pre-wrap break-words">
-                                                    {row.estimateItem?.description ?? ''}
+                                                    {row.hideDescription ? '' : (row.estimateItem?.description ?? '')}
                                                 </div>
                                                 <div>
-                                                    {/* 数量が1より大きい場合のみ表示。フリー項目は常に単価も表示 */}
-                                                    {row.estimateItem && row.estimateItem.qty > 1
+                                                    {/* 数量が1より大きい場合のみ表示。親付きフリー行（満期サービス以外）は qty=1 でも常に数量を表示。 */}
+                                                    {row.estimateItem &&
+                                                    (row.estimateItem.qty > 1 ||
+                                                        (row.isFreeItem && row.isFixedRow && !row.isMaturity))
                                                         ? `数量: ${row.estimateItem.qty.toLocaleString()}`
                                                         : ''}
                                                     {row.isFreeItem && !row.isFixedRow && row.estimateItem
@@ -493,7 +558,9 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                                         : ''}
                                                 </div>
                                             </td>
-                                            <td className="border border-black px-1 text-right">
+                                            <td
+                                                className={`border border-black px-1 text-right ${mergeCls}`}
+                                            >
                                                 {row.estimateItem ? (
                                                     isServiceIncludedFor(row.estimateItem, false) ? (
                                                         <span style={{ color: '#8a7e5c', fontWeight: 600 }}>
@@ -512,7 +579,9 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                                     ''
                                                 )}
                                             </td>
-                                            <td className="border border-r-0 border-black px-1 text-right">
+                                            <td
+                                                className={`border border-r-0 border-black px-1 text-right ${mergeCls}`}
+                                            >
                                                 {row.estimateItem ? (
                                                     isMaturityServiceIncludedFor(row.estimateItem) ? (
                                                         <span style={{ color: '#8a7e5c', fontWeight: 600 }}>
@@ -538,7 +607,8 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                             </td>
                                         </tr>
                                     </Fragment>
-                                ))}
+                                    )
+                                })}
                             </tbody>
                             {/* 金額合計 */}
                             <tfoot className="border-0 border-t-2 border-black">
@@ -753,14 +823,18 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                             {
                                                 label: '本通夜',
                                                 data: customer?.wakeAt
-                                                    ? `${fmtDate(customer.wakeAt)} ${fmtTime(customer.wakeAt)}〜`
+                                                    ? (customer as any)?.wakeAtTimeUnspecified
+                                                        ? `${fmtDate(customer.wakeAt)}`
+                                                        : `${fmtDate(customer.wakeAt)} ${fmtTime(customer.wakeAt)}〜`
                                                     : '未定',
                                                 place: customer?.wakePlace,
                                             },
                                             {
                                                 label: '出棺',
                                                 data: customer?.departureAt
-                                                    ? `${fmtDate(customer.departureAt)} ${fmtTime(customer.departureAt)} 発`
+                                                    ? (customer as any)?.departureAtTimeUnspecified
+                                                        ? `${fmtDate(customer.departureAt)} 発`
+                                                        : `${fmtDate(customer.departureAt)} ${fmtTime(customer.departureAt)} 発`
                                                     : '未定',
                                                 place: customer?.departurePlace,
                                             },
@@ -869,9 +943,11 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                 <tr className="border-b border-black">
                                     <th className="border-r border-black px-1 text-left font-normal">
                                         <div className="flex justify-between">
-                                            {'見積担当'.split('').map((char, j) => (
-                                                <span key={j}>{char}</span>
-                                            ))}
+                                            {(title.includes('請求書') ? '請求担当' : '見積担当')
+                                                .split('')
+                                                .map((char, j) => (
+                                                    <span key={j}>{char}</span>
+                                                ))}
                                         </div>
                                     </th>
                                     <td className="px-1 ">{customer?.estimateStaff ?? ''}</td>

@@ -118,6 +118,7 @@ export async function POST(
                         amount: item.amount,
                         isService: item.isService ?? false,
                         isMaturityService: item.isMaturityService ?? false,
+                        adhocSetScope: item.adhocSetScope ?? 'NONE',
                         sortNo: item.sortNo,
                     })),
                 },
@@ -149,6 +150,9 @@ export async function POST(
             await prisma.invoiceItemFree.createMany({
                 data: allEstimateFreeItems.map((item: any, index: number) => ({
                     invoiceItemId: anchorItemId,
+                    parentProductItemId: item.parentProductItemId
+                        ? BigInt(item.parentProductItemId)
+                        : null,
                     productItemName: item.productItemName || '',
                     description: item.description || '',
                     unitPriceGeneral: item.unitPriceGeneral || 0,

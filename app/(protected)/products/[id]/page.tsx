@@ -71,6 +71,8 @@ export default function ProductEditPage() {
     const [variants, setVariants] = useState<VariantRow[]>([])
     // 複数行構成商品
     const [isMultiRow, setIsMultiRow] = useState(false)
+    // フリー行追加（見積/請求書で該当商品の下に自由入力行を1行表示）
+    const [canAddFreeRow, setCanAddFreeRow] = useState(false)
     type MultiRowVariant = {
         localId: string
         label: string
@@ -138,6 +140,7 @@ export default function ProductEditPage() {
         setDefaultDescription(product.defaultDescription ?? '')
         setChildIds((product.children || []).map((c: any) => String(c.id)))
         setIsMultiRow((product as any).isMultiRow ?? false)
+        setCanAddFreeRow((product as any).canAddFreeRow ?? false)
         setMultiRows(
             ((product as any).rows || []).map((r: any) => ({
                 localId: String(r.id),
@@ -208,6 +211,7 @@ export default function ProductEditPage() {
                 isMaturityServiceable,
                 defaultDescription: defaultDescription.trim() || null,
                 isMultiRow,
+                canAddFreeRow,
                 rows: isMultiRow
                     ? multiRows.map((r) => ({
                           label: r.label,
@@ -858,6 +862,22 @@ export default function ProductEditPage() {
                             onChange={(e) => setIsMultiRow(e.target.checked)}
                         />
                         複数行構成商品（会葬礼状、御供養など、1商品で複数明細行＋符号制御）
+                    </label>
+                </div>
+
+                {/* フリー行追加（見積/請求書で該当商品の下に自由入力行を1行表示） */}
+                <div className="mb-5">
+                    <label
+                        className="font-mincho cursor-pointer flex items-center gap-2"
+                        style={{ fontSize: '14px', color: 'var(--brand-text)' }}
+                    >
+                        <input
+                            type="checkbox"
+                            className="h-5 w-5 cursor-pointer"
+                            checked={canAddFreeRow}
+                            onChange={(e) => setCanAddFreeRow(e.target.checked)}
+                        />
+                        フリー行追加（見積/請求書で該当商品の下に自由入力行を1行表示）
                     </label>
                 </div>
 

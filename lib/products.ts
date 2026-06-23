@@ -68,6 +68,7 @@ export interface ProductItem {
     setableScope?: AppliesTo
     isMaturityServiceable?: boolean
     isMultiRow?: boolean
+    canAddFreeRow?: boolean
     isActive: boolean
     variants: ProductVariant[]
     rows?: ProductRow[]
@@ -85,6 +86,7 @@ export interface ProductItemInput {
     setableScope?: AppliesTo
     isMultiRow?: boolean
     isMaturityServiceable?: boolean
+    canAddFreeRow?: boolean
 }
 
 export interface ProductSetInput {

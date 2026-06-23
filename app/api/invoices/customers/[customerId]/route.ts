@@ -118,6 +118,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ cust
                         amount: item.amount || 0,
                         isService: Boolean(item.isService),
                         isMaturityService: Boolean(item.isMaturityService),
+                        adhocSetScope: item.adhocSetScope ?? 'NONE',
                         sortNo: item.sortNo ?? index,
                     })),
                 },
@@ -150,6 +151,9 @@ export async function POST(request: NextRequest, props: { params: Promise<{ cust
             await prisma.invoiceItemFree.createMany({
                 data: freeItems.map((item: any, index: number) => ({
                     invoiceItemId: anchorItemId,
+                    parentProductItemId: item.parentProductItemId
+                        ? BigInt(item.parentProductItemId)
+                        : null,
                     productItemName: item.productItemName || '',
                     description: item.description || '',
                     unitPriceGeneral: item.unitPriceGeneral || 0,

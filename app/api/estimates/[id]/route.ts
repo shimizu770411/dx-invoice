@@ -72,6 +72,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
                 ...fi,
                 id: fi.id.toString(),
                 estimateItemId: fi.estimateItemId.toString(),
+                parentProductItemId: fi.parentProductItemId?.toString() ?? null,
             }))
         )
         return NextResponse.json(
@@ -215,6 +216,7 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
                             amount: item.amount || 0,
                             isService: Boolean(item.isService),
                             isMaturityService: Boolean(item.isMaturityService),
+                            adhocSetScope: item.adhocSetScope ?? 'NONE',
                             sortNo: item.sortNo ?? index,
                         })),
                     },
@@ -254,6 +256,9 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
                 await tx.estimateItemFree.createMany({
                     data: freeItems.map((item: any, index: number) => ({
                         estimateItemId: anchorItemId,
+                        parentProductItemId: item.parentProductItemId
+                            ? BigInt(item.parentProductItemId)
+                            : null,
                         productItemName: item.productItemName || '',
                         description: item.description || '',
                         unitPriceGeneral: item.unitPriceGeneral || 0,

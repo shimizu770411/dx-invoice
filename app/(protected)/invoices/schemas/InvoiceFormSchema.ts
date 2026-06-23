@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 export const invoiceItemFieldSchema = z.object({
-    qty: z.coerce.number().min(0).max(1000, '数量オーバー'),
+    qty: z.coerce.number().min(0).max(3000, '数量オーバー'),
     description: z.string(),
 })
 
@@ -9,10 +9,11 @@ export const invoiceItemFieldSchema = z.object({
 // 解約手数料は 0 以上（請求書のみ）。それ以外のフリー項目は 0 以上。
 export const invoiceFreeItemFieldSchema = z
     .object({
+        parentProductItemId: z.string().nullable().optional(),
         productItemName: z.string(),
         description: z.string(),
         unitPriceGeneral: z.coerce.number(),
-        qty: z.coerce.number().min(0).max(1000, '数量オーバー'),
+        qty: z.coerce.number().min(0).max(3000, '数量オーバー'),
     })
     .superRefine((data, ctx) => {
         if (data.productItemName === '満期サービス') {

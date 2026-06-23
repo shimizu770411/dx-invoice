@@ -55,11 +55,17 @@ function InvoiceNewPageInner() {
     const handleVariantChange = (
         index: number,
         variant: ProductVariant | null,
-        options?: { isService?: boolean; isMaturityService?: boolean; rowVariant?: any }
+        options?: {
+            isService?: boolean
+            isMaturityService?: boolean
+            adhocSetScope?: 'NONE' | 'MEMBER_ONLY' | 'GENERAL_ONLY' | 'BOTH'
+            rowVariant?: any
+        }
     ) => {
         const isMember = watchedIsMember === 'true'
         const isService = options?.isService ?? false
         const isMaturityService = options?.isMaturityService ?? false
+        const adhocSetScope = options?.adhocSetScope ?? 'NONE'
         setItems((prev) =>
             prev.map((item, i) => {
                 if (i !== index) return item
@@ -73,7 +79,8 @@ function InvoiceNewPageInner() {
                         unitPriceMember: rv.unitPrice,
                         isService,
                         isMaturityService,
-                    }
+                        adhocSetScope,
+                    } as any
                 }
                 if (!variant) return item
                 return {
@@ -86,7 +93,8 @@ function InvoiceNewPageInner() {
                         : resolveUnitPriceMember(item, variant, isMember),
                     isService,
                     isMaturityService,
-                }
+                    adhocSetScope,
+                } as any
             })
         )
     }

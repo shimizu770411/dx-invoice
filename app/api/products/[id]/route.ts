@@ -71,6 +71,7 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
         if (body.isMaturityServiceable !== undefined)
             updateData.isMaturityServiceable = Boolean(body.isMaturityServiceable)
         if (body.isMultiRow !== undefined) updateData.isMultiRow = Boolean(body.isMultiRow)
+        if (body.canAddFreeRow !== undefined) updateData.canAddFreeRow = Boolean(body.canAddFreeRow)
         if (body.defaultDescription !== undefined)
             updateData.defaultDescription = body.defaultDescription || null
 

@@ -49,11 +49,17 @@ export default function EstimateEditPage() {
     const handleVariantChange = (
         index: number,
         variant: ProductVariant | null,
-        options?: { isService?: boolean; isMaturityService?: boolean; rowVariant?: any }
+        options?: {
+            isService?: boolean
+            isMaturityService?: boolean
+            adhocSetScope?: 'NONE' | 'MEMBER_ONLY' | 'GENERAL_ONLY' | 'BOTH'
+            rowVariant?: any
+        }
     ) => {
         const isMember = watchedIsMember === 'true'
         const isService = options?.isService ?? false
         const isMaturityService = options?.isMaturityService ?? false
+        const adhocSetScope = options?.adhocSetScope ?? 'NONE'
         setItems((prev) =>
             prev.map((item, i) => {
                 if (i !== index) return item
@@ -67,7 +73,8 @@ export default function EstimateEditPage() {
                         unitPriceMember: rv.unitPrice,
                         isService,
                         isMaturityService,
-                    }
+                        adhocSetScope,
+                    } as any
                 }
                 if (!variant) return item
                 return {
@@ -80,7 +87,8 @@ export default function EstimateEditPage() {
                         : resolveUnitPriceMember(item, variant, isMember),
                     isService,
                     isMaturityService,
-                }
+                    adhocSetScope,
+                } as any
             })
         )
     }
@@ -98,7 +106,7 @@ export default function EstimateEditPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [watchedIsMember])
 
-    const [showSelectedOptions, setShowSelectedOptions] = useState(true)
+    const [showSelectedOptions, setShowSelectedOptions] = useState(false)
 
     if (loading) {
         return <div className="p-8">読み込み中...</div>

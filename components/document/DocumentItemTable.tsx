@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Control, FieldArrayWithId, UseFormSetValue, useWatch } from 'react-hook-form'
 import { FormInput } from '@/components/form/FormInput'
@@ -64,6 +64,7 @@ type DocumentItem = {
         setableScope?: 'NONE' | 'MEMBER_ONLY' | 'GENERAL_ONLY' | 'BOTH'
         isMaturityServiceable?: boolean
         isMultiRow?: boolean
+        canAddFreeRow?: boolean
         rows?: DocumentRow[]
         children?: { id: string; name: string }[]
     } | null
@@ -145,6 +146,9 @@ export function DocumentItemTable({
     >({})
     const [pendingIsService, setPendingIsService] = useState(false)
     const [pendingIsMaturityService, setPendingIsMaturityService] = useState(false)
+    const [pendingAdhocSetScope, setPendingAdhocSetScope] = useState<
+        'NONE' | 'MEMBER_ONLY' | 'BOTH'
+    >('NONE')
     const [enlargedImage, setEnlargedImage] = useState<string | null>(null)
     const [checkedItems, setCheckedItems] = useState<boolean[]>([])
     const [prevQtySignature, setPrevQtySignature] = useState('')
@@ -210,6 +214,10 @@ export function DocumentItemTable({
         }
         setPendingIsService(!!item?.isService)
         setPendingIsMaturityService(!!item?.isMaturityService)
+        const adhoc = (item as any)?.adhocSetScope
+        setPendingAdhocSetScope(
+            adhoc === 'MEMBER_ONLY' || adhoc === 'BOTH' ? adhoc : 'NONE'
+        )
         setVariantDialogIndex(index)
     }
 
@@ -251,7 +259,8 @@ export function DocumentItemTable({
                 onVariantChange?.(variantDialogIndex, pendingVariant, {
                     isService: pendingIsService,
                     isMaturityService: pendingIsMaturityService,
-                })
+                    adhocSetScope: pendingAdhocSetScope,
+                } as any)
                 setValue?.(
                     `items.${variantDialogIndex}.qty` as `items.${number}.qty`,
                     item?.qty || 1,
@@ -265,6 +274,7 @@ export function DocumentItemTable({
         setPendingRowVariant(null)
         setPendingRowVariantsMap({})
         setPendingIsService(false)
+        setPendingAdhocSetScope('NONE')
     }
 
     const watchedItems = useWatch({ control, name: 'items' })
@@ -355,21 +365,33 @@ export function DocumentItemTable({
                                 const item = items[index]
                                 if (!isRowVisible(item)) {
                                     // 非表示行は qty を 0 にして登録対象から除外
+                                    // setValue はレンダリング中に呼べないため setTimeout で非同期化
                                     if ((watchedItems?.[index]?.qty ?? 0) > 0) {
-                                        setValue?.(`items.${index}.qty` as `items.${number}.qty`, 0, {
-                                            shouldDirty: true,
-                                        })
+                                        setTimeout(() => {
+                                            setValue?.(
+                                                `items.${index}.qty` as `items.${number}.qty`,
+                                                0,
+                                                { shouldDirty: true }
+                                            )
+                                        }, 0)
                                     }
                                     return null
                                 }
                                 const isParent = item?.productItem?.isSetParent
                                 const isChild = item?.productItem?.isSetChild
+                                // 任意セット扱い (adhocSetScope) が現在モードに該当
+                                const adhocScope = (item as any)?.adhocSetScope
+                                const isAdhocSetIncluded =
+                                    adhocScope === 'BOTH' ||
+                                    (adhocScope === 'MEMBER_ONLY' && isMember) ||
+                                    (adhocScope === 'GENERAL_ONLY' && !isMember)
                                 // 子商品 + 初期セット種類 + setableScope が現在モードに適用: セット扱い
-                                const isSetIncluded = !!(
-                                    isChild &&
-                                    item?.productVariant?.isDefaultSet &&
-                                    scopeApplies(item?.productItem?.setableScope, isMember)
-                                )
+                                const isSetIncluded =
+                                    !!(
+                                        isChild &&
+                                        item?.productVariant?.isDefaultSet &&
+                                        scopeApplies(item?.productItem?.setableScope, isMember)
+                                    ) || isAdhocSetIncluded
                                 // サービス品フラグON + serviceableScope が現在モードに適用: サービス扱い
                                 const isServiceIncluded = !!(
                                     item?.isService &&
@@ -415,9 +437,21 @@ export function DocumentItemTable({
                                     }
                                     return false
                                 })()
+                                // 親付きフリー行の index を取得（商品マスタの canAddFreeRow=ON で見積/請求書に含まれる商品）
+                                const itemPid = String(item?.productItemId ?? '')
+                                const linkedFreeIndex =
+                                    item?.productItem?.canAddFreeRow &&
+                                    (watchedItems?.[index]?.qty ?? 0) > 0
+                                        ? (watchedFreeItems ?? []).findIndex(
+                                              (fi: any) =>
+                                                  fi?.parentProductItemId &&
+                                                  String(fi.parentProductItemId) === itemPid
+                                          )
+                                        : -1
+
                                 return (
+                                    <Fragment key={field.id}>
                                     <tr
-                                        key={field.id}
                                         style={isChild ? { backgroundColor: '#fcfaf2' } : undefined}
                                     >
                                         {(!isMultiRowItem || isGroupStart) && (
@@ -575,7 +609,7 @@ export function DocumentItemTable({
                                                 control={control}
                                                 type="number"
                                                 min={0}
-                                                max={1000}
+                                                max={3000}
                                                 disabled={isMultiRowItem ? !groupAnyChecked : !checkedItems[index]}
                                             />
                                         </td>
@@ -649,9 +683,61 @@ export function DocumentItemTable({
                                             />
                                         </td>
                                     </tr>
+                                    {linkedFreeIndex >= 0 && (
+                                        <tr
+                                            key={`free-of-${itemPid}`}
+                                            style={{ backgroundColor: '#f7f5ee' }}
+                                        >
+                                            <td className="border border-gray-300 p-1 text-center text-xs text-gray-500">
+                                                ↳
+                                            </td>
+                                            <td className="border border-gray-300 p-3">
+                                                <FormInput
+                                                    name={`freeItems.${linkedFreeIndex}.productItemName`}
+                                                    control={control}
+                                                    type="text"
+                                                    placeholder="品目名（自由入力）"
+                                                    disabled={isMultiRowItem ? !groupAnyChecked : !checkedItems[index]}
+                                                />
+                                            </td>
+                                            <td className="border border-gray-300 p-3 text-center text-sm text-gray-500">
+                                                追加行
+                                            </td>
+                                            <td className="border border-gray-300 p-3">
+                                                <FormInput
+                                                    name={`freeItems.${linkedFreeIndex}.qty`}
+                                                    control={control}
+                                                    type="number"
+                                                    min={0}
+                                                    max={3000}
+                                                    disabled={isMultiRowItem ? !groupAnyChecked : !checkedItems[index]}
+                                                />
+                                            </td>
+                                            <td className="border border-gray-300 p-3 text-right">
+                                                <FormCurrencyInput
+                                                    name={`freeItems.${linkedFreeIndex}.unitPriceGeneral`}
+                                                    control={control}
+                                                    disabled={isMultiRowItem ? !groupAnyChecked : !checkedItems[index]}
+                                                />
+                                            </td>
+                                            <td className="border border-gray-300 p-3">
+                                                <FormTextarea
+                                                    name={`freeItems.${linkedFreeIndex}.description`}
+                                                    control={control}
+                                                    rows={2}
+                                                    noResize
+                                                    maxRows={2}
+                                                    disabled={isMultiRowItem ? !groupAnyChecked : !checkedItems[index]}
+                                                />
+                                            </td>
+                                        </tr>
+                                    )}
+                                    </Fragment>
                                 )
                             })}
                             {freeFields.map((field, index) => {
+                                // 親付きフリー行（商品の直下に既に表示済み）は下部テーブルからは除外
+                                if (watchedFreeItems?.[index]?.parentProductItemId) return null
                                 const liveQty = watchedFreeItems?.[index]?.qty ?? freeItems[index]?.qty ?? 0
                                 const liveUnitPrice =
                                     watchedFreeItems?.[index]?.unitPriceGeneral ??
@@ -751,7 +837,7 @@ export function DocumentItemTable({
                                                         control={control}
                                                         type="number"
                                                         min={0}
-                                                        max={1000}
+                                                        max={3000}
                                                         disabled={inputsDisabled}
                                                     />
                                                 </td>
@@ -866,8 +952,11 @@ export function DocumentItemTable({
                                                 onChange={(e) => {
                                                     const next = e.target.checked
                                                     setPendingIsService(next)
-                                                    // 排他: サービス品 ON 時は満期サービスを OFF
-                                                    if (next) setPendingIsMaturityService(false)
+                                                    // 排他: サービス品 ON 時は満期サービスとセット扱いを OFF
+                                                    if (next) {
+                                                        setPendingIsMaturityService(false)
+                                                        setPendingAdhocSetScope('NONE')
+                                                    }
                                                 }}
                                                 className="h-5 w-5 cursor-pointer"
                                             />
@@ -901,8 +990,11 @@ export function DocumentItemTable({
                                                 onChange={(e) => {
                                                     const next = e.target.checked
                                                     setPendingIsMaturityService(next)
-                                                    // 排他: 満期サービス ON 時はサービス品を OFF
-                                                    if (next) setPendingIsService(false)
+                                                    // 排他: 満期サービス ON 時はサービス品とセット扱いを OFF
+                                                    if (next) {
+                                                        setPendingIsService(false)
+                                                        setPendingAdhocSetScope('NONE')
+                                                    }
                                                 }}
                                                 className="h-5 w-5 cursor-pointer"
                                             />
@@ -916,6 +1008,69 @@ export function DocumentItemTable({
                                                 満期サービスとする（会員価格を 0 円扱い、合計から除外）
                                             </span>
                                         </label>
+                                    )}
+                                    {/* 一般商品 (親セット/子セットでない) のみ：見積単位のセット扱い設定 */}
+                                    {!isChildItem && !item?.productItem?.isSetParent && (
+                                        <div
+                                            className="mb-4 font-mincho"
+                                            style={{
+                                                padding: '10px 14px',
+                                                border: '1px solid var(--brand-border)',
+                                                backgroundColor:
+                                                    pendingAdhocSetScope !== 'NONE'
+                                                        ? 'rgba(196, 174, 106, 0.1)'
+                                                        : '#ffffff',
+                                            }}
+                                        >
+                                            <p
+                                                className="mb-2"
+                                                style={{
+                                                    fontSize: '14px',
+                                                    color: 'var(--brand-navy)',
+                                                    letterSpacing: '0.1em',
+                                                }}
+                                            >
+                                                この商品をセット扱いにする（合計金額から除外）
+                                            </p>
+                                            <div className="flex flex-col gap-1">
+                                                {(
+                                                    [
+                                                        { value: 'NONE', label: 'しない' },
+                                                        { value: 'MEMBER_ONLY', label: '会員価格のみ' },
+                                                        { value: 'BOTH', label: '両方の価格' },
+                                                    ] as { value: 'NONE' | 'MEMBER_ONLY' | 'BOTH'; label: string }[]
+                                                ).map((opt) => (
+                                                    <label
+                                                        key={opt.value}
+                                                        className="flex items-center gap-2 cursor-pointer"
+                                                    >
+                                                        <input
+                                                            type="radio"
+                                                            name="adhocSetScope"
+                                                            value={opt.value}
+                                                            checked={pendingAdhocSetScope === opt.value}
+                                                            onChange={() => {
+                                                                setPendingAdhocSetScope(opt.value)
+                                                                // 排他: セット扱い ON (NONE 以外) 時はサービス品と満期サービスを OFF
+                                                                if (opt.value !== 'NONE') {
+                                                                    setPendingIsService(false)
+                                                                    setPendingIsMaturityService(false)
+                                                                }
+                                                            }}
+                                                            className="h-4 w-4 cursor-pointer"
+                                                        />
+                                                        <span
+                                                            style={{
+                                                                fontSize: '13px',
+                                                                color: 'var(--brand-text)',
+                                                            }}
+                                                        >
+                                                            {opt.label}
+                                                        </span>
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        </div>
                                     )}
                                     {isMultiRowItem ? (
                                         productRows.length === 0 ? (

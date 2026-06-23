@@ -12,6 +12,8 @@ type DisplayRow = {
     isFreeItem?: boolean
     isMaturity?: boolean
     isFixedRow?: boolean
+    hideDescription?: boolean
+    isSecondaryRow?: boolean
 }
 
 function buildDisplayRows(
@@ -19,27 +21,73 @@ function buildDisplayRows(
     items: PdfDocumentItem[],
     freeItems?: PdfFreeItem[]
 ): DisplayRow[] {
-    const itemByProductId = new Map<string, PdfDocumentItem>()
+    // 複数行構成商品にも対応：商品IDごとに全 estimateItem を保持
+    const itemsByProductId = new Map<string, PdfDocumentItem[]>()
     for (const item of items) {
         const pid = item.productItemId ?? ''
-        if (pid && !itemByProductId.has(pid)) {
-            itemByProductId.set(pid, item)
+        if (!pid) continue
+        if (!itemsByProductId.has(pid)) {
+            itemsByProductId.set(pid, [])
+        }
+        itemsByProductId.get(pid)!.push(item)
+    }
+    // 親付きフリー行を商品IDで引けるよう Map 化
+    const linkedFreeByProductId = new Map<string, PdfFreeItem>()
+    for (const fi of freeItems ?? []) {
+        if (fi.parentProductItemId) {
+            linkedFreeByProductId.set(String(fi.parentProductItemId), fi)
         }
     }
+
     const rows: DisplayRow[] = []
     for (const product of products) {
-        const estimateItem = itemByProductId.get(product.id) ?? null
-        // 未選択の親セットは非表示
-        if (!estimateItem && product.isSetParent) continue
-        rows.push({
-            label: product.name,
-            estimateItem,
-            showProductVariantName: product.name.includes('霊柩車'),
-        })
+        const itemsForProduct = itemsByProductId.get(product.id) ?? []
+        if (itemsForProduct.length === 0) {
+            // 未選択の親セットは非表示
+            if (product.isSetParent) continue
+            rows.push({
+                label: product.name,
+                estimateItem: null,
+                showProductVariantName: product.name.includes('霊柩車'),
+            })
+        } else {
+            // 複数行構成商品（同じ productItemId の複数行）は、1行目のみ品名と摘要を表示
+            itemsForProduct.forEach((estimateItem, idx) => {
+                const isFirstRow = idx === 0
+                rows.push({
+                    label: isFirstRow ? product.name : '',
+                    estimateItem,
+                    showProductVariantName: isFirstRow && product.name.includes('霊柩車'),
+                    hideDescription: !isFirstRow,
+                    isSecondaryRow: !isFirstRow,
+                })
+            })
+        }
+        // canAddFreeRow=ON の商品はフリー行を直下に追加表示（入力が空でも表示）
+        if (product.canAddFreeRow) {
+            const linkedFi = linkedFreeByProductId.get(String(product.id))
+            rows.push({
+                label: linkedFi?.productItemName || '　',
+                estimateItem: {
+                    description: linkedFi?.description ?? null,
+                    qty: linkedFi?.qty ?? 0,
+                    unitPriceGeneral: linkedFi?.unitPriceGeneral ?? 0,
+                    unitPriceMember: linkedFi?.unitPriceGeneral ?? 0,
+                    amount: (linkedFi?.unitPriceGeneral ?? 0) * (linkedFi?.qty ?? 0),
+                    sortNo: 9999,
+                } as any,
+                showProductVariantName: false,
+                isFreeItem: true,
+                // 「単価: ¥XX」表示をスキップし、qty>1 のときの「数量: XX」のみ表示させる
+                isFixedRow: true,
+            })
+        }
     }
     // フリー項目を末尾に追加
     // 解約手数料は明細には表示せず、合計欄で別行扱いにする
+    // 親付きフリー行（parentProductItemId あり）は商品直下で既に表示済みのため除外
     for (const fi of freeItems ?? []) {
+        if (fi.parentProductItemId) continue
         if (fi.productItemName === '解約手数料') continue
         const isMaturity = fi.productItemName === '満期サービス'
         rows.push({
@@ -207,12 +255,19 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
                                 </tr>
                             </thead>
                             <tbody>
-                                {displayRows.map((row, index) => (
+                                {displayRows.map((row, index) => {
+                                    const isNextSecondary = displayRows[index + 1]?.isSecondaryRow
+                                    const mergeCls = `${row.isSecondaryRow ? 'border-t-0' : ''} ${isNextSecondary ? 'border-b-0' : ''}`
+                                    return (
                                     <Fragment key={index}>
                                         <tr key={`main-${index}`}>
-                                            <td className="border border-l-0 border-black px-2">
+                                            <td
+                                                className={`border border-l-0 border-black px-2 ${mergeCls}`}
+                                            >
                                                 {(() => {
-                                                    const chars = (row.label || '-').split('')
+                                                    const chars = row.isSecondaryRow
+                                                        ? []
+                                                        : (row.label || '-').split('')
                                                     return (
                                                         <>
                                                             <div
@@ -237,9 +292,11 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
                                                     )
                                                 })()}
                                             </td>
-                                            <td className="border border-l-0 border-black px-0.5 text-left">
+                                            <td
+                                                className={`border border-l-0 border-black px-0.5 text-left ${mergeCls}`}
+                                            >
                                                 <div className="whitespace-pre-wrap break-words">
-                                                    {row.estimateItem?.description ?? ''}
+                                                    {row.hideDescription ? '' : (row.estimateItem?.description ?? '')}
                                                 </div>
                                                 {row.isFreeItem && !row.isFixedRow && row.estimateItem && (
                                                     <div>
@@ -247,15 +304,20 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
                                                     </div>
                                                 )}
                                             </td>
-                                            <td className="border border-black px-1 text-right">
+                                            <td
+                                                className={`border border-black px-1 text-right ${mergeCls}`}
+                                            >
                                                 {row.estimateItem ? `${row.estimateItem.qty.toLocaleString()}` : ''}
                                             </td>
-                                            <td className="border border-r-0 border-black px-1 text-right">
+                                            <td
+                                                className={`border border-r-0 border-black px-1 text-right ${mergeCls}`}
+                                            >
                                                 {row.estimateItem ? row.estimateItem.amount.toLocaleString() : ''}
                                             </td>
                                         </tr>
                                     </Fragment>
-                                ))}
+                                    )
+                                })}
                             </tbody>
                             {/* 金額合計 */}
                             <tfoot className="border-0 border-t-2 border-black">

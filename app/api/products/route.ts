@@ -79,6 +79,7 @@ export async function POST(request: NextRequest) {
                 setableScope: normalizeScope(body.setableScope),
                 isMaturityServiceable: Boolean(body.isMaturityServiceable),
                 isMultiRow: Boolean(body.isMultiRow),
+                canAddFreeRow: Boolean(body.canAddFreeRow),
                 defaultDescription: body.defaultDescription || null,
                 rows: Array.isArray(body.rows)
                     ? {

@@ -43,16 +43,16 @@ describe('estimateItemFieldSchema', () => {
         }
     })
 
-    it('qty が 1001 だとエラー（max 1000）', () => {
-        const result = estimateItemFieldSchema.safeParse({ qty: 1001, description: '' })
+    it('qty が 3001 だとエラー（max 3000）', () => {
+        const result = estimateItemFieldSchema.safeParse({ qty: 3001, description: '' })
         expect(result.success).toBe(false)
         if (!result.success) {
             expect(result.error.flatten().fieldErrors.qty).toBeDefined()
         }
     })
 
-    it('qty が 1000 はパスする（max境界）', () => {
-        const result = estimateItemFieldSchema.safeParse({ qty: 1000, description: '' })
+    it('qty が 3000 はパスする（max境界）', () => {
+        const result = estimateItemFieldSchema.safeParse({ qty: 3000, description: '' })
         expect(result.success).toBe(true)
     })
 
