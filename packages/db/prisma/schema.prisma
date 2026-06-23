@@ -112,8 +112,10 @@ model Customer {
   payerTel              String?   @db.VarChar(30) @map("payer_tel")
   pickupPlace           String?   @db.VarChar(255) @map("pickup_place")
   wakeAt                DateTime? @db.Timestamptz(6) @map("wake_at")
+  wakeAtTimeUnspecified Boolean   @default(false) @map("wake_at_time_unspecified")
   wakePlace             String?   @db.VarChar(255) @map("wake_place")
   departureAt           DateTime? @db.Timestamptz(6) @map("departure_at")
+  departureAtTimeUnspecified Boolean @default(false) @map("departure_at_time_unspecified")
   departurePlace        String?   @db.VarChar(255) @map("departure_place")
   funeralFrom           DateTime? @db.Timestamptz(6) @map("funeral_from")
   funeralTo             DateTime? @db.Timestamptz(6) @map("funeral_to")
@@ -188,6 +190,7 @@ model ProductItem {
   setableScope          AppliesTo @default(NONE) @map("setable_scope")
   isMaturityServiceable Boolean   @default(false) @map("is_maturity_serviceable")
   isMultiRow            Boolean   @default(false) @map("is_multi_row")
+  canAddFreeRow         Boolean   @default(false) @map("can_add_free_row")
   isActive              Boolean   @default(true) @map("is_active")
   createdAt     DateTime @default(now()) @db.Timestamptz(6) @map("created_at")
   updatedAt     DateTime @updatedAt @db.Timestamptz(6) @map("updated_at")
@@ -198,6 +201,8 @@ model ProductItem {
   invoiceItems  InvoiceItem[]
   setParentLinks ProductSet[] @relation("SetParent")
   setChildLinks  ProductSet[] @relation("SetChild")
+  estimateFreeRows EstimateItemFree[] @relation("EstimateFreeRowOfProduct")
+  invoiceFreeRows  InvoiceItemFree[]  @relation("InvoiceFreeRowOfProduct")
 
   @@index([sortNo])
   @@index([isSetParent])
@@ -345,6 +350,7 @@ model EstimateItem {
   amount               Int           @default(0)
   isService            Boolean       @default(false) @map("is_service")
   isMaturityService    Boolean       @default(false) @map("is_maturity_service")
+  adhocSetScope        AppliesTo     @default(NONE) @map("adhoc_set_scope")
   sortNo               Int           @default(0) @map("sort_no")
   createdAt            DateTime      @default(now()) @db.Timestamptz(6) @map("created_at")
   updatedAt            DateTime      @updatedAt @db.Timestamptz(6) @map("updated_at")
@@ -360,6 +366,7 @@ model EstimateItem {
 model EstimateItemFree {
   id                  BigInt   @id @default(autoincrement())
   estimateItemId      BigInt   @map("estimate_item_id")
+  parentProductItemId BigInt?  @map("parent_product_item_id")
   productItemName     String?  @db.VarChar(255) @map("product_item_name")
   description         String?  @db.VarChar(255)
   unitPriceGeneral    Int      @default(0) @map("unit_price_general")
@@ -370,6 +377,7 @@ model EstimateItemFree {
   updatedAt           DateTime @updatedAt @db.Timestamptz(6) @map("updated_at")
 
   estimateItem        EstimateItem @relation(fields: [estimateItemId], references: [id], onDelete: Cascade)
+  parentProductItem   ProductItem? @relation("EstimateFreeRowOfProduct", fields: [parentProductItemId], references: [id])
 
   @@map("estimate_items_free")
 }
@@ -423,6 +431,7 @@ model InvoiceItem {
   amount               Int           @default(0)
   isService            Boolean       @default(false) @map("is_service")
   isMaturityService    Boolean       @default(false) @map("is_maturity_service")
+  adhocSetScope        AppliesTo     @default(NONE) @map("adhoc_set_scope")
   sortNo               Int           @default(0) @map("sort_no")
   createdAt            DateTime      @default(now()) @db.Timestamptz(6) @map("created_at")
   updatedAt            DateTime      @updatedAt @db.Timestamptz(6) @map("updated_at")
@@ -438,6 +447,7 @@ model InvoiceItem {
 model InvoiceItemFree {
   id                  BigInt   @id @default(autoincrement())
   invoiceItemId       BigInt   @map("invoice_item_id")
+  parentProductItemId BigInt?  @map("parent_product_item_id")
   productItemName     String?  @db.VarChar(255) @map("product_item_name")
   description         String?  @db.VarChar(255)
   unitPriceGeneral    Int      @default(0) @map("unit_price_general")
@@ -448,6 +458,7 @@ model InvoiceItemFree {
   updatedAt           DateTime @updatedAt @db.Timestamptz(6) @map("updated_at")
 
   invoiceItem         InvoiceItem @relation(fields: [invoiceItemId], references: [id], onDelete: Cascade)
+  parentProductItem   ProductItem? @relation("InvoiceFreeRowOfProduct", fields: [parentProductItemId], references: [id])
 
   @@map("invoice_items_free")
 }
