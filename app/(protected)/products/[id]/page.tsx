@@ -234,10 +234,10 @@ export default function ProductEditPage() {
                 await setProductChildren(productId, [])
             }
             // 3) 種類（dirty なものを順次保存）
-            // 並び替え操作（▲▼/ドラッグ）の時は moveVariant が全行を dirty 化しているため、
-            // ループ内で sortNo=i として全行に対して更新がかかり、再正規化される。
-            // 末尾追加（isNew）は sortNo を送らず API 側の MAX+1 ロジックに委譲することで、
-            // 既存行の sortNo に触れず、新規行だけ末尾に追加される。
+            // 新規・既存どちらも画面上の位置 i を sortNo として保存する。
+            // 過去に新規行のみ sortNo を送らず MAX+1 に委譲していたため、
+            // 「新規行を前、既存行を後ろ」と並び替えて保存すると新規/既存で sortNo が
+            // 重複し、副キー id の昇順で画面表示と保存順が逆転するバグがあった。
             const updatedVariants = [...variants]
             for (let i = 0; i < updatedVariants.length; i++) {
                 const v = updatedVariants[i]
@@ -252,7 +252,7 @@ export default function ProductEditPage() {
                         setPrice: v.isDefaultSet ? 0 : v.setPrice,
                         isDefaultSet: v.isDefaultSet,
                         isActive: v.isActive,
-                        // sortNo は API 側で MAX+1 を自動設定
+                        sortNo: i,
                     })
                     updatedVariants[i] = {
                         ...v,
