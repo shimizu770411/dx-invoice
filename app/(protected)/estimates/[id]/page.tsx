@@ -41,6 +41,7 @@ export default function EstimateEditPage() {
     const { loading, customer, estimate, items, setItems, freeItems, onSubmit } = useEstimateEdit(estimateId, reset)
     const [activeTab, setActiveTab] = useState<'items' | 'other'>('items')
     const [itemsViewMode, setItemsViewMode] = useState<'list' | 'card'>('list')
+    const [isConfirmedOnServer, setIsConfirmedOnServer] = useState(false)
     const watchedItems = useWatch({ control, name: 'items' })
     const watchedFreeItems = useWatch({ control, name: 'freeItems' })
     const watchedIsMember = useWatch({ control, name: 'isMember' })
@@ -93,6 +94,35 @@ export default function EstimateEditPage() {
         )
     }
 
+    const handleMultiSelectChange = (
+        index: number,
+        selectedIds: string[],
+        options?: { adhocSetScope?: 'NONE' | 'MEMBER_ONLY' | 'BOTH'; isService?: boolean; isMaturityService?: boolean }
+    ) => {
+        const isMember = watchedIsMember === 'true'
+        setItems((prev) =>
+            prev.map((item, i) => {
+                if (i !== index) return item
+                const variants = (item as any).productItem?.variants || []
+                const selected = variants.filter((v: any) => selectedIds.includes(String(v.id)))
+                const totalGeneral = selected.reduce((s: number, v: any) => s + v.priceGeneral, 0)
+                const totalMember = selected.reduce((s: number, v: any) => s + v.priceMember, 0)
+                const firstVariant = selected[0] || null
+                return {
+                    ...item,
+                    multiSelectVariantIds: JSON.stringify(selectedIds),
+                    productVariantId: firstVariant ? String(firstVariant.id) : undefined,
+                    productVariant: firstVariant,
+                    unitPriceGeneral: totalGeneral,
+                    unitPriceMember: isMember ? totalMember : totalGeneral,
+                    adhocSetScope: options?.adhocSetScope ?? 'NONE',
+                    isService: options?.isService ?? false,
+                    isMaturityService: options?.isMaturityService ?? false,
+                } as any
+            })
+        )
+    }
+
     // 会員/一般切替時に、各 item の unitPriceMember を再計算
     useEffect(() => {
         const isMember = watchedIsMember === 'true'
@@ -108,6 +138,12 @@ export default function EstimateEditPage() {
 
     const [showSelectedOptions, setShowSelectedOptions] = useState(false)
 
+    useEffect(() => {
+        if (estimate) {
+            setIsConfirmedOnServer(estimate.status === 'CONFIRMED')
+        }
+    }, [estimate?.status])
+
     if (loading) {
         return <div className="p-8">読み込み中...</div>
     }
@@ -116,7 +152,7 @@ export default function EstimateEditPage() {
         return null
     }
 
-    const isConfirmed = estimate.status === 'CONFIRMED'
+    const isConfirmed = isConfirmedOnServer
 
     const totals = calculateTotals(
         items,
@@ -265,6 +301,7 @@ export default function EstimateEditPage() {
                                     freeItems={freeItems}
                                     freeFields={freeItemFields}
                                     onVariantChange={handleVariantChange}
+                                    onMultiSelectChange={handleMultiSelectChange}
                                     setValue={setValue}
                                     readOnly={isConfirmed}
                                     currentStoreId={customer?.storeId ? String(customer.storeId) : null}
@@ -277,6 +314,7 @@ export default function EstimateEditPage() {
                                     isMember={watchedIsMember === 'true'}
                                     totals={totals}
                                     onVariantChange={handleVariantChange}
+                                    onMultiSelectChange={handleMultiSelectChange}
                                     setValue={setValue}
                                     freeItems={freeItems}
                                     freeFields={freeItemFields}
@@ -319,6 +357,8 @@ export default function EstimateEditPage() {
                                             return
                                         try {
                                             await unconfirmEstimate(estimate.id)
+                                            setIsConfirmedOnServer(false)
+                                            setValue('status', 'DRAFT')
                                             toast({
                                                 title: '確定を解除しました',
                                                 variant: 'success',

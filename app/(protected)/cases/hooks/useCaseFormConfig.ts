@@ -36,7 +36,7 @@ export function getFormDefaultValues(): CaseFormData {
         payerTel: undefined,
         pickupPlace: undefined,
         wakeAt: undefined,
-        wakeAtTimeUnspecified: false,
+        wakeAtTimeUnspecified: true,
         wakePlace: undefined,
         departureAt: undefined,
         departureAtTimeUnspecified: false,

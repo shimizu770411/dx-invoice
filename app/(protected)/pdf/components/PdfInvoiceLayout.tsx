@@ -9,6 +9,9 @@ export type PdfProductItem = {
     name: string
     isSetParent?: boolean
     canAddFreeRow?: boolean
+    isMultiSelect?: boolean
+    multiSelectMerge?: boolean
+    variants?: { id: string; name: string }[]
 }
 
 export type PdfDocumentItem = {
@@ -24,6 +27,7 @@ export type PdfDocumentItem = {
     } | null
     productVariant?: { name?: string; imageUrl?: string | null; isDefaultSet?: boolean; setPrice?: number } | null
     description?: string | null
+    multiSelectVariantIds?: string | null
     qty: number
     unitPriceGeneral: number
     unitPriceMember: number
@@ -76,6 +80,7 @@ export type PdfDocumentCustomer = {
     altarPlaceType?: string | null
     altarPlaceOther?: string | null
     ceilingHeight?: string | number | null
+    preConsultStaff?: string | null
     estimateStaff?: string | null
     ceremonyStaff?: string | null
     transportStaff?: string | null
@@ -135,6 +140,7 @@ type DisplayRow = {
     isFixedRow?: boolean // 満期サービス・解約手数料など固定行（単価表示スキップ）
     hideDescription?: boolean // 複数行構成商品の2行目以降は摘要を非表示
     isSecondaryRow?: boolean // 複数行構成商品の2行目以降（品名空・上罫線なし）
+    displayDescription?: string // MERGEDモード複数選択時: 種類名を「、」で連結した表示用文字列
     deductionLabel?: string
     deductionItem?: PdfDocumentItem | null
 }
@@ -178,16 +184,31 @@ function buildDisplayRows(
                 showProductVariantName: false,
             })
         } else {
-            // 複数行構成商品（同じ productItemId の複数行）は、1行目のみ品名と摘要を表示し
-            // 2行目以降は品名・摘要を空にしてセル結合風の見た目にする
+            // 複数行構成商品（同じ productItemId の複数行）は、1行目のみ品名を表示し
+            // 2行目以降は品名を空にしてセル結合風の見た目にする。
+            // EACH モード（isMultiSelect=true, multiSelectMerge=false）は各行に摘要（種類名）を表示する。
+            // MERGED モード（isMultiSelect=true, multiSelectMerge=true/null）は1行で種類名を「、」連結表示する。
+            const isEachMode = product.isMultiSelect && product.multiSelectMerge === false
+            const isMergedMode = product.isMultiSelect && product.multiSelectMerge !== false
             itemsForProduct.forEach((estimateItem, idx) => {
                 const isFirstRow = idx === 0
+                let displayDescription: string | undefined
+                if (isMergedMode && isFirstRow && estimateItem.multiSelectVariantIds) {
+                    try {
+                        const ids: string[] = JSON.parse(estimateItem.multiSelectVariantIds)
+                        const names = (product.variants || [])
+                            .filter((v) => ids.includes(String(v.id)))
+                            .map((v) => v.name)
+                        if (names.length > 0) displayDescription = names.join('、')
+                    } catch { /* ignore */ }
+                }
                 rows.push({
                     label: isFirstRow ? product.name : '',
                     estimateItem,
                     showProductVariantName: isFirstRow && product.name.includes('霊柩車'),
-                    hideDescription: !isFirstRow,
+                    hideDescription: isEachMode ? false : !isFirstRow,
                     isSecondaryRow: !isFirstRow,
+                    displayDescription,
                 })
             })
         }
@@ -348,6 +369,7 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
               altarPlaceType: docAny.altarPlaceType ?? null,
               altarPlaceOther: docAny.altarPlaceOther ?? null,
               ceilingHeight: docAny.ceilingHeight ?? null,
+              preConsultStaff: docAny.preConsultStaff ?? null,
               estimateStaff: docAny.estimateStaff ?? null,
               ceremonyStaff: docAny.ceremonyStaff ?? null,
               transportStaff: docAny.transportStaff ?? null,
@@ -544,7 +566,7 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                                 className={`border border-l-0 border-black px-0.5 text-left ${mergeCls}`}
                                             >
                                                 <div className="whitespace-pre-wrap break-words">
-                                                    {row.hideDescription ? '' : (row.estimateItem?.description ?? '')}
+                                                    {row.hideDescription ? '' : (row.displayDescription ?? row.estimateItem?.description ?? '')}
                                                 </div>
                                                 <div>
                                                     {/* 数量が1より大きい場合のみ表示。親付きフリー行（満期サービス以外）は qty=1 でも常に数量を表示。 */}
@@ -943,14 +965,25 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                 <tr className="border-b border-black">
                                     <th className="border-r border-black px-1 text-left font-normal">
                                         <div className="flex justify-between">
-                                            {(title.includes('請求書') ? '請求担当' : '見積担当')
+                                            {(title.includes('請求書')
+                                                ? '請求書発行担当'
+                                                : docAny.status === 'DRAFT'
+                                                  ? '事前相談見積担当'
+                                                  : '本見積担当'
+                                            )
                                                 .split('')
                                                 .map((char, j) => (
                                                     <span key={j}>{char}</span>
                                                 ))}
                                         </div>
                                     </th>
-                                    <td className="px-1 ">{customer?.estimateStaff ?? ''}</td>
+                                    <td className="px-1 ">
+                                        {title.includes('請求書')
+                                            ? (customer?.estimateStaff ?? '')
+                                            : docAny.status === 'DRAFT'
+                                              ? (customer?.preConsultStaff ?? '')
+                                              : (customer?.estimateStaff ?? '')}
+                                    </td>
                                 </tr>
                                 <tr className="border-b border-black">
                                     <th className="border-x border-black px-1 text-left font-normal">

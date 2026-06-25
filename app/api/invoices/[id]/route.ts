@@ -202,6 +202,7 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
                             isService: Boolean(item.isService),
                             isMaturityService: Boolean(item.isMaturityService),
                             adhocSetScope: item.adhocSetScope ?? 'NONE',
+                            multiSelectVariantIds: item.multiSelectVariantIds || null,
                             sortNo: item.sortNo ?? index,
                         })),
                     },

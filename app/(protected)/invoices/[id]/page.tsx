@@ -89,6 +89,35 @@ export default function InvoiceEditPage() {
         )
     }
 
+    const handleMultiSelectChange = (
+        index: number,
+        selectedIds: string[],
+        options?: { adhocSetScope?: 'NONE' | 'MEMBER_ONLY' | 'BOTH'; isService?: boolean; isMaturityService?: boolean }
+    ) => {
+        const isMember = watchedIsMember === 'true'
+        setItems((prev) =>
+            prev.map((item, i) => {
+                if (i !== index) return item
+                const variants = (item as any).productItem?.variants || []
+                const selected = variants.filter((v: any) => selectedIds.includes(String(v.id)))
+                const totalGeneral = selected.reduce((s: number, v: any) => s + v.priceGeneral, 0)
+                const totalMember = selected.reduce((s: number, v: any) => s + v.priceMember, 0)
+                const firstVariant = selected[0] || null
+                return {
+                    ...item,
+                    multiSelectVariantIds: JSON.stringify(selectedIds),
+                    productVariantId: firstVariant ? String(firstVariant.id) : undefined,
+                    productVariant: firstVariant,
+                    unitPriceGeneral: totalGeneral,
+                    unitPriceMember: isMember ? totalMember : totalGeneral,
+                    adhocSetScope: options?.adhocSetScope ?? 'NONE',
+                    isService: options?.isService ?? false,
+                    isMaturityService: options?.isMaturityService ?? false,
+                } as any
+            })
+        )
+    }
+
     // 会員/一般切替時に、各 item の unitPriceMember を再計算
     useEffect(() => {
         const isMember = watchedIsMember === 'true'
@@ -290,6 +319,7 @@ export default function InvoiceEditPage() {
                                 freeItems={freeItems}
                                 freeFields={freeItemFields}
                                 onVariantChange={handleVariantChange}
+                                onMultiSelectChange={handleMultiSelectChange}
                                 setValue={setValue}
                                 currentStoreId={customer?.storeId ? String(customer.storeId) : null}
                             />

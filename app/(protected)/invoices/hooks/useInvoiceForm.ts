@@ -209,6 +209,24 @@ export function useInvoiceCreate(customerId: string, reset: UseFormReset<Invoice
                 })
                 return
             }
+            // 複数選択・種類別モード(EACH): 1スロット → バリアントごとに複数行へ展開
+            const finalItems = activeItems.flatMap((item) => {
+                const pi = (item as any).productItem
+                if (!pi?.isMultiSelect || pi.multiSelectMerge !== false) return [item]
+                if (!item.multiSelectVariantIds) return [item]
+                try {
+                    const ids: string[] = JSON.parse(item.multiSelectVariantIds)
+                    if (ids.length === 0) return [item]
+                    return ids.flatMap((variantId: string) => {
+                        const v = (pi.variants || []).find((v: any) => String(v.id) === variantId)
+                        if (!v) return []
+                        return [{ ...item, productVariantId: String(v.id), productVariant: v,
+                            unitPriceGeneral: v.priceGeneral, unitPriceMember: v.priceMember,
+                            amount: (isMember ? v.priceMember : v.priceGeneral) * item.qty,
+                            multiSelectVariantIds: null, description: v.name }]
+                    })
+                } catch { return [item] }
+            }).map((item, i) => ({ ...item, sortNo: i }))
             const mergedFreeItems = freeItems
                 .map((item, i) => {
                     const productItemName = formValues.freeItems[i]?.productItemName ?? item.productItemName ?? ''
@@ -232,7 +250,7 @@ export function useInvoiceCreate(customerId: string, reset: UseFormReset<Invoice
                 freeItems,
                 formValues.freeItems
             )
-            const data = { ...formValues, ...totals, items: activeItems, freeItems: mergedFreeItems }
+            const data = { ...formValues, ...totals, items: finalItems, freeItems: mergedFreeItems }
             const created = await createInvoice(customerId, data)
             toast({ title: '登録しました', variant: 'success', duration: 2000 })
             queryClient.invalidateQueries({ queryKey: ['customers'] })
@@ -332,12 +350,31 @@ export function useInvoiceEdit(invoiceId: string, reset: UseFormReset<InvoiceFor
                     }
                     continue
                 }
-                const existing = existingItems.find(
+                const allExisting = existingItems.filter(
                     (item) =>
                         item.productItemId === product.id && !(item as any).productRowId
                 )
-                if (existing) {
-                    mergedItems.push({ ...existing, productItem: { ...product } })
+                if (allExisting.length > 0) {
+                    // EACH モード (isMultiSelect=true, multiSelectMerge=false): 複数EACH行を1スロットに集約
+                    if ((product as any).isMultiSelect && (product as any).multiSelectMerge === false && allExisting.length > 1) {
+                        const variantIds = allExisting
+                            .map((it: any) => String(it.productVariantId))
+                            .filter(Boolean)
+                        const selectedVariants = (product.variants || []).filter((v: any) =>
+                            variantIds.includes(String(v.id))
+                        )
+                        const totalGeneral = selectedVariants.reduce((s: number, v: any) => s + v.priceGeneral, 0)
+                        const totalMember = selectedVariants.reduce((s: number, v: any) => s + v.priceMember, 0)
+                        mergedItems.push({
+                            ...allExisting[0],
+                            productItem: { ...product },
+                            multiSelectVariantIds: JSON.stringify(variantIds),
+                            unitPriceGeneral: totalGeneral,
+                            unitPriceMember: totalMember,
+                        } as any)
+                    } else {
+                        mergedItems.push({ ...allExisting[0], productItem: { ...product } })
+                    }
                     continue
                 }
                 const firstVariant = product.variants[0] ?? null
@@ -457,6 +494,24 @@ export function useInvoiceEdit(invoiceId: string, reset: UseFormReset<InvoiceFor
                 })
                 return
             }
+            // 複数選択・種類別モード(EACH): 1スロット → バリアントごとに複数行へ展開
+            const finalItems = activeItems.flatMap((item) => {
+                const pi = (item as any).productItem
+                if (!pi?.isMultiSelect || pi.multiSelectMerge !== false) return [item]
+                if (!item.multiSelectVariantIds) return [item]
+                try {
+                    const ids: string[] = JSON.parse(item.multiSelectVariantIds)
+                    if (ids.length === 0) return [item]
+                    return ids.flatMap((variantId: string) => {
+                        const v = (pi.variants || []).find((v: any) => String(v.id) === variantId)
+                        if (!v) return []
+                        return [{ ...item, productVariantId: String(v.id), productVariant: v,
+                            unitPriceGeneral: v.priceGeneral, unitPriceMember: v.priceMember,
+                            amount: (isMember ? v.priceMember : v.priceGeneral) * item.qty,
+                            multiSelectVariantIds: null, description: v.name }]
+                    })
+                } catch { return [item] }
+            }).map((item, i) => ({ ...item, sortNo: i }))
             const mergedFreeItems = freeItems
                 .map((item, i) => {
                     const productItemName = formValues.freeItems[i]?.productItemName ?? item.productItemName ?? ''
@@ -480,7 +535,7 @@ export function useInvoiceEdit(invoiceId: string, reset: UseFormReset<InvoiceFor
                 freeItems,
                 formValues.freeItems
             )
-            const data = { ...formValues, ...totals, items: activeItems, freeItems: mergedFreeItems }
+            const data = { ...formValues, ...totals, items: finalItems, freeItems: mergedFreeItems }
             await updateInvoice(invoiceId, data)
             toast({ title: '更新しました', variant: 'success', duration: 2000 })
             await loadData()

@@ -119,6 +119,7 @@ export async function POST(
                         isService: item.isService ?? false,
                         isMaturityService: item.isMaturityService ?? false,
                         adhocSetScope: item.adhocSetScope ?? 'NONE',
+                        multiSelectVariantIds: (item as any).multiSelectVariantIds || null,
                         sortNo: item.sortNo,
                     })),
                 },

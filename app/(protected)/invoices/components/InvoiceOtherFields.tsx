@@ -10,5 +10,10 @@ type Props = {
 }
 
 export function InvoiceOtherFields({ control }: Props) {
-    return <DocumentOtherFields control={control as unknown as Control<DocumentFormData>} />
+    return (
+        <DocumentOtherFields
+            control={control as unknown as Control<DocumentFormData>}
+            estimateStaffLabel="請求書発行担当"
+        />
+    )
 }

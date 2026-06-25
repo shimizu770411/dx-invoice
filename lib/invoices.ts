@@ -28,6 +28,7 @@ export interface InvoiceItem {
   isService?: boolean;
   isMaturityService?: boolean;
   adhocSetScope?: 'NONE' | 'MEMBER_ONLY' | 'GENERAL_ONLY' | 'BOTH';
+  multiSelectVariantIds?: string | null;
   sortNo: number;
   productItem?: any;
   productVariant?: any;

@@ -18,6 +18,7 @@ type Props = {
     onVariantChange?: (index: number, variant: ProductVariant) => void
     setValue?: UseFormSetValue<InvoiceFormData>
     currentStoreId?: string | null
+    onMultiSelectChange?: (index: number, variantIds: string[], options?: { adhocSetScope?: 'NONE' | 'MEMBER_ONLY' | 'BOTH'; isService?: boolean; isMaturityService?: boolean }) => void
 }
 
 export function InvoiceItemTable({ control, fields, freeFields, setValue, ...rest }: Props) {

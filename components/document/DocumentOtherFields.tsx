@@ -9,9 +9,11 @@ import type { DocumentFormData } from './DocumentItemTable'
 type Props = {
     control: Control<DocumentFormData>
     disabled?: boolean
+    estimateStaffLabel?: string
+    preConsultStaffSlot?: React.ReactNode
 }
 
-export function DocumentOtherFields({ control, disabled }: Props) {
+export function DocumentOtherFields({ control, disabled, estimateStaffLabel = '見積担当', preConsultStaffSlot }: Props) {
     const altarPlaceType = useWatch({ control, name: 'altarPlaceType' })
 
     return (
@@ -39,7 +41,8 @@ export function DocumentOtherFields({ control, disabled }: Props) {
                     )}
                 </div>
                 <FormInput name="ceilingHeight" control={control} label="天井高" suffix="尺" />
-                <FormInput name="estimateStaff" control={control} label="見積担当" />
+                {preConsultStaffSlot}
+                <FormInput name="estimateStaff" control={control} label={estimateStaffLabel} />
                 <FormInput name="ceremonyStaff" control={control} label="式担当" />
                 <FormInput name="transportStaff" control={control} label="搬送担当" />
                 <FormInput name="decorationStaff" control={control} label="飾り担当" />

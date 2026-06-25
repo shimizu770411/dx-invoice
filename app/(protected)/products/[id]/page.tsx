@@ -73,6 +73,10 @@ export default function ProductEditPage() {
     const [isMultiRow, setIsMultiRow] = useState(false)
     // フリー行追加（見積/請求書で該当商品の下に自由入力行を1行表示）
     const [canAddFreeRow, setCanAddFreeRow] = useState(false)
+    // 複数種類同時選択
+    const [isMultiSelect, setIsMultiSelect] = useState(false)
+    // 複数選択時の出力方法: true=合算1行 / false=種類別複数行
+    const [multiSelectMerge, setMultiSelectMerge] = useState(true)
     type MultiRowVariant = {
         localId: string
         label: string
@@ -141,6 +145,8 @@ export default function ProductEditPage() {
         setChildIds((product.children || []).map((c: any) => String(c.id)))
         setIsMultiRow((product as any).isMultiRow ?? false)
         setCanAddFreeRow((product as any).canAddFreeRow ?? false)
+        setIsMultiSelect((product as any).isMultiSelect ?? false)
+        setMultiSelectMerge((product as any).multiSelectMerge ?? true)
         setMultiRows(
             ((product as any).rows || []).map((r: any) => ({
                 localId: String(r.id),
@@ -212,6 +218,8 @@ export default function ProductEditPage() {
                 defaultDescription: defaultDescription.trim() || null,
                 isMultiRow,
                 canAddFreeRow,
+                isMultiSelect,
+                multiSelectMerge: isMultiSelect ? multiSelectMerge : true,
                 rows: isMultiRow
                     ? multiRows.map((r) => ({
                           label: r.label,
@@ -879,6 +887,71 @@ export default function ProductEditPage() {
                         />
                         フリー行追加（見積/請求書で該当商品の下に自由入力行を1行表示）
                     </label>
+                </div>
+
+                {/* 複数種類同時選択（写真商品など） */}
+                <div className="mb-5">
+                    <label
+                        className="font-mincho cursor-pointer flex items-center gap-2"
+                        style={{ fontSize: '14px', color: 'var(--brand-text)' }}
+                    >
+                        <input
+                            type="checkbox"
+                            className="h-5 w-5 cursor-pointer"
+                            checked={isMultiSelect}
+                            disabled={isMultiRow}
+                            onChange={(e) => setIsMultiSelect(e.target.checked)}
+                        />
+                        <span style={{ opacity: isMultiRow ? 0.4 : 1 }}>
+                            複数種類同時選択（写真商品など、複数バリエーションを同時選択可能）
+                        </span>
+                    </label>
+                    {isMultiSelect && !isMultiRow && (
+                        <div
+                            className="mt-3 ml-7"
+                            style={{
+                                padding: '12px 16px',
+                                border: '1px solid var(--brand-border)',
+                                backgroundColor: '#f8f9fb',
+                            }}
+                        >
+                            <p
+                                className="font-mincho mb-2"
+                                style={{ fontSize: '12px', color: 'var(--brand-text-muted)', letterSpacing: '0.05em' }}
+                            >
+                                見積・請求書での出力方法
+                            </p>
+                            <div className="flex flex-col gap-2">
+                                {(
+                                    [
+                                        { value: true,  label: '合算して1行で出す', desc: '選択した種類の金額を合算し1明細行で表示' },
+                                        { value: false, label: '種類別に複数行で出す', desc: '選択した種類それぞれを1行ずつ表示' },
+                                    ] as { value: boolean; label: string; desc: string }[]
+                                ).map((opt) => (
+                                    <label
+                                        key={String(opt.value)}
+                                        className="font-mincho cursor-pointer flex items-start gap-2"
+                                        style={{ fontSize: '13px', color: 'var(--brand-text)' }}
+                                    >
+                                        <input
+                                            type="radio"
+                                            className="mt-0.5 cursor-pointer"
+                                            checked={multiSelectMerge === opt.value}
+                                            onChange={() => setMultiSelectMerge(opt.value)}
+                                        />
+                                        <span>
+                                            {opt.label}
+                                            <span
+                                                style={{ fontSize: '11px', color: 'var(--brand-text-muted)', marginLeft: '6px' }}
+                                            >
+                                                {opt.desc}
+                                            </span>
+                                        </span>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* 商品種別 */}

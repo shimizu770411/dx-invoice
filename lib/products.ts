@@ -69,6 +69,8 @@ export interface ProductItem {
     isMaturityServiceable?: boolean
     isMultiRow?: boolean
     canAddFreeRow?: boolean
+    isMultiSelect?: boolean
+    multiSelectMerge?: boolean
     isActive: boolean
     variants: ProductVariant[]
     rows?: ProductRow[]
@@ -87,6 +89,8 @@ export interface ProductItemInput {
     isMultiRow?: boolean
     isMaturityServiceable?: boolean
     canAddFreeRow?: boolean
+    isMultiSelect?: boolean
+    multiSelectMerge?: boolean
 }
 
 export interface ProductSetInput {

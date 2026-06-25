@@ -65,6 +65,8 @@ type DocumentItem = {
         isMaturityServiceable?: boolean
         isMultiRow?: boolean
         canAddFreeRow?: boolean
+        isMultiSelect?: boolean
+        multiSelectMerge?: boolean
         rows?: DocumentRow[]
         children?: { id: string; name: string }[]
     } | null
@@ -87,6 +89,7 @@ type DocumentItem = {
     qty: number
     isService?: boolean
     isMaturityService?: boolean
+    multiSelectVariantIds?: string | null
 }
 
 type DocumentFreeItem = {
@@ -116,6 +119,11 @@ type Props = {
     readOnly?: boolean
     /** 顧客の現在の担当店舗 ID。保存済み variant の店舗と異なる場合に警告表示 */
     currentStoreId?: string | null
+    onMultiSelectChange?: (
+        index: number,
+        variantIds: string[],
+        options?: { adhocSetScope?: 'NONE' | 'MEMBER_ONLY' | 'BOTH'; isService?: boolean; isMaturityService?: boolean }
+    ) => void
 }
 
 export function DocumentItemTable({
@@ -130,6 +138,7 @@ export function DocumentItemTable({
     setValue,
     readOnly = false,
     currentStoreId,
+    onMultiSelectChange,
 }: Props) {
     /** 保存済み variant の店舗が現在の顧客店舗と一致しないか判定 */
     const isStoreMismatch = (item: DocumentItem | undefined): boolean => {
@@ -149,6 +158,7 @@ export function DocumentItemTable({
     const [pendingAdhocSetScope, setPendingAdhocSetScope] = useState<
         'NONE' | 'MEMBER_ONLY' | 'BOTH'
     >('NONE')
+    const [pendingMultiVariantIds, setPendingMultiVariantIds] = useState<string[]>([])
     const [enlargedImage, setEnlargedImage] = useState<string | null>(null)
     const [checkedItems, setCheckedItems] = useState<boolean[]>([])
     const [prevQtySignature, setPrevQtySignature] = useState('')
@@ -205,10 +215,25 @@ export function DocumentItemTable({
             setPendingRowVariant(null)
             setPendingVariant(null)
         } else {
-            const variants = item?.productItem?.variants || []
-            const current =
-                variants.find((v) => v.id === item?.productVariantId) || variants[0] || null
-            setPendingVariant(current)
+            const isMultiSelectProduct = !!item?.productItem?.isMultiSelect
+            if (isMultiSelectProduct) {
+                try {
+                    // multiSelectVariantIds があればそこから、なければ productVariantId から初期化
+                    const ids: string[] = item?.multiSelectVariantIds
+                        ? JSON.parse(item.multiSelectVariantIds)
+                        : item?.productVariantId
+                          ? [String(item.productVariantId)]
+                          : []
+                    setPendingMultiVariantIds(ids)
+                } catch { setPendingMultiVariantIds([]) }
+                setPendingVariant(null)
+            } else {
+                const variants = item?.productItem?.variants || []
+                const current =
+                    variants.find((v) => v.id === item?.productVariantId) || variants[0] || null
+                setPendingVariant(current)
+                setPendingMultiVariantIds([])
+            }
             setPendingRowVariant(null)
             setPendingRowVariantsMap({})
         }
@@ -255,6 +280,12 @@ export function DocumentItemTable({
                         }
                     }
                 })
+            } else if (item?.productItem?.isMultiSelect) {
+                onMultiSelectChange?.(variantDialogIndex, pendingMultiVariantIds, {
+                    adhocSetScope: pendingAdhocSetScope,
+                    isService: pendingIsService,
+                    isMaturityService: pendingIsMaturityService,
+                })
             } else if (pendingVariant) {
                 onVariantChange?.(variantDialogIndex, pendingVariant, {
                     isService: pendingIsService,
@@ -273,6 +304,7 @@ export function DocumentItemTable({
         setPendingVariant(null)
         setPendingRowVariant(null)
         setPendingRowVariantsMap({})
+        setPendingMultiVariantIds([])
         setPendingIsService(false)
         setPendingAdhocSetScope('NONE')
     }
@@ -637,7 +669,17 @@ export function DocumentItemTable({
                                             ) : (
                                                 <>
                                                     <div className="text-sm">
-                                                        {item?.productVariant?.name ?? '-'}
+                                                        {(item?.productItem?.isMultiSelect && item?.multiSelectVariantIds)
+                                                            ? (() => {
+                                                                try {
+                                                                    const ids: string[] = JSON.parse(item.multiSelectVariantIds as string)
+                                                                    const names = (item?.productItem?.variants || [])
+                                                                        .filter((v: any) => ids.includes(String(v.id)))
+                                                                        .map((v: any) => v.name)
+                                                                    return names.length > 0 ? `${names.join('、')}（${names.length}種類）` : '-'
+                                                                } catch { return '-' }
+                                                              })()
+                                                            : item?.productVariant?.name ?? '-'}
                                                     </div>
                                                     {isMaturityServiceIncluded ? (
                                                         <div
@@ -917,6 +959,7 @@ export function DocumentItemTable({
                             const isChildItem = !!item?.productItem?.isSetChild
                             // 複数行構成行か（productRowId あり）
                             const isMultiRowItem = !!item?.productRowId
+                            const isMultiSelectProduct = !!item?.productItem?.isMultiSelect
                             // 商品単位モード: 同じ商品の全行を取得し、各行の ProductRow を表示
                             const productRows = isMultiRowItem
                                 ? item?.productItem?.rows || []
@@ -1189,6 +1232,76 @@ export function DocumentItemTable({
                                         )
                                     ) : variants.length === 0 ? (
                                         <p className="text-gray-500">種類がありません</p>
+                                    ) : isMultiSelectProduct ? (
+                                        <>
+                                            <p className="mb-3 text-sm" style={{ color: 'var(--brand-text-muted)' }}>
+                                                複数選択可（タップで選択・解除）
+                                            </p>
+                                            <div className="grid grid-cols-3 gap-3">
+                                                {variants.map((v: any) => {
+                                                    const isSelected = pendingMultiVariantIds.includes(String(v.id))
+                                                    return (
+                                                        <button
+                                                            key={v.id}
+                                                            type="button"
+                                                            onClick={() =>
+                                                                setPendingMultiVariantIds((prev) =>
+                                                                    isSelected
+                                                                        ? prev.filter((id) => id !== String(v.id))
+                                                                        : [...prev, String(v.id)]
+                                                                )
+                                                            }
+                                                            className={`flex flex-col items-center rounded-lg border-2 p-3 transition-colors ${
+                                                                isSelected
+                                                                    ? 'border-blue-500 bg-blue-100'
+                                                                    : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
+                                                            }`}
+                                                        >
+                                                            <div className="mb-2 flex h-24 w-full items-center justify-center overflow-hidden rounded">
+                                                                {v.imageUrl ? (
+                                                                    <div
+                                                                        role="button"
+                                                                        tabIndex={-1}
+                                                                        className="h-full w-full cursor-zoom-in"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation()
+                                                                            setEnlargedImage(
+                                                                                resolveProductImageUrl(v.imageUrl) || ''
+                                                                            )
+                                                                        }}
+                                                                        aria-label="画像を拡大"
+                                                                    >
+                                                                        <Image
+                                                                            src={resolveProductImageUrl(v.imageUrl) || ''}
+                                                                            alt={v.name}
+                                                                            width={96}
+                                                                            height={96}
+                                                                            className="h-full w-full object-contain"
+                                                                        />
+                                                                    </div>
+                                                                ) : (
+                                                                    <ImageOff className="h-10 w-10 text-gray-300" />
+                                                                )}
+                                                            </div>
+                                                            <p className="mb-1 w-full text-center text-xl font-medium leading-snug">
+                                                                {v.name}
+                                                            </p>
+                                                            <p className="text-lg text-gray-500">
+                                                                一般: ¥{v.priceGeneral.toLocaleString()}
+                                                            </p>
+                                                            <p className="text-lg text-gray-500">
+                                                                会員: ¥{v.priceMember.toLocaleString()}
+                                                            </p>
+                                                            {isSelected && (
+                                                                <p className="mt-1 text-sm font-semibold" style={{ color: 'var(--brand-navy)' }}>
+                                                                    ✓ 選択中
+                                                                </p>
+                                                            )}
+                                                        </button>
+                                                    )
+                                                })}
+                                            </div>
+                                        </>
                                     ) : (
                                         <div className="grid grid-cols-3 gap-3">
                                             {variants.map((v: any) => {
@@ -1275,7 +1388,8 @@ export function DocumentItemTable({
                             disabled={
                                 !pendingVariant &&
                                 !pendingRowVariant &&
-                                Object.keys(pendingRowVariantsMap).length === 0
+                                Object.keys(pendingRowVariantsMap).length === 0 &&
+                                pendingMultiVariantIds.length === 0
                             }
                             className="cursor-pointer rounded border-0 bg-blue-600 px-4 py-2 text-white disabled:cursor-not-allowed disabled:bg-gray-300"
                         >

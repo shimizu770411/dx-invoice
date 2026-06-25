@@ -19,6 +19,7 @@ type Props = {
     setValue?: UseFormSetValue<EstimateFormData>
     readOnly?: boolean
     currentStoreId?: string | null
+    onMultiSelectChange?: (index: number, variantIds: string[], options?: { adhocSetScope?: 'NONE' | 'MEMBER_ONLY' | 'BOTH'; isService?: boolean; isMaturityService?: boolean }) => void
 }
 
 export function EstimateItemTable({ control, fields, freeFields, setValue, ...rest }: Props) {

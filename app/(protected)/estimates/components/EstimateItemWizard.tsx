@@ -27,6 +27,7 @@ type Props = {
     isMember: boolean
     totals: Totals
     onVariantChange?: (index: number, variant: ProductVariant) => void
+    onMultiSelectChange?: (index: number, variantIds: string[], options?: { adhocSetScope?: 'NONE' | 'MEMBER_ONLY' | 'BOTH'; isService?: boolean; isMaturityService?: boolean }) => void
     setValue?: UseFormSetValue<EstimateFormData>
     freeItems?: EstimateFreeItem[]
     freeFields?: FieldArrayWithId<EstimateFormData, 'freeItems', 'id'>[]
@@ -44,6 +45,7 @@ export function EstimateItemWizard({
     isMember,
     totals,
     onVariantChange,
+    onMultiSelectChange,
     setValue,
     freeItems = [],
     freeFields = [],
@@ -299,20 +301,24 @@ export function EstimateItemWizard({
                                 ⚠ 店舗変更により利用不可
                             </div>
                         )}
-                        {step.kind === 'product' && currentQty > 0 && item?.productVariant && (
-                            <div
-                                className="font-mincho"
-                                style={{
-                                    padding: '6px 14px',
-                                    border: '1px solid var(--brand-navy)',
-                                    color: 'var(--brand-navy)',
-                                    fontSize: '13px',
-                                    letterSpacing: '0.15em',
-                                }}
-                            >
-                                選択中: {item.productVariant.name}
-                            </div>
-                        )}
+                        {step.kind === 'product' && currentQty > 0 && (() => {
+                            if ((item as any)?.productItem?.isMultiSelect) {
+                                const ids: string[] = (() => { try { return JSON.parse((item as any).multiSelectVariantIds || '[]') } catch { return [] } })()
+                                if (ids.length === 0) return null
+                                const names = ids.map((id) => variants.find((v) => String(v.id) === id)?.name).filter(Boolean).join('、')
+                                return (
+                                    <div className="font-mincho" style={{ padding: '6px 14px', border: '1px solid var(--brand-navy)', color: 'var(--brand-navy)', fontSize: '13px', letterSpacing: '0.15em' }}>
+                                        選択中: {names}（{ids.length}種類）
+                                    </div>
+                                )
+                            }
+                            if (!item?.productVariant) return null
+                            return (
+                                <div className="font-mincho" style={{ padding: '6px 14px', border: '1px solid var(--brand-navy)', color: 'var(--brand-navy)', fontSize: '13px', letterSpacing: '0.15em' }}>
+                                    選択中: {item.productVariant.name}
+                                </div>
+                            )
+                        })()}
                     </div>
                 </div>
 
@@ -329,113 +335,88 @@ export function EstimateItemWizard({
                     >
                         種類がありません
                     </div>
-                ) : (
-                    <div className="grid grid-cols-3 gap-4 mb-5">
-                        {variants.map((v) => {
-                            const isSelected = selectedVariantId === v.id
-                            const img = resolveProductImageUrl(v.imageUrl)
-                            return (
-                                <button
-                                    key={v.id}
-                                    type="button"
-                                    onClick={() => handleSelectVariant(v)}
-                                    className="transition-all overflow-hidden"
-                                    style={{
-                                        border: isSelected
-                                            ? '2px solid var(--brand-navy)'
-                                            : '1px solid var(--brand-border)',
-                                        backgroundColor: isSelected ? '#f5f6fc' : '#ffffff',
-                                        padding: '0',
-                                        textAlign: 'left',
-                                        boxShadow: isSelected
-                                            ? '0 4px 12px rgba(1, 8, 62, 0.15)'
-                                            : '0 1px 3px rgba(1, 8, 62, 0.05)',
-                                        cursor: 'pointer',
-                                    }}
-                                >
-                                    <div
-                                        className="flex items-center justify-center overflow-hidden relative"
-                                        style={{
-                                            width: '100%',
-                                            aspectRatio: '4 / 3',
-                                            backgroundColor: 'var(--brand-ivory)',
-                                            borderBottom: '1px solid var(--brand-border)',
-                                        }}
-                                    >
-                                        {img ? (
-                                            <Image
-                                                src={img}
-                                                alt={v.name}
-                                                fill
-                                                sizes="300px"
-                                                className="object-contain"
-                                                style={{ padding: '4px' }}
-                                            />
-                                        ) : (
-                                            <ImageOff
-                                                className="h-12 w-12"
-                                                style={{
-                                                    color: 'var(--brand-gold-soft)',
-                                                    opacity: 0.4,
-                                                }}
-                                            />
-                                        )}
-                                        {isSelected && (
+                ) : (() => {
+                    const isMultiSelectProduct = !!(item as any)?.productItem?.isMultiSelect
+                    const multiSelectedIds: string[] = isMultiSelectProduct
+                        ? (() => { try { return JSON.parse((item as any).multiSelectVariantIds || '[]') } catch { return [] } })()
+                        : []
+                    const cardStyle = (isSelected: boolean): React.CSSProperties => ({
+                        border: isSelected ? '2px solid var(--brand-navy)' : '1px solid var(--brand-border)',
+                        backgroundColor: isSelected ? '#f5f6fc' : '#ffffff',
+                        padding: '0',
+                        textAlign: 'left',
+                        boxShadow: isSelected ? '0 4px 12px rgba(1, 8, 62, 0.15)' : '0 1px 3px rgba(1, 8, 62, 0.05)',
+                        cursor: 'pointer',
+                    })
+                    return (
+                        <>
+                            {isMultiSelectProduct && (
+                                <p className="font-mincho mb-2" style={{ fontSize: '12px', color: 'var(--brand-text-muted)', letterSpacing: '0.1em' }}>
+                                    複数選択可（タップで選択・解除）
+                                </p>
+                            )}
+                            <div className="grid grid-cols-3 gap-4 mb-5">
+                                {variants.map((v) => {
+                                    const isSelected = isMultiSelectProduct
+                                        ? multiSelectedIds.includes(String(v.id))
+                                        : selectedVariantId === v.id
+                                    const img = resolveProductImageUrl(v.imageUrl)
+                                    const handleClick = isMultiSelectProduct
+                                        ? () => {
+                                            const next = isSelected
+                                                ? multiSelectedIds.filter((id) => id !== String(v.id))
+                                                : [...multiSelectedIds, String(v.id)]
+                                            onMultiSelectChange?.(index, next)
+                                            if (next.length > 0 && (!currentQty || currentQty === 0)) {
+                                                setValue?.(`items.${index}.qty` as `items.${number}.qty`, 1, { shouldDirty: true })
+                                            } else if (next.length === 0) {
+                                                setValue?.(`items.${index}.qty` as `items.${number}.qty`, 0, { shouldDirty: true })
+                                            }
+                                            setValue?.('_changeMarker' as any, String(Date.now()), { shouldDirty: true })
+                                        }
+                                        : () => handleSelectVariant(v)
+                                    return (
+                                        <button
+                                            key={v.id}
+                                            type="button"
+                                            onClick={handleClick}
+                                            className="transition-all overflow-hidden"
+                                            style={cardStyle(isSelected)}
+                                        >
                                             <div
-                                                className="absolute top-2 right-2 flex items-center justify-center"
-                                                style={{
-                                                    width: '32px',
-                                                    height: '32px',
-                                                    backgroundColor: 'var(--brand-navy)',
-                                                    color: '#ffffff',
-                                                    borderRadius: '50%',
-                                                    fontSize: '18px',
-                                                }}
+                                                className="flex items-center justify-center overflow-hidden relative"
+                                                style={{ width: '100%', aspectRatio: '4 / 3', backgroundColor: 'var(--brand-ivory)', borderBottom: '1px solid var(--brand-border)' }}
                                             >
-                                                ✓
+                                                {img ? (
+                                                    <Image src={img} alt={v.name} fill sizes="300px" className="object-contain" style={{ padding: '4px' }} />
+                                                ) : (
+                                                    <ImageOff className="h-12 w-12" style={{ color: 'var(--brand-gold-soft)', opacity: 0.4 }} />
+                                                )}
+                                                {isSelected && (
+                                                    <div className="absolute top-2 right-2 flex items-center justify-center"
+                                                        style={{ width: '32px', height: '32px', backgroundColor: 'var(--brand-navy)', color: '#ffffff', borderRadius: '50%', fontSize: '18px' }}>
+                                                        ✓
+                                                    </div>
+                                                )}
                                             </div>
-                                        )}
-                                    </div>
-                                    <div className="px-3 py-2">
-                                        <p
-                                            className="font-mincho mb-1"
-                                            style={{
-                                                fontSize: '14px',
-                                                fontWeight: 500,
-                                                color: 'var(--brand-text)',
-                                                letterSpacing: '0.08em',
-                                                lineHeight: 1.4,
-                                            }}
-                                        >
-                                            {v.name}
-                                        </p>
-                                        <p
-                                            className="font-garamond"
-                                            style={{
-                                                fontSize: '17px',
-                                                fontWeight: 600,
-                                                color: 'var(--brand-navy)',
-                                                fontVariantNumeric: 'tabular-nums',
-                                            }}
-                                        >
-                                            ¥{(isMember ? v.priceMember : v.priceGeneral).toLocaleString()}
-                                        </p>
-                                        <p
-                                            className="font-mincho"
-                                            style={{
-                                                fontSize: '10px',
-                                                color: 'var(--brand-gold-soft)',
-                                                letterSpacing: '0.1em',
-                                            }}
-                                        >
-                                            {isMember ? '会員価格' : '一般価格'}
-                                        </p>
-                                    </div>
-                                </button>
-                            )
-                        })}
-                    </div>
-                ))}
+                                            <div className="px-3 py-2">
+                                                <p className="font-mincho mb-1" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--brand-text)', letterSpacing: '0.08em', lineHeight: 1.4 }}>
+                                                    {v.name}
+                                                </p>
+                                                <p className="font-garamond" style={{ fontSize: '17px', fontWeight: 600, color: 'var(--brand-navy)', fontVariantNumeric: 'tabular-nums' }}>
+                                                    ¥{(isMember ? v.priceMember : v.priceGeneral).toLocaleString()}
+                                                </p>
+                                                <p className="font-mincho" style={{ fontSize: '10px', color: 'var(--brand-gold-soft)', letterSpacing: '0.1em' }}>
+                                                    {isMember ? '会員価格' : '一般価格'}
+                                                </p>
+                                            </div>
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                        </>
+                    )
+                })())}
 
                 {/* 数量・摘要入力（商品ステップ） */}
                 {step.kind === 'product' && currentQty > 0 && (
