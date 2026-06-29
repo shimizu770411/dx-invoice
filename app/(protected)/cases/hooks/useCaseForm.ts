@@ -57,6 +57,79 @@ export function useCaseFormData() {
     return { formatDateForInput, formatDateForISO }
 }
 
+// APIレスポンス → CaseFormData 変換（純粋関数）
+function toCustomerFormData(customerData: any, formatDateForInput: (v: any) => string): CaseFormData {
+    const defaultMembership = (rowNo: number) => ({
+        rowNo,
+        memberNo: '',
+        joinedAt: '',
+        memberName: '',
+        courseUnits: undefined,
+        maturityAmount: undefined,
+        paymentAmountOnce: DEFAULT_PAYMENT_AMOUNT_ONCE,
+        paymentTimes: undefined,
+        paymentAmount: undefined,
+        salesStaffName: '',
+        relationToDeceased: '',
+    })
+    return {
+        receptionAt: formatDateForInput(customerData.receptionAt),
+        deceasedName: customerData.deceasedName || '',
+        deceasedLastName: customerData.deceasedLastName || '',
+        deceasedFirstName: customerData.deceasedFirstName || '',
+        gender: customerData.gender || '',
+        age: customerData.age ?? 0,
+        religion: customerData.religion || '',
+        chiefMournerName: customerData.chiefMournerName || '',
+        chiefMournerRelation: customerData.chiefMournerRelation || '',
+        chiefMournerCityId: customerData.chiefMournerCityId || '',
+        chiefMournerTownId: customerData.chiefMournerTownId || '',
+        chiefMournerAddress: customerData.chiefMournerAddress || '',
+        chiefMournerTel: customerData.chiefMournerTel || '',
+        sameAsChiefMourner: false,
+        payerName: customerData.payerName || '',
+        payerRelation: customerData.payerRelation || '',
+        payerAddress: customerData.payerAddress || '',
+        payerTel: customerData.payerTel || '',
+        pickupPlace: customerData.pickupPlace || '',
+        wakeAt: formatDateForInput(customerData.wakeAt),
+        wakePlace: customerData.wakePlace || '',
+        departureAt: formatDateForInput(customerData.departureAt),
+        departurePlace: customerData.departurePlace || '',
+        funeralFrom: formatDateForInput(customerData.funeralFrom),
+        funeralTo: formatDateForInput(customerData.funeralTo),
+        funeralPlace: customerData.funeralPlace || '',
+        notes: customerData.notes || '',
+        memberships: customerData.memberships?.map((m: any) => ({
+            rowNo: m.rowNo,
+            memberNo: m.memberNo || '',
+            joinedAt: m.joinedAt ? formatDateForInput(m.joinedAt).split('T')[0] : '',
+            memberName: m.memberName || '',
+            courseUnits: m.courseUnits ?? undefined,
+            maturityAmount: m.maturityAmount ?? undefined,
+            paymentAmountOnce: m.paymentAmountOnce ?? DEFAULT_PAYMENT_AMOUNT_ONCE,
+            paymentTimes: m.paymentTimes ?? undefined,
+            paymentAmount: m.paymentAmount ?? undefined,
+            salesStaffName: m.salesStaffName || '',
+            relationToDeceased: m.relationToDeceased || '',
+        })) || [defaultMembership(1), defaultMembership(2), defaultMembership(3)],
+    }
+}
+
+// フォームへの一括反映（純粋関数）
+function applyCustomerFormData(data: CaseFormData, setValue: UseFormSetValue<any>): void {
+    const fields: (keyof CaseFormData)[] = [
+        'receptionAt', 'deceasedName', 'deceasedLastName', 'deceasedFirstName',
+        'gender', 'age', 'religion',
+        'chiefMournerName', 'chiefMournerRelation', 'chiefMournerCityId',
+        'chiefMournerTownId', 'chiefMournerAddress', 'chiefMournerTel',
+        'payerName', 'payerRelation', 'payerAddress', 'payerTel',
+        'pickupPlace', 'wakeAt', 'wakePlace', 'departureAt', 'departurePlace',
+        'funeralFrom', 'funeralTo', 'funeralPlace', 'notes', 'memberships',
+    ]
+    fields.forEach((key) => setValue(key, data[key]))
+}
+
 export function useCaseFormLoader(setValue: UseFormSetValue<any>): {
     loadCities: () => Promise<AddressCity[]>
     loadCitiesAndCustomer: (customerId: string) => Promise<{
@@ -70,8 +143,7 @@ export function useCaseFormLoader(setValue: UseFormSetValue<any>): {
 
     const loadCities = useCallback(async (): Promise<AddressCity[]> => {
         try {
-            const citiesData = await getCities()
-            return citiesData
+            return await getCities()
         } catch (error) {
             handleLoadError(error)
             return []
@@ -82,126 +154,13 @@ export function useCaseFormLoader(setValue: UseFormSetValue<any>): {
         async (customerId: string) => {
             try {
                 const [customerData, citiesData] = await Promise.all([getCustomer(customerId), getCities()])
-
                 if (!customerData) {
                     toast({ title: '案件が見つかりません', variant: 'destructive', duration: 3000 })
                     router.push('/cases')
                     return { customer: null, cities: citiesData }
                 }
-
-                // フォームデータに変換
-                const formattedData: CaseFormData = {
-                    receptionAt: formatDateForInput(customerData.receptionAt),
-                    deceasedName: customerData.deceasedName || '',
-                    deceasedLastName: customerData.deceasedLastName || '',
-                    deceasedFirstName: customerData.deceasedFirstName || '',
-                    gender: customerData.gender || '',
-                    age: customerData.age ? customerData.age : 0,
-                    religion: customerData.religion || '',
-                    chiefMournerName: customerData.chiefMournerName || '',
-                    chiefMournerRelation: customerData.chiefMournerRelation || '',
-                    chiefMournerCityId: customerData.chiefMournerCityId || '',
-                    chiefMournerTownId: customerData.chiefMournerTownId || '',
-                    chiefMournerAddress: customerData.chiefMournerAddress || '',
-                    chiefMournerTel: customerData.chiefMournerTel || '',
-                    sameAsChiefMourner: false,
-                    payerName: customerData.payerName || '',
-                    payerRelation: customerData.payerRelation || '',
-                    payerAddress: customerData.payerAddress || '',
-                    payerTel: customerData.payerTel || '',
-                    pickupPlace: customerData.pickupPlace || '',
-                    wakeAt: formatDateForInput(customerData.wakeAt),
-                    wakePlace: customerData.wakePlace || '',
-                    departureAt: formatDateForInput(customerData.departureAt),
-                    departurePlace: customerData.departurePlace || '',
-                    funeralFrom: formatDateForInput(customerData.funeralFrom),
-                    funeralTo: formatDateForInput(customerData.funeralTo),
-                    funeralPlace: customerData.funeralPlace || '',
-                    notes: customerData.notes || '',
-                    memberships: customerData.memberships?.map((m: any) => ({
-                        rowNo: m.rowNo,
-                        memberNo: m.memberNo || '',
-                        joinedAt: m.joinedAt ? formatDateForInput(m.joinedAt).split('T')[0] : '',
-                        memberName: m.memberName || '',
-                        courseUnits: m.courseUnits ? m.courseUnits : undefined,
-                        maturityAmount: m.maturityAmount ? m.maturityAmount : undefined,
-                        paymentAmountOnce: m.paymentAmountOnce ? m.paymentAmountOnce : 3000,
-                        paymentTimes: m.paymentTimes ? m.paymentTimes : undefined,
-                        paymentAmount: m.paymentAmount ? m.paymentAmount : undefined,
-                        salesStaffName: m.salesStaffName || '',
-                        relationToDeceased: m.relationToDeceased || '',
-                    })) || [
-                        {
-                            rowNo: 1,
-                            memberNo: '',
-                            joinedAt: '',
-                            memberName: '',
-                            courseUnits: undefined,
-                            maturityAmount: undefined,
-                            paymentAmountOnce: DEFAULT_PAYMENT_AMOUNT_ONCE,
-                            paymentTimes: undefined,
-                            paymentAmount: undefined,
-                            salesStaffName: '',
-                            relationToDeceased: '',
-                        },
-                        {
-                            rowNo: 2,
-                            memberNo: '',
-                            joinedAt: '',
-                            memberName: '',
-                            courseUnits: undefined,
-                            maturityAmount: undefined,
-                            paymentAmountOnce: DEFAULT_PAYMENT_AMOUNT_ONCE,
-                            paymentTimes: undefined,
-                            paymentAmount: undefined,
-                            salesStaffName: '',
-                            relationToDeceased: '',
-                        },
-                        {
-                            rowNo: 3,
-                            memberNo: '',
-                            joinedAt: '',
-                            memberName: '',
-                            courseUnits: undefined,
-                            maturityAmount: undefined,
-                            paymentAmountOnce: DEFAULT_PAYMENT_AMOUNT_ONCE,
-                            paymentTimes: undefined,
-                            paymentAmount: undefined,
-                            salesStaffName: '',
-                            relationToDeceased: '',
-                        },
-                    ],
-                }
-
-                // フォームに値を設定
-                setValue('receptionAt', formattedData.receptionAt)
-                setValue('deceasedName', formattedData.deceasedName)
-                setValue('deceasedLastName', formattedData.deceasedLastName)
-                setValue('deceasedFirstName', formattedData.deceasedFirstName)
-                setValue('gender', formattedData.gender)
-                setValue('age', formattedData.age)
-                setValue('religion', formattedData.religion)
-                setValue('chiefMournerName', formattedData.chiefMournerName)
-                setValue('chiefMournerRelation', formattedData.chiefMournerRelation)
-                setValue('chiefMournerCityId', formattedData.chiefMournerCityId)
-                setValue('chiefMournerTownId', formattedData.chiefMournerTownId)
-                setValue('chiefMournerAddress', formattedData.chiefMournerAddress)
-                setValue('chiefMournerTel', formattedData.chiefMournerTel)
-                setValue('payerName', formattedData.payerName)
-                setValue('payerRelation', formattedData.payerRelation)
-                setValue('payerAddress', formattedData.payerAddress)
-                setValue('payerTel', formattedData.payerTel)
-                setValue('pickupPlace', formattedData.pickupPlace)
-                setValue('wakeAt', formattedData.wakeAt)
-                setValue('wakePlace', formattedData.wakePlace)
-                setValue('departureAt', formattedData.departureAt)
-                setValue('departurePlace', formattedData.departurePlace)
-                setValue('funeralFrom', formattedData.funeralFrom)
-                setValue('funeralTo', formattedData.funeralTo)
-                setValue('funeralPlace', formattedData.funeralPlace)
-                setValue('notes', formattedData.notes)
-                setValue('memberships', formattedData.memberships)
-
+                const formattedData = toCustomerFormData(customerData, formatDateForInput)
+                applyCustomerFormData(formattedData, setValue)
                 return { customer: customerData, cities: citiesData }
             } catch (error) {
                 handleLoadError(error)
@@ -212,15 +171,11 @@ export function useCaseFormLoader(setValue: UseFormSetValue<any>): {
     )
 
     const handleCityChange = useCallback(async (cityId: string) => {
-        if (cityId) {
-            try {
-                const townsData = await getTowns(cityId)
-                return townsData
-            } catch (error) {
-                handleLoadError(error)
-                return []
-            }
-        } else {
+        if (!cityId) return []
+        try {
+            return await getTowns(cityId)
+        } catch (error) {
+            handleLoadError(error)
             return []
         }
     }, [])

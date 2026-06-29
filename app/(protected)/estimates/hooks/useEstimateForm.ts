@@ -4,23 +4,153 @@ import { useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
 import { getEstimate, createEstimate, updateEstimate, Estimate, EstimateItem, EstimateFreeItem } from '@/lib/estimates'
 import { getCustomer } from '@/lib/customers'
-import { getProducts, ProductItem, ProductVariant } from '@/lib/products'
+import { getProducts, ProductItem } from '@/lib/products'
 import { expandMultiRowToItems } from '@/lib/expandMultiRow'
 import { toast } from '@/hooks/use-toast'
 import { handleLoadError, handleSaveError } from '@/lib/errorHandler'
 import { calculateDocumentFormTotals } from '@/lib/documentTotals'
 import { useDocumentItems } from '@/hooks/useDocumentItems'
-import { sortByProductItemId, expandEachModeItems, padDocumentFreeItems, buildDocumentFreeItems, MATURITY_SERVICE_NAME } from '@/lib/documentUtils'
+import { expandEachModeItems, padDocumentFreeItems, buildDocumentFreeItems, MATURITY_SERVICE_NAME } from '@/lib/documentUtils'
 import { useDocumentProductSearch } from '@/hooks/useDocumentProductSearch'
-import {
-    EstimateFormData,
-    EstimateItemField,
-    EstimateFreeItemField,
-    DEFAULT_FORM_VALUES,
-} from '../schemas/EstimateFormSchema'
+import { EstimateFormData, DEFAULT_FORM_VALUES } from '../schemas/EstimateFormSchema'
 
 
-// 商品マスタとは連動しない明細フリー行を、明細末尾に常時 5 行表示し、
+// -------------------------------------------------------
+// 商品データ変換ユーティリティ（モジュールレベル純粋関数）
+// -------------------------------------------------------
+
+function filterProductsByStore(products: ProductItem[], storeId: string | null): ProductItem[] {
+    return products.map((product) => ({
+        ...product,
+        variants: product.variants.filter(
+            (v: any) => !v.storeId || (storeId && String(v.storeId) === storeId)
+        ),
+    }))
+}
+
+// 新規作成時: 商品マスタ → 初期明細行（全て qty=0）
+function buildNewEstimateItems(filteredProducts: ProductItem[]): EstimateItem[] {
+    const ordered: EstimateItem[] = []
+    const addedIds = new Set<string>()
+    for (const product of filteredProducts) {
+        const key = String(product.id)
+        if (addedIds.has(key)) continue
+        if ((product as any).isMultiRow && (product as any).rows?.length > 0) {
+            const expanded = expandMultiRowToItems<EstimateItem>(
+                product,
+                ordered.length,
+                (product as any).defaultDescription ?? ''
+            )
+            ordered.push(...expanded.map((it) => ({ ...it, qty: 0, amount: 0 })))
+        } else {
+            const firstVariant = product.variants[0] ?? null
+            ordered.push({
+                productItemId: product.id,
+                productVariantId: firstVariant?.id ?? undefined,
+                description: (product as any).defaultDescription ?? '',
+                unitPriceGeneral: (firstVariant as any)?.priceGeneral || 0,
+                unitPriceMember: (firstVariant as any)?.priceMember || 0,
+                qty: 0,
+                amount: 0,
+                sortNo: ordered.length,
+                productItem: { ...product },
+                productVariant: firstVariant,
+            } as EstimateItem)
+        }
+        addedIds.add(key)
+    }
+    return ordered
+}
+
+// 編集時: 1商品 → 既存明細とマージした明細行
+function buildEstimateItemsForProduct(
+    product: any,
+    startSortNo: number,
+    existingItems: EstimateItem[]
+): EstimateItem[] {
+    if (product.isMultiRow && product.rows?.length > 0) {
+        const out: EstimateItem[] = []
+        let cursor = startSortNo
+        for (const row of product.rows as any[]) {
+            const def = row.variants?.find((v: any) => v.isDefault) ?? row.variants?.[0]
+            const unitPrice = def?.unitPrice ?? 0
+            const signs: (1 | -1)[] = row.hasReturn ? [1, -1] : [1]
+            for (const sign of signs) {
+                const existing = existingItems.find(
+                    (item) =>
+                        String((item as any).productRowId ?? '') === String(row.id) &&
+                        Number((item as any).sign ?? 1) === sign
+                )
+                if (existing) {
+                    out.push({ ...existing, productItem: { ...product }, productRow: row } as EstimateItem)
+                } else {
+                    out.push({
+                        productItemId: product.id,
+                        productRowId: String(row.id),
+                        productRowVariantId: def ? String(def.id) : null,
+                        calcType: row.calcType,
+                        sign,
+                        description: product.defaultDescription ?? '',
+                        unitPriceGeneral: unitPrice,
+                        unitPriceMember: unitPrice,
+                        qty: 0,
+                        amount: 0,
+                        sortNo: cursor,
+                        productItem: { ...product },
+                        productRow: row,
+                        productRowVariant: def,
+                    } as EstimateItem)
+                }
+                cursor++
+            }
+        }
+        return out
+    }
+    const allExisting = existingItems.filter(
+        (item) => item.productItemId === product.id && !(item as any).productRowId
+    )
+    if (allExisting.length > 0) {
+        if (product.isMultiSelect && product.multiSelectMerge === false && allExisting.length > 1) {
+            const variantIds = allExisting.map((it: any) => String(it.productVariantId)).filter(Boolean)
+            const selectedVariants = (product.variants || []).filter((v: any) => variantIds.includes(String(v.id)))
+            return [{
+                ...allExisting[0],
+                productItem: { ...product },
+                multiSelectVariantIds: JSON.stringify(variantIds),
+                unitPriceGeneral: selectedVariants.reduce((s: number, v: any) => s + v.priceGeneral, 0),
+                unitPriceMember: selectedVariants.reduce((s: number, v: any) => s + v.priceMember, 0),
+            } as EstimateItem]
+        }
+        return [{ ...allExisting[0], productItem: { ...product } }]
+    }
+    const firstVariant = product.variants[0] ?? null
+    return [{
+        productItemId: product.id,
+        productVariantId: firstVariant?.id ?? undefined,
+        description: product.defaultDescription ?? '',
+        unitPriceGeneral: firstVariant?.priceGeneral || 0,
+        unitPriceMember: firstVariant?.priceMember || 0,
+        qty: 0,
+        amount: 0,
+        sortNo: startSortNo,
+        productItem: { ...product },
+        productVariant: firstVariant,
+    } as EstimateItem]
+}
+
+// 編集時: 全商品 × 既存明細 → マージ済み明細リスト
+function buildMergedEstimateItems(filteredProducts: ProductItem[], existingItems: EstimateItem[]): EstimateItem[] {
+    const mergedItems: EstimateItem[] = []
+    const addedIds = new Set<string>()
+    for (const product of filteredProducts) {
+        const key = String(product.id)
+        if (addedIds.has(key)) continue
+        mergedItems.push(...buildEstimateItemsForProduct(product, mergedItems.length, existingItems))
+        addedIds.add(key)
+    }
+    return mergedItems
+}
+
 // -------------------------------------------------------
 // 新規作成フック（customerId から）
 // -------------------------------------------------------
@@ -36,70 +166,12 @@ export function useEstimateCreate(customerId: string, reset: UseFormReset<Estima
         try {
             const [customerData, allProducts] = await Promise.all([getCustomer(customerId), getProducts()])
             setCustomer(customerData)
-
-            // 顧客の担当店舗でvariantを絞り込み（該当店舗 + 全店舗共通）
-            // バリエーション0件の商品も表示する（価格は明細で個別に設定可能）
             const storeId = customerData?.storeId ? String(customerData.storeId) : null
-            const filteredProducts = allProducts.map((product) => ({
-                ...product,
-                variants: product.variants.filter(
-                    (v) => !v.storeId || (storeId && String(v.storeId) === storeId)
-                ),
-            }))
-
-            // 並び順:
-            //   1. 親祭壇（isSetParent=true）を sortNo 順
-            //   2. 一般商品（isSetParent=false かつ isSetChild=false）を sortNo 順
-            //   3. 子商品（isSetChild=true）は親の直後に挿入（初期は qty=0）
-            const parents = filteredProducts.filter((p: any) => p.isSetParent)
-            const normals = filteredProducts.filter((p: any) => !p.isSetParent && !p.isSetChild)
-            const childMap = new Map<string, any>()
-            filteredProducts.forEach((p: any) => {
-                if (p.isSetChild) childMap.set(String(p.id), p)
-            })
-
-            const buildItems = (product: any, startSortNo: number): EstimateItem[] => {
-                // 複数行構成商品: ProductRow ごとに1行ずつ展開（初期は qty=0）
-                if (product.isMultiRow && product.rows && product.rows.length > 0) {
-                    return expandMultiRowToItems<EstimateItem>(
-                        product,
-                        startSortNo,
-                        product.defaultDescription ?? ''
-                    ).map((it) => ({ ...it, qty: 0, amount: 0 }))
-                }
-                const firstVariant = product.variants[0] ?? null
-                return [
-                    {
-                        productItemId: product.id,
-                        productVariantId: firstVariant?.id ?? undefined,
-                        description: product.defaultDescription ?? '',
-                        unitPriceGeneral: firstVariant?.priceGeneral || 0,
-                        unitPriceMember: firstVariant?.priceMember || 0,
-                        qty: 0,
-                        amount: 0,
-                        sortNo: startSortNo,
-                        productItem: { ...product },
-                        productVariant: firstVariant,
-                    } as EstimateItem,
-                ]
-            }
-
-            // 商品マスタの sortNo 順にすべて追加（重複なし）
-            const ordered: EstimateItem[] = []
-            const addedIds = new Set<string>()
-            for (const product of filteredProducts) {
-                const key = String(product.id)
-                if (addedIds.has(key)) continue
-                ordered.push(...buildItems(product, ordered.length))
-                addedIds.add(key)
-            }
-
-            const initialItems = ordered
+            const filteredProducts = filterProductsByStore(allProducts, storeId)
+            const initialItems = buildNewEstimateItems(filteredProducts)
             setItems(initialItems)
-
             const initialFreeItems = padDocumentFreeItems<EstimateFreeItem>([], [MATURITY_SERVICE_NAME])
             setFreeItems(initialFreeItems)
-
             reset({
                 ...DEFAULT_FORM_VALUES,
                 items: initialItems.map((item) => ({
@@ -197,124 +269,15 @@ export function useEstimateEdit(estimateId: string, reset: UseFormReset<Estimate
             const [estimateData, allProducts] = await Promise.all([getEstimate(estimateId), getProducts()])
             setEstimate(estimateData)
             const existingItems: EstimateItem[] = estimateData.items || []
-
             const customerData = await getCustomer(estimateData.customerId)
             setCustomer(customerData)
-
-            // 顧客の担当店舗でvariantを絞り込み（該当店舗 + 全店舗共通）
-            // バリエーション0件の商品も表示する（価格は明細で個別に設定可能）
             const storeId = customerData?.storeId ? String(customerData.storeId) : null
-            const filteredProducts = allProducts.map((product) => ({
-                ...product,
-                variants: product.variants.filter(
-                    (v) => !v.storeId || (storeId && String(v.storeId) === storeId)
-                ),
-            }))
-
-            const buildItems = (product: any, startSortNo: number): EstimateItem[] => {
-                // 複数行構成商品: ProductRow ごとに、既存明細とマージしながら展開
-                // hasReturn=true の行は加算/減算の2行に展開
-                if (product.isMultiRow && product.rows && product.rows.length > 0) {
-                    const out: EstimateItem[] = []
-                    let cursor = startSortNo
-                    for (const row of product.rows as any[]) {
-                        const def =
-                            row.variants?.find((v: any) => v.isDefault) ?? row.variants?.[0]
-                        const unitPrice = def?.unitPrice ?? 0
-                        const signs: (1 | -1)[] = row.hasReturn ? [1, -1] : [1]
-                        for (const sign of signs) {
-                            const existing = existingItems.find(
-                                (item) =>
-                                    String((item as any).productRowId ?? '') === String(row.id) &&
-                                    Number((item as any).sign ?? 1) === sign
-                            )
-                            if (existing) {
-                                out.push({
-                                    ...existing,
-                                    productItem: { ...product },
-                                    productRow: row,
-                                } as EstimateItem)
-                            } else {
-                                out.push({
-                                    productItemId: product.id,
-                                    productRowId: String(row.id),
-                                    productRowVariantId: def ? String(def.id) : null,
-                                    calcType: row.calcType,
-                                    sign,
-                                    description: product.defaultDescription ?? '',
-                                    unitPriceGeneral: unitPrice,
-                                    unitPriceMember: unitPrice,
-                                    qty: 0,
-                                    amount: 0,
-                                    sortNo: cursor,
-                                    productItem: { ...product },
-                                    productRow: row,
-                                    productRowVariant: def,
-                                } as EstimateItem)
-                            }
-                            cursor++
-                        }
-                    }
-                    return out
-                }
-                const allExisting = existingItems.filter(
-                    (item) =>
-                        item.productItemId === product.id && !(item as any).productRowId
-                )
-                if (allExisting.length > 0) {
-                    // EACH モード (isMultiSelect=true, multiSelectMerge=false): 複数EACH行を1スロットに集約
-                    if ((product as any).isMultiSelect && (product as any).multiSelectMerge === false && allExisting.length > 1) {
-                        const variantIds = allExisting
-                            .map((it: any) => String(it.productVariantId))
-                            .filter(Boolean)
-                        const selectedVariants = (product.variants || []).filter((v: any) =>
-                            variantIds.includes(String(v.id))
-                        )
-                        const totalGeneral = selectedVariants.reduce((s: number, v: any) => s + v.priceGeneral, 0)
-                        const totalMember = selectedVariants.reduce((s: number, v: any) => s + v.priceMember, 0)
-                        return [{
-                            ...allExisting[0],
-                            productItem: { ...product },
-                            multiSelectVariantIds: JSON.stringify(variantIds),
-                            unitPriceGeneral: totalGeneral,
-                            unitPriceMember: totalMember,
-                        } as EstimateItem]
-                    }
-                    return [{ ...allExisting[0], productItem: { ...product } }]
-                }
-                const firstVariant = product.variants[0] ?? null
-                return [
-                    {
-                        productItemId: product.id,
-                        productVariantId: firstVariant?.id ?? undefined,
-                        description: product.defaultDescription ?? '',
-                        unitPriceGeneral: firstVariant?.priceGeneral || 0,
-                        unitPriceMember: firstVariant?.priceMember || 0,
-                        qty: 0,
-                        amount: 0,
-                        sortNo: startSortNo,
-                        productItem: { ...product },
-                        productVariant: firstVariant,
-                    } as EstimateItem,
-                ]
-            }
-
-            // 商品マスタの sortNo 順にすべて追加（重複なし）
-            const mergedItems: EstimateItem[] = []
-            const addedIds = new Set<string>()
-            for (const product of filteredProducts) {
-                const key = String(product.id)
-                if (addedIds.has(key)) continue
-                mergedItems.push(...buildItems(product, mergedItems.length))
-                addedIds.add(key)
-            }
-
+            const filteredProducts = filterProductsByStore(allProducts, storeId)
+            const mergedItems = buildMergedEstimateItems(filteredProducts, existingItems)
             const loadedFreeItems: EstimateFreeItem[] = (estimateData as any).freeItems || []
-
             const paddedFreeItems = buildDocumentFreeItems(loadedFreeItems, mergedItems, [MATURITY_SERVICE_NAME])
             setItems(mergedItems)
             setFreeItems(paddedFreeItems)
-
             reset({
                 docNo: estimateData.docNo || '',
                 status: estimateData.status || 'DRAFT',
