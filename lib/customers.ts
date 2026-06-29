@@ -12,6 +12,8 @@ export interface CustomerListItem {
     hasEstimate: boolean
     estimateId?: string
     estimateStatus?: string | null
+    estimateType?: 'PRE_CONSULTATION' | 'FORMAL'
+    preConsultEstimateId?: string
     hasInvoice: boolean
     invoiceId?: string
     isPaid: boolean
@@ -50,6 +52,7 @@ export async function searchCustomers(params: SearchCustomersParams): Promise<Cu
 
 export async function getCustomer(id: string) {
     const response = await apiClient.get(`/customers/${id}`)
+    if (!response.data) throw new Error('案件が見つかりません')
     return response.data
 }
 

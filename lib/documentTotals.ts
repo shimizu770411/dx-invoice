@@ -1,0 +1,87 @@
+import { scopeApplies } from '@/lib/productScope'
+import { computeMultiRowAmount } from '@/lib/expandMultiRow'
+
+type DocumentFormItem = {
+    qty: number
+    unitPriceGeneral: number
+    unitPriceMember: number
+    [key: string]: any
+}
+
+type DocumentFormItemField = {
+    qty?: number
+    [key: string]: any
+}
+
+type DocumentFormFreeItem = {
+    unitPriceGeneral: number
+    qty: number
+}
+
+type DocumentFormFreeItemField = {
+    qty?: number
+    unitPriceGeneral?: number
+}
+
+// Hook用（商品属性・スコープ・会員/一般単価を考慮した複雑な合計計算）
+export function calculateDocumentFormTotals(
+    items: DocumentFormItem[],
+    itemFields: DocumentFormItemField[] | undefined,
+    isMember: boolean,
+    customer: any,
+    freeItems?: DocumentFormFreeItem[],
+    freeItemFields?: DocumentFormFreeItemField[]
+) {
+    const regularSubtotal = items.reduce((sum, item, i) => {
+        const qty = itemFields?.[i]?.qty ?? item.qty
+        const pi = item?.productItem
+        const pv = item?.productVariant
+        const isSetIncluded = pi?.isSetChild && pv?.isDefaultSet && scopeApplies(pi?.setableScope, isMember)
+        const isServiceIncluded = item?.isService && scopeApplies(pi?.serviceableScope, isMember)
+        const isMaturityServiceIncluded = item?.isMaturityService && pi?.isMaturityServiceable
+        const adhocScope = item?.adhocSetScope
+        const isAdhocSetIncluded =
+            adhocScope === 'BOTH' ||
+            (adhocScope === 'MEMBER_ONLY' && isMember) ||
+            (adhocScope === 'GENERAL_ONLY' && !isMember)
+        if (isSetIncluded || isServiceIncluded || isMaturityServiceIncluded || isAdhocSetIncluded) return sum
+        if (item?.productRowId && item?.calcType) {
+            return sum + computeMultiRowAmount({ calcType: item.calcType, sign: item.sign, unitPrice: item.unitPriceGeneral, qty })
+        }
+        const unitPrice = isMember ? item.unitPriceMember : item.unitPriceGeneral
+        return sum + unitPrice * qty
+    }, 0)
+    const freeSubtotal = (freeItems || []).reduce((sum, item, i) => {
+        const qty = freeItemFields?.[i]?.qty ?? item.qty
+        const unitPrice = freeItemFields?.[i]?.unitPriceGeneral ?? item.unitPriceGeneral
+        return sum + unitPrice * qty
+    }, 0)
+    const subtotal = regularSubtotal + freeSubtotal
+    const tax = Math.round(subtotal * 0.1)
+    const total = subtotal + tax
+    const membershipPaidAmount =
+        customer?.memberships?.reduce((sum: number, m: any) => sum + (m.paymentAmount || 0), 0) || 0
+    const grandTotal = Math.max(0, total - membershipPaidAmount)
+    return { subtotal, tax, total, membershipPaidAmount, grandTotal }
+}
+
+// API用（amount 計算済みの items を受け取るシンプルな合計計算）
+export function calculateDocumentTotals(
+    items: { amount?: number }[],
+    membershipPaidAmount: number,
+    freeItems: { unitPriceGeneral?: number; qty?: number }[] = []
+) {
+    const itemsSubtotal = items.reduce((sum, item) => sum + (item.amount || 0), 0)
+    const freeSubtotal = freeItems.reduce((sum, item) => sum + (item.unitPriceGeneral || 0) * (item.qty || 1), 0)
+    const subtotal = itemsSubtotal + freeSubtotal
+    const tax = Math.round(subtotal * 0.1)
+    const total = subtotal + tax
+    const grandTotal = total - membershipPaidAmount
+    return {
+        subtotal,
+        tax,
+        total,
+        membershipPaidAmount,
+        grandTotal: Math.max(0, grandTotal),
+    }
+}

@@ -58,8 +58,9 @@ export async function getInvoices(customerId?: string): Promise<Invoice[]> {
 }
 
 export async function getInvoice(id: string): Promise<Invoice> {
-  const response = await apiClient.get<Invoice>(`/invoices/${id}`);
-  return response.data;
+  const response = await apiClient.get<Invoice>(`/invoices/${id}`)
+  if (!response.data) throw new Error('請求書データが見つかりません')
+  return response.data
 }
 
 export async function createInvoice(customerId: string, data: any): Promise<Invoice> {

@@ -33,7 +33,7 @@ export type DocumentFormData = {
     decorationStaff: string
     returnStaff: string
     items: { qty: number; description: string }[]
-    freeItems: { productItemName: string; description: string; unitPriceGeneral: number; qty: number }[]
+    freeItems: { parentProductItemId?: string | null; productItemName: string; description: string; unitPriceGeneral: number; qty: number }[]
 }
 
 type DocumentRowVariant = {

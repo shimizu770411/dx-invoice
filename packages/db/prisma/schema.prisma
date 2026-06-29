@@ -34,6 +34,11 @@ enum DocumentStatus {
   CONFIRMED
 }
 
+enum EstimateType {
+  PRE_CONSULTATION
+  FORMAL
+}
+
 enum PaymentTargetType {
   INVOICE
   FLOWER_TARGET
@@ -310,6 +315,7 @@ model Estimate {
   customerId          BigInt              @map("customer_id")
   docNo               String?              @unique @db.VarChar(30) @map("doc_no")
   status              DocumentStatus       @default(DRAFT)
+  estimateType        EstimateType         @default(PRE_CONSULTATION) @map("estimate_type")
   isMember            Boolean              @default(false) @map("is_member")
   subtotal            Int                  @default(0)
   tax                 Int                  @default(0)

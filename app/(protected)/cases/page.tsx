@@ -359,17 +359,18 @@ export default function CasesPage() {
                         const hasInv = item.hasInvoice
                         const isPaid = item.isPaid
 
-                        // 見積書: 作成済 → done (白地ネイビー枠)、確認段階(CONFIRMED) → gold、未着手 → primary(現ステップ)
+                        // 見積書: 本見積あり → gold、事前相談見積のみ → done、未作成 → primary
+                        const hasFormalEst = item.estimateType === 'FORMAL'
                         const estVariant: Variant = !hasEst
                             ? 'primary'
-                            : item.estimateStatus === 'CONFIRMED'
+                            : hasFormalEst
                               ? 'gold'
                               : 'done'
                         const estLabel = !hasEst
                             ? '見積書作成'
-                            : item.estimateStatus === 'CONFIRMED'
-                              ? '見積書確認'
-                              : '見積書編集'
+                            : hasFormalEst
+                              ? '本見積編集'
+                              : '事前相談見積'
 
                         // 請求書: 見積書なし → disabled、請求書なし → primary(次ステップ)、あり → done
                         const invDisabled = !hasEst
@@ -432,6 +433,17 @@ export default function CasesPage() {
                                 >
                                     {estLabel}
                                 </button>
+                                {/* 本見積作成済みの場合、事前相談見積も別ボタンで表示 */}
+                                {hasFormalEst && item.preConsultEstimateId && (
+                                    <button
+                                        onClick={() => router.push(`/estimates/${item.preConsultEstimateId}`)}
+                                        style={btnStyle('done')}
+                                        className="font-mincho"
+                                        title="事前相談見積を閲覧"
+                                    >
+                                        事前相談見積
+                                    </button>
+                                )}
                                 <Arrow />
                                 <button
                                     onClick={() => {

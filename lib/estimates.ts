@@ -41,6 +41,7 @@ export interface Estimate {
     customerId: string
     docNo?: string
     status: string
+    estimateType: 'PRE_CONSULTATION' | 'FORMAL'
     subtotal: number
     tax: number
     total: number
@@ -58,6 +59,7 @@ export async function getEstimates(customerId?: string): Promise<Estimate[]> {
 
 export async function getEstimate(id: string): Promise<Estimate> {
     const response = await apiClient.get<Estimate>(`/estimates/${id}`)
+    if (!response.data) throw new Error('見積データが見つかりません')
     return response.data
 }
 
@@ -71,7 +73,7 @@ export async function updateEstimate(id: string, data: any): Promise<Estimate> {
     return response.data
 }
 
-export async function unconfirmEstimate(id: string): Promise<Estimate> {
-    const response = await apiClient.post(`/estimates/${id}/unconfirm`)
+export async function confirmEstimate(id: string): Promise<{ id: string }> {
+    const response = await apiClient.post<{ id: string }>(`/estimates/${id}/confirm`)
     return response.data
 }

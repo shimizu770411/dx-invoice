@@ -2,23 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-middleware'
 import { serializeBigInt } from '@/lib/prisma-utils'
-
-function calculateTotals(items: any[], membershipPaidAmount: number, freeItems: any[] = []) {
-    const itemsSubtotal = items.reduce((sum, item) => sum + (item.amount || 0), 0)
-    const freeSubtotal = freeItems.reduce((sum, item) => sum + (item.unitPriceGeneral || 0) * (item.qty || 1), 0)
-    const subtotal = itemsSubtotal + freeSubtotal
-    const tax = Math.round(subtotal * 0.1)
-    const total = subtotal + tax
-    const grandTotal = total - membershipPaidAmount
-
-    return {
-        subtotal,
-        tax,
-        total,
-        membershipPaidAmount,
-        grandTotal: Math.max(0, grandTotal),
-    }
-}
+import { calculateDocumentTotals } from '@/lib/documentTotals'
+import { buildDocNoPrefix, buildDocNo } from '@/lib/documentUtils'
 
 export async function POST(
     request: NextRequest,
@@ -69,19 +54,15 @@ export async function POST(
         )
 
         const allEstimateFreeItems = estimate.items.flatMap((item: any) => item.freeItems || [])
-        const totals = calculateTotals(estimate.items, membershipPaidAmount, allEstimateFreeItems)
+        const totals = calculateDocumentTotals(estimate.items, membershipPaidAmount, allEstimateFreeItems)
 
         // docNo の自動採番: customers.reception_atの年月(yyyymm) + 同プレフィックスの最大連番+1(3桁)
-        const receptionDate = estimate.customer.receptionAt ? new Date(estimate.customer.receptionAt) : new Date()
-        const yyyy = receptionDate.getFullYear()
-        const mm = String(receptionDate.getMonth() + 1).padStart(2, '0')
-        const prefix = `${yyyy}${mm}`
+        const prefix = buildDocNoPrefix(estimate.customer.receptionAt)
         const latestDoc = await prisma.invoice.findFirst({
             where: { docNo: { startsWith: prefix } },
             orderBy: { docNo: 'desc' },
         })
-        const nextSeq = latestDoc?.docNo ? parseInt(latestDoc.docNo.slice(6)) + 1 : 1
-        const autoDocNo = `${prefix}${String(nextSeq).padStart(3, '0')}`
+        const autoDocNo = buildDocNo(prefix, latestDoc?.docNo)
 
         const invoice = await prisma.invoice.create({
             data: {

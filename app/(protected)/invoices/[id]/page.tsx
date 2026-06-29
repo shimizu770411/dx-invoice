@@ -408,12 +408,9 @@ export default function InvoiceEditPage() {
                         </div>
                     </div>
 
-                </div>
-
-                {/* 操作ボタン（画面下固定: 更新=左、PDFプレビュー=中央、閉じる=右） */}
-                <div className="fixed bottom-0 left-0 right-0 p-2 bg-white">
-                    {isDirty && (
-                        <div className="text-right pb-1">
+                    {/* 操作ボタン（右側） */}
+                    <div className="flex flex-col items-end gap-1">
+                        {isDirty && (
                             <span
                                 className="font-mincho"
                                 style={{
@@ -424,95 +421,96 @@ export default function InvoiceEditPage() {
                             >
                                 ※ 未保存の変更があります
                             </span>
-                        </div>
-                    )}
-                    <div className="flex justify-between items-center gap-3">
-                        <button
-                            type="submit"
-                            disabled={isSubmitting}
-                            className="font-mincho transition-colors text-white"
-                            style={{
-                                padding: '12px 44px',
-                                backgroundColor: isSubmitting ? '#7a7a7a' : 'var(--brand-navy)',
-                                border: 'none',
-                                fontSize: '14px',
-                                letterSpacing: '0.4em',
-                                fontWeight: 500,
-                                cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                                boxShadow: '0 2px 4px rgba(1, 8, 62, 0.15)',
-                            }}
-                        >
-                            {isSubmitting ? '保存中…' : '更　新'}
-                        </button>
+                        )}
                         <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-3 text-sm">
-                                <label className="flex items-center gap-1 cursor-pointer">
-                                    <input
-                                        type="radio"
-                                        name="showOptions-invoice"
-                                        checked={showSelectedOptions}
-                                        onChange={() => setShowSelectedOptions(true)}
-                                    />
-                                    選択オプション表示
-                                </label>
-                                <label className="flex items-center gap-1 cursor-pointer">
-                                    <input
-                                        type="radio"
-                                        name="showOptions-invoice"
-                                        checked={!showSelectedOptions}
-                                        onChange={() => setShowSelectedOptions(false)}
-                                    />
-                                    非表示
-                                </label>
+                            <button
+                                type="submit"
+                                disabled={isSubmitting}
+                                className="font-mincho transition-colors text-white"
+                                style={{
+                                    padding: '12px 44px',
+                                    backgroundColor: isSubmitting ? '#7a7a7a' : 'var(--brand-navy)',
+                                    border: 'none',
+                                    fontSize: '14px',
+                                    letterSpacing: '0.4em',
+                                    fontWeight: 500,
+                                    cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                                    boxShadow: '0 2px 4px rgba(1, 8, 62, 0.15)',
+                                }}
+                            >
+                                {isSubmitting ? '保存中…' : '更　新'}
+                            </button>
+                            <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-3 text-sm">
+                                    <label className="flex items-center gap-1 cursor-pointer">
+                                        <input
+                                            type="radio"
+                                            name="showOptions-invoice"
+                                            checked={showSelectedOptions}
+                                            onChange={() => setShowSelectedOptions(true)}
+                                        />
+                                        選択オプション表示
+                                    </label>
+                                    <label className="flex items-center gap-1 cursor-pointer">
+                                        <input
+                                            type="radio"
+                                            name="showOptions-invoice"
+                                            checked={!showSelectedOptions}
+                                            onChange={() => setShowSelectedOptions(false)}
+                                        />
+                                        非表示
+                                    </label>
+                                </div>
+                                <button
+                                    type="button"
+                                    disabled={isDirty}
+                                    onClick={() =>
+                                        window.open(
+                                            `/api/pdf/invoice/${invoice.id}${!showSelectedOptions ? '?showOptions=false' : ''}`,
+                                            '_blank'
+                                        )
+                                    }
+                                    className="font-mincho transition-colors"
+                                    style={{
+                                        padding: '12px 28px',
+                                        backgroundColor: isDirty ? '#ffffff' : '#ffffff',
+                                        color: isDirty ? '#c4bfb0' : 'var(--brand-gold-soft)',
+                                        border: isDirty
+                                            ? '1px dashed var(--brand-border)'
+                                            : '1px solid var(--brand-gold)',
+                                        fontSize: '14px',
+                                        letterSpacing: '0.25em',
+                                        fontWeight: 500,
+                                        cursor: isDirty ? 'not-allowed' : 'pointer',
+                                        boxShadow: isDirty ? 'none' : '0 1px 2px rgba(196, 174, 106, 0.2)',
+                                    }}
+                                >
+                                    PDFプレビュー
+                                </button>
                             </div>
                             <button
                                 type="button"
-                                disabled={isDirty}
-                                onClick={() =>
-                                    window.open(
-                                        `/api/pdf/invoice/${invoice.id}${!showSelectedOptions ? '?showOptions=false' : ''}`,
-                                        '_blank'
-                                    )
-                                }
+                                onClick={() => {
+                                    router.push('/cases')
+                                    router.refresh()
+                                }}
                                 className="font-mincho transition-colors"
                                 style={{
                                     padding: '12px 28px',
-                                    backgroundColor: isDirty ? '#ffffff' : '#ffffff',
-                                    color: isDirty ? '#c4bfb0' : 'var(--brand-gold-soft)',
-                                    border: isDirty
-                                        ? '1px dashed var(--brand-border)'
-                                        : '1px solid var(--brand-gold)',
+                                    backgroundColor: '#ffffff',
+                                    color: 'var(--brand-text-muted)',
+                                    border: '1px solid var(--brand-border)',
                                     fontSize: '14px',
                                     letterSpacing: '0.25em',
                                     fontWeight: 500,
-                                    cursor: isDirty ? 'not-allowed' : 'pointer',
-                                    boxShadow: isDirty ? 'none' : '0 1px 2px rgba(196, 174, 106, 0.2)',
+                                    cursor: 'pointer',
                                 }}
                             >
-                                PDFプレビュー
+                                閉じる
                             </button>
                         </div>
-                        <button
-                            type="button"
-                            onClick={() => {
-                                router.push('/cases')
-                                router.refresh()
-                            }}
-                            className="font-mincho transition-colors"
-                            style={{
-                                padding: '12px 28px',
-                                backgroundColor: '#ffffff',
-                                color: 'var(--brand-text-muted)',
-                                border: '1px solid var(--brand-border)',
-                                fontSize: '14px',
-                                letterSpacing: '0.25em',
-                                fontWeight: 500,
-                                cursor: 'pointer',
-                            }}
-                        >
-                            閉じる
-                        </button>
                     </div>
+
                 </div>
             </form>
         </FormProvider>

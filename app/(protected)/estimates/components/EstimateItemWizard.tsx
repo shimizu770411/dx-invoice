@@ -305,7 +305,7 @@ export function EstimateItemWizard({
                             if ((item as any)?.productItem?.isMultiSelect) {
                                 const ids: string[] = (() => { try { return JSON.parse((item as any).multiSelectVariantIds || '[]') } catch { return [] } })()
                                 if (ids.length === 0) return null
-                                const names = ids.map((id) => variants.find((v) => String(v.id) === id)?.name).filter(Boolean).join('、')
+                                const names = ids.map((id) => variants.find((v: ProductVariant) => String(v.id) === id)?.name).filter(Boolean).join('、')
                                 return (
                                     <div className="font-mincho" style={{ padding: '6px 14px', border: '1px solid var(--brand-navy)', color: 'var(--brand-navy)', fontSize: '13px', letterSpacing: '0.15em' }}>
                                         選択中: {names}（{ids.length}種類）
@@ -356,7 +356,7 @@ export function EstimateItemWizard({
                                 </p>
                             )}
                             <div className="grid grid-cols-3 gap-4 mb-5">
-                                {variants.map((v) => {
+                                {variants.map((v: ProductVariant) => {
                                     const isSelected = isMultiSelectProduct
                                         ? multiSelectedIds.includes(String(v.id))
                                         : selectedVariantId === v.id

@@ -7,9 +7,13 @@ import { getCustomer } from '@/lib/customers'
 import { getEstimates } from '@/lib/estimates'
 import { getProducts, ProductItem, ProductVariant } from '@/lib/products'
 import { InvoiceItem, InvoiceFreeItem } from '@/lib/invoices'
-import { scopeApplies } from '@/lib/productScope'
-import { expandMultiRowToItems, computeMultiRowAmount } from '@/lib/expandMultiRow'
+import { expandMultiRowToItems } from '@/lib/expandMultiRow'
 import { toast } from '@/hooks/use-toast'
+import { handleLoadError, handleSaveError, handleOperationError } from '@/lib/errorHandler'
+import { calculateDocumentFormTotals } from '@/lib/documentTotals'
+import { useDocumentItems } from '@/hooks/useDocumentItems'
+import { sortByProductItemId, expandEachModeItems, padDocumentFreeItems, buildDocumentFreeItems, MATURITY_SERVICE_NAME, CANCELLATION_FEE_NAME } from '@/lib/documentUtils'
+import { useDocumentProductSearch } from '@/hooks/useDocumentProductSearch'
 import {
     InvoiceFormData,
     InvoiceItemField,
@@ -17,67 +21,8 @@ import {
     DEFAULT_INVOICE_FORM_VALUES,
 } from '../schemas/InvoiceFormSchema'
 
-const sortByProductItemId = (arr: InvoiceItem[]): InvoiceItem[] =>
-    arr.slice().sort((a, b) => {
-        if (a.productItemId == null) return 1
-        if (b.productItemId == null) return -1
-        return Number(a.productItemId) - Number(b.productItemId)
-    })
 
-// 商品マスタとは連動しない明細フリー行を、明細末尾に常時 5 行表示し、
-// その後に固定の「満期サービス」行（6行目）「解約手数料」行（7行目）を続ける。
-const FIXED_FREE_ROW_COUNT = 5
-export const MATURITY_SERVICE_NAME = '満期サービス'
-export const CANCELLATION_FEE_NAME = '解約手数料'
 const FIXED_ROW_NAMES = [MATURITY_SERVICE_NAME, CANCELLATION_FEE_NAME]
-
-const padInvoiceFreeItems = (arr: InvoiceFreeItem[]): InvoiceFreeItem[] => {
-    const maturity = arr.find((it) => it.productItemName === MATURITY_SERVICE_NAME)
-    const cancellationFee = arr.find((it) => it.productItemName === CANCELLATION_FEE_NAME)
-    const others = arr.filter((it) => !FIXED_ROW_NAMES.includes(it.productItemName))
-
-    const padded: InvoiceFreeItem[] = others.slice()
-    while (padded.length < FIXED_FREE_ROW_COUNT) {
-        padded.push({
-            productItemName: '',
-            description: '',
-            unitPriceGeneral: 0,
-            qty: 0,
-            amount: 0,
-            sortNo: padded.length,
-        })
-    }
-
-    // 6 行目: 満期サービス（既存があれば引継ぎ、無ければ初期値）。摘要は表示しないので常に空に。
-    padded.push(
-        maturity
-            ? { ...maturity, description: '', sortNo: FIXED_FREE_ROW_COUNT }
-            : {
-                  productItemName: MATURITY_SERVICE_NAME,
-                  description: '',
-                  unitPriceGeneral: 0,
-                  qty: 0,
-                  amount: 0,
-                  sortNo: FIXED_FREE_ROW_COUNT,
-              }
-    )
-
-    // 7 行目: 解約手数料（既存があれば引継ぎ、無ければ初期値）。摘要は表示しないので常に空に。
-    padded.push(
-        cancellationFee
-            ? { ...cancellationFee, description: '', sortNo: FIXED_FREE_ROW_COUNT + 1 }
-            : {
-                  productItemName: CANCELLATION_FEE_NAME,
-                  description: '',
-                  unitPriceGeneral: 0,
-                  qty: 0,
-                  amount: 0,
-                  sortNo: FIXED_FREE_ROW_COUNT + 1,
-              }
-    )
-
-    return padded
-}
 
 // -------------------------------------------------------
 // 新規作成フック（customerId から）
@@ -139,7 +84,7 @@ export function useInvoiceCreate(customerId: string, reset: UseFormReset<Invoice
             }
             setItems(initialItems)
 
-            const initialFreeItems = padInvoiceFreeItems([])
+            const initialFreeItems = padDocumentFreeItems<InvoiceFreeItem>([], [MATURITY_SERVICE_NAME, CANCELLATION_FEE_NAME])
             setFreeItems(initialFreeItems)
 
             reset({
@@ -157,8 +102,7 @@ export function useInvoiceCreate(customerId: string, reset: UseFormReset<Invoice
                 })),
             })
         } catch (error) {
-            console.error('Failed to load data:', error)
-            toast({ title: 'データの読み込みに失敗しました', variant: 'destructive', duration: 3000 })
+            handleLoadError(error)
         } finally {
             setLoading(false)
         }
@@ -183,8 +127,7 @@ export function useInvoiceCreate(customerId: string, reset: UseFormReset<Invoice
             queryClient.invalidateQueries({ queryKey: ['customers'] })
             router.push(`/invoices/${newInvoice.id}`)
         } catch (error) {
-            console.error('Failed to copy from estimate:', error)
-            toast({ title: '見積からのコピーに失敗しました', variant: 'destructive', duration: 3000 })
+            handleOperationError(error, '見積からのコピーに失敗しました')
         } finally {
             setCopyingFrom(false)
         }
@@ -209,24 +152,7 @@ export function useInvoiceCreate(customerId: string, reset: UseFormReset<Invoice
                 })
                 return
             }
-            // 複数選択・種類別モード(EACH): 1スロット → バリアントごとに複数行へ展開
-            const finalItems = activeItems.flatMap((item) => {
-                const pi = (item as any).productItem
-                if (!pi?.isMultiSelect || pi.multiSelectMerge !== false) return [item]
-                if (!item.multiSelectVariantIds) return [item]
-                try {
-                    const ids: string[] = JSON.parse(item.multiSelectVariantIds)
-                    if (ids.length === 0) return [item]
-                    return ids.flatMap((variantId: string) => {
-                        const v = (pi.variants || []).find((v: any) => String(v.id) === variantId)
-                        if (!v) return []
-                        return [{ ...item, productVariantId: String(v.id), productVariant: v,
-                            unitPriceGeneral: v.priceGeneral, unitPriceMember: v.priceMember,
-                            amount: (isMember ? v.priceMember : v.priceGeneral) * item.qty,
-                            multiSelectVariantIds: null, description: v.name }]
-                    })
-                } catch { return [item] }
-            }).map((item, i) => ({ ...item, sortNo: i }))
+            const finalItems = expandEachModeItems(activeItems, isMember)
             const mergedFreeItems = freeItems
                 .map((item, i) => {
                     const productItemName = formValues.freeItems[i]?.productItemName ?? item.productItemName ?? ''
@@ -242,7 +168,7 @@ export function useInvoiceCreate(customerId: string, reset: UseFormReset<Invoice
                 })
                 .filter((it) => it.productItemName.trim().length > 0 && it.qty > 0)
                 .map((it, i) => ({ ...it, sortNo: i }))
-            const totals = calculateInvoiceTotals(
+            const totals = calculateDocumentFormTotals(
                 items,
                 formValues.items,
                 isMember,
@@ -256,8 +182,7 @@ export function useInvoiceCreate(customerId: string, reset: UseFormReset<Invoice
             queryClient.invalidateQueries({ queryKey: ['customers'] })
             router.push(`/invoices/${created.id}`)
         } catch (error) {
-            console.error('Failed to create:', error)
-            toast({ title: '保存に失敗しました', variant: 'destructive', duration: 3000 })
+            handleSaveError(error)
         }
     }
 
@@ -394,40 +319,7 @@ export function useInvoiceEdit(invoiceId: string, reset: UseFormReset<InvoiceFor
 
             const loadedFreeItems: InvoiceFreeItem[] = (invoiceData as any).freeItems || []
 
-            // 親付き/親なしを分離
-            const standaloneFreeItems = loadedFreeItems.filter((fi) => !fi.parentProductItemId)
-            const parentLinkedFreeItems = loadedFreeItems.filter((fi) => fi.parentProductItemId)
-
-            // 親なしを 5 行に padding（満期サービスは末尾）
-            const paddedStandaloneFreeItems = padInvoiceFreeItems(standaloneFreeItems)
-
-            // canAddFreeRow=ON で請求書に含まれる商品で、まだ親付きフリー行がないものに対し空行を自動生成
-            const existingParentIds = new Set(
-                parentLinkedFreeItems.map((fi) => String(fi.parentProductItemId))
-            )
-            const autoGeneratedFreeItems: InvoiceFreeItem[] = []
-            for (const item of mergedItems) {
-                if (!item.qty || item.qty <= 0) continue
-                const product = item.productItem as any
-                if (!product?.canAddFreeRow) continue
-                const pid = String(product.id)
-                if (existingParentIds.has(pid)) continue
-                autoGeneratedFreeItems.push({
-                    parentProductItemId: pid,
-                    productItemName: '',
-                    description: '',
-                    unitPriceGeneral: 0,
-                    qty: 0,
-                    amount: 0,
-                    sortNo: 9999,
-                } as InvoiceFreeItem)
-            }
-
-            const paddedFreeItems: InvoiceFreeItem[] = [
-                ...paddedStandaloneFreeItems,
-                ...parentLinkedFreeItems,
-                ...autoGeneratedFreeItems,
-            ]
+            const paddedFreeItems = buildDocumentFreeItems(loadedFreeItems, mergedItems, [MATURITY_SERVICE_NAME, CANCELLATION_FEE_NAME])
             setItems(mergedItems)
             setFreeItems(paddedFreeItems)
 
@@ -457,8 +349,7 @@ export function useInvoiceEdit(invoiceId: string, reset: UseFormReset<InvoiceFor
                 })),
             })
         } catch (error) {
-            console.error('Failed to load invoice:', error)
-            toast({ title: 'データの読み込みに失敗しました', variant: 'destructive', duration: 3000 })
+            handleLoadError(error)
         } finally {
             setLoading(false)
         }
@@ -494,24 +385,7 @@ export function useInvoiceEdit(invoiceId: string, reset: UseFormReset<InvoiceFor
                 })
                 return
             }
-            // 複数選択・種類別モード(EACH): 1スロット → バリアントごとに複数行へ展開
-            const finalItems = activeItems.flatMap((item) => {
-                const pi = (item as any).productItem
-                if (!pi?.isMultiSelect || pi.multiSelectMerge !== false) return [item]
-                if (!item.multiSelectVariantIds) return [item]
-                try {
-                    const ids: string[] = JSON.parse(item.multiSelectVariantIds)
-                    if (ids.length === 0) return [item]
-                    return ids.flatMap((variantId: string) => {
-                        const v = (pi.variants || []).find((v: any) => String(v.id) === variantId)
-                        if (!v) return []
-                        return [{ ...item, productVariantId: String(v.id), productVariant: v,
-                            unitPriceGeneral: v.priceGeneral, unitPriceMember: v.priceMember,
-                            amount: (isMember ? v.priceMember : v.priceGeneral) * item.qty,
-                            multiSelectVariantIds: null, description: v.name }]
-                    })
-                } catch { return [item] }
-            }).map((item, i) => ({ ...item, sortNo: i }))
+            const finalItems = expandEachModeItems(activeItems, isMember)
             const mergedFreeItems = freeItems
                 .map((item, i) => {
                     const productItemName = formValues.freeItems[i]?.productItemName ?? item.productItemName ?? ''
@@ -527,7 +401,7 @@ export function useInvoiceEdit(invoiceId: string, reset: UseFormReset<InvoiceFor
                 })
                 .filter((it) => it.productItemName.trim().length > 0 && it.qty > 0)
                 .map((it, i) => ({ ...it, sortNo: i }))
-            const totals = calculateInvoiceTotals(
+            const totals = calculateDocumentFormTotals(
                 items,
                 formValues.items,
                 isMember,
@@ -540,8 +414,7 @@ export function useInvoiceEdit(invoiceId: string, reset: UseFormReset<InvoiceFor
             toast({ title: '更新しました', variant: 'success', duration: 2000 })
             await loadData()
         } catch (error) {
-            console.error('Failed to update:', error)
-            toast({ title: '保存に失敗しました', variant: 'destructive', duration: 3000 })
+            handleSaveError(error)
         }
     }
 
@@ -551,193 +424,14 @@ export function useInvoiceEdit(invoiceId: string, reset: UseFormReset<InvoiceFor
 // -------------------------------------------------------
 // 品目検索フック
 // -------------------------------------------------------
-export function useInvoiceProductSearch(
-    items: InvoiceItem[],
-    setItems: React.Dispatch<React.SetStateAction<InvoiceItem[]>>,
-    appendItemField: (val: InvoiceItemField) => void,
-    moveItemField: (from: number, to: number) => void
-) {
-    const [products, setProducts] = useState<ProductItem[]>([])
-    const [searchProductName, setSearchProductName] = useState('')
-    const [selectedProduct, setSelectedProduct] = useState<ProductItem | null>(null)
-    const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null)
-
-    const handleSearchProducts = async (query?: string) => {
-        try {
-            const results = await getProducts(query !== undefined ? query : searchProductName)
-            setProducts(results)
-        } catch (error) {
-            console.error('Failed to search products:', error)
-            toast({ title: '品目の検索に失敗しました', variant: 'destructive', duration: 3000 })
-        }
-    }
-
-    const handleSelectProduct = (product: ProductItem) => {
-        setSelectedProduct(product)
-        setSelectedVariant(product.variants.length > 0 ? product.variants[0] : null)
-    }
-
-    const handleAddItem = () => {
-        if (!selectedProduct) {
-            toast({ title: '商品を選択してください', variant: 'destructive', duration: 3000 })
-            return
-        }
-
-        const defaultDescription = selectedProduct.defaultDescription ?? ''
-
-        // 複数行構成商品: ProductRow ごとに1行ずつ展開
-        if (selectedProduct.isMultiRow) {
-            const expanded = expandMultiRowToItems<InvoiceItem>(
-                selectedProduct,
-                items.length,
-                defaultDescription
-            )
-            if (expanded.length === 0) {
-                toast({
-                    title: 'この商品には明細行が登録されていません。商品マスタで設定してください。',
-                    variant: 'destructive',
-                    duration: 4000,
-                })
-                return
-            }
-            const sortedItems = sortByProductItemId([...items, ...expanded])
-            setItems(sortedItems)
-            expanded.forEach((e) =>
-                appendItemField({ qty: e.qty ?? 1, description: e.description ?? '' })
-            )
-            setSelectedProduct(null)
-            setSelectedVariant(null)
-            setSearchProductName('')
-            setProducts([])
-            return
-        }
-
-        if (!selectedVariant) {
-            toast({ title: '種類を選択してください', variant: 'destructive', duration: 3000 })
-            return
-        }
-
-        const newItem: InvoiceItem = {
-            productItemId: selectedProduct.id,
-            productVariantId: selectedVariant.id,
-            description: defaultDescription,
-            unitPriceGeneral: selectedVariant.priceGeneral,
-            unitPriceMember: selectedVariant.priceMember,
-            qty: 1,
-            amount: selectedVariant.priceGeneral,
-            sortNo: items.length,
-            productItem: selectedProduct,
-            productVariant: selectedVariant,
-        }
-
-        const sortedItems = sortByProductItemId([...items, newItem])
-        const oldIndex = items.length
-        const newIndex = sortedItems.findIndex(
-            (item) => item.productItemId === newItem.productItemId && item.productVariantId === newItem.productVariantId
-        )
-        setItems(sortedItems)
-        appendItemField({ qty: 1, description: defaultDescription })
-        if (newIndex !== oldIndex) {
-            moveItemField(oldIndex, newIndex)
-        }
-        setSelectedProduct(null)
-        setSelectedVariant(null)
-        setSearchProductName('')
-        setProducts([])
-    }
-
-    return {
-        products,
-        searchProductName,
-        setSearchProductName,
-        selectedProduct,
-        selectedVariant,
-        setSelectedVariant,
-        handleSearchProducts,
-        handleSelectProduct,
-        clearSelectedProduct: () => {
-            setSelectedProduct(null)
-            setSelectedVariant(null)
-        },
-        handleAddItem,
-    }
-}
+export const useInvoiceProductSearch = useDocumentProductSearch<InvoiceItem>
 
 // -------------------------------------------------------
 // 明細操作フック
 // -------------------------------------------------------
-export function useInvoiceItems(
-    items: InvoiceItem[],
-    setItems: React.Dispatch<React.SetStateAction<InvoiceItem[]>>,
-    removeItemField: (index: number) => void
-) {
-    const handleRemoveItem = (index: number) => {
-        setItems((prev) => prev.filter((_, i) => i !== index))
-        removeItemField(index)
-    }
-
-    return { handleRemoveItem }
-}
+export const useInvoiceItems = useDocumentItems<InvoiceItem>
 
 // -------------------------------------------------------
 // 合計計算ユーティリティ
 // -------------------------------------------------------
-export function calculateInvoiceTotals(
-    items: InvoiceItem[],
-    itemFields: InvoiceItemField[] | undefined,
-    isMember: boolean,
-    customer: any,
-    freeItems?: InvoiceFreeItem[],
-    freeItemFields?: InvoiceFreeItemField[]
-) {
-    const regularSubtotal = items.reduce((sum, item, i) => {
-        const qty = itemFields?.[i]?.qty ?? item.qty
-        const pi = (item as any)?.productItem
-        const pv = (item as any)?.productVariant
-        // 子商品 + 初期セット種類 + setableScope が現在モードに該当: 合計対象外
-        const isSetIncluded =
-            pi?.isSetChild &&
-            pv?.isDefaultSet &&
-            scopeApplies(pi?.setableScope, isMember)
-        // サービス品フラグON + serviceableScope が現在モードに該当: 合計対象外
-        const isServiceIncluded =
-            (item as any)?.isService && scopeApplies(pi?.serviceableScope, isMember)
-        // 満期サービスフラグON + 商品の満期サービス可否が「可」: 合計対象外
-        const isMaturityServiceIncluded =
-            (item as any)?.isMaturityService && pi?.isMaturityServiceable
-        // 任意セット扱い (adhocSetScope) が現在モードに該当: 合計対象外
-        const adhocScope = (item as any)?.adhocSetScope
-        const isAdhocSetIncluded =
-            adhocScope === 'BOTH' ||
-            (adhocScope === 'MEMBER_ONLY' && isMember) ||
-            (adhocScope === 'GENERAL_ONLY' && !isMember)
-        if (isSetIncluded || isServiceIncluded || isMaturityServiceIncluded || isAdhocSetIncluded)
-            return sum
-        // 複数行構成商品: calcType と sign を考慮（一般/会員ともに同一単価）
-        if ((item as any)?.productRowId && (item as any)?.calcType) {
-            return (
-                sum +
-                computeMultiRowAmount({
-                    calcType: (item as any).calcType,
-                    sign: (item as any).sign,
-                    unitPrice: item.unitPriceGeneral,
-                    qty,
-                })
-            )
-        }
-        const unitPrice = isMember ? item.unitPriceMember : item.unitPriceGeneral
-        return sum + unitPrice * qty
-    }, 0)
-    const freeSubtotal = (freeItems || []).reduce((sum, item, i) => {
-        const qty = freeItemFields?.[i]?.qty ?? item.qty
-        const unitPrice = freeItemFields?.[i]?.unitPriceGeneral ?? item.unitPriceGeneral
-        return sum + unitPrice * qty
-    }, 0)
-    const subtotal = regularSubtotal + freeSubtotal
-    const tax = Math.round(subtotal * 0.1)
-    const total = subtotal + tax
-    const membershipPaidAmount =
-        customer?.memberships?.reduce((sum: number, m: any) => sum + (m.paymentAmount || 0), 0) || 0
-    const grandTotal = Math.max(0, total - membershipPaidAmount)
-    return { subtotal, tax, total, membershipPaidAmount, grandTotal }
-}
+export const calculateInvoiceTotals = calculateDocumentFormTotals

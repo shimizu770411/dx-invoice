@@ -164,7 +164,8 @@ export async function GET(request: NextRequest) {
                 chiefMournerCity: true,
                 chiefMournerTown: true,
                 estimates: {
-                    select: { id: true, status: true },
+                    select: { id: true, status: true, estimateType: true },
+                    orderBy: { id: 'asc' },
                 },
                 invoices: {
                     include: {
@@ -201,14 +202,21 @@ export async function GET(request: NextRequest) {
         let filteredCustomers = customers
 
         if (estimateStatusConfirmed) {
+            // 本見積（FORMAL）が存在する案件のみ
             filteredCustomers = filteredCustomers.filter((customer: any) =>
-                customer.estimates.some((e: any) => e.status === 'DRAFT')
+                customer.estimates.some((e: any) => e.estimateType === 'FORMAL')
             )
         }
 
-        if (estimateStatus) {
+        if (estimateStatus === 'DRAFT') {
+            // 事前相談見積のみ（本見積未作成）
             filteredCustomers = filteredCustomers.filter((customer: any) =>
-                customer.estimates.some((e: any) => e.status === estimateStatus)
+                customer.estimates.some((e: any) => e.estimateType === 'PRE_CONSULTATION' && e.status === 'DRAFT')
+            )
+        } else if (estimateStatus === 'CONFIRMED') {
+            // 本見積あり
+            filteredCustomers = filteredCustomers.filter((customer: any) =>
+                customer.estimates.some((e: any) => e.estimateType === 'FORMAL')
             )
         }
 
@@ -252,8 +260,11 @@ export async function GET(request: NextRequest) {
                 receptionAt: customer.receptionAt ? customer.receptionAt.toISOString() : null,
                 funeralFrom: customer.funeralFrom ? customer.funeralFrom.toISOString() : null,
                 hasEstimate: customer.estimates.length > 0,
-                estimateId: customer.estimates[0]?.id.toString(),
-                estimateStatus: customer.estimates[0]?.status ?? null,
+                // 本見積（FORMAL）があればそちらを優先して返す
+                estimateId: (customer.estimates.find((e: any) => e.estimateType === 'FORMAL') ?? customer.estimates[0])?.id.toString(),
+                estimateStatus: (customer.estimates.find((e: any) => e.estimateType === 'FORMAL') ?? customer.estimates[0])?.status ?? null,
+                estimateType: (customer.estimates.find((e: any) => e.estimateType === 'FORMAL') ?? customer.estimates[0])?.estimateType ?? null,
+                preConsultEstimateId: customer.estimates.find((e: any) => e.estimateType === 'PRE_CONSULTATION')?.id.toString() ?? null,
                 hasInvoice: customer.invoices.length > 0,
                 invoiceId: invoice?.id.toString(),
                 isPaid: isPaid,

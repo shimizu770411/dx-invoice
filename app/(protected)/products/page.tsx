@@ -86,7 +86,7 @@ export default function ProductsPage() {
     }
 
     const handleCancelOrder = () => {
-        setItems(products)
+        setItems(products || [])
         setOrderMode(false)
     }
 

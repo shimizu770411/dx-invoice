@@ -14,7 +14,7 @@ import { EstimateCustomerSummary } from '../components/EstimateCustomerSummary'
 import { EstimateBasicInfo } from '../components/EstimateBasicInfo'
 import { ProductVariant } from '@/lib/products'
 import { resolveUnitPriceMember } from '@/lib/itemPricing'
-import { unconfirmEstimate } from '@/lib/estimates'
+import { confirmEstimate } from '@/lib/estimates'
 import { toast } from '@/hooks/use-toast'
 
 export default function EstimateEditPage() {
@@ -42,6 +42,7 @@ export default function EstimateEditPage() {
     const [activeTab, setActiveTab] = useState<'items' | 'other'>('items')
     const [itemsViewMode, setItemsViewMode] = useState<'list' | 'card'>('list')
     const [isConfirmedOnServer, setIsConfirmedOnServer] = useState(false)
+    const [isConfirming, setIsConfirming] = useState(false)
     const watchedItems = useWatch({ control, name: 'items' })
     const watchedFreeItems = useWatch({ control, name: 'freeItems' })
     const watchedIsMember = useWatch({ control, name: 'isMember' })
@@ -140,9 +141,12 @@ export default function EstimateEditPage() {
 
     useEffect(() => {
         if (estimate) {
-            setIsConfirmedOnServer(estimate.status === 'CONFIRMED')
+            // PRE_CONSULTATION + CONFIRMED = 本見積作成済みで読み取り専用
+            setIsConfirmedOnServer(
+                estimate.estimateType === 'PRE_CONSULTATION' && estimate.status === 'CONFIRMED'
+            )
         }
-    }, [estimate?.status])
+    }, [estimate?.estimateType, estimate?.status])
 
     if (loading) {
         return <div className="p-8">読み込み中...</div>
@@ -199,7 +203,14 @@ export default function EstimateEditPage() {
     return (
         <FormProvider {...methods}>
             <form onSubmit={handleSubmit(onSubmitWithStoreCheck, onInvalid)} className="flex flex-col p-8 pb-24">
-                <h1 className="mb-8 text-2xl font-bold">見積書 編集</h1>
+                <h1 className="mb-4 text-2xl font-bold">
+                    {estimate.estimateType === 'FORMAL' ? '本見積 編集' : '事前相談見積 編集'}
+                </h1>
+                {isConfirmed && estimate.estimateType === 'PRE_CONSULTATION' && (
+                    <div className="mb-4 rounded border border-amber-400 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                        本見積が作成済みのため、この事前相談見積は閲覧のみです。変更は本見積から行ってください。
+                    </div>
+                )}
 
                 {/* 顧客情報サマリー */}
                 <EstimateCustomerSummary customer={customer} />
@@ -334,7 +345,57 @@ export default function EstimateEditPage() {
                     {isDirty && <div className="text-red-600 text-right pb-1 text-sm">未保存の変更があります</div>}
                     <div className="flex justify-between items-center gap-4 bg-white">
                         <div className="flex gap-4">
-                            {!isConfirmed && (
+                            {/* 事前相談見積（編集可）: 更新ボタン + 本見積作成ボタン */}
+                            {!isConfirmed && estimate.estimateType === 'PRE_CONSULTATION' && (
+                                <>
+                                    <button
+                                        type="submit"
+                                        disabled={isSubmitting}
+                                        className={`rounded border-0 px-6 py-3 text-white ${
+                                            isSubmitting ? 'cursor-not-allowed bg-gray-300' : 'cursor-pointer bg-green-600'
+                                        }`}
+                                    >
+                                        {isSubmitting ? '保存中...' : '更新'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        disabled={isConfirming || isDirty}
+                                        onClick={async () => {
+                                            if (isDirty) {
+                                                toast({ title: '先に「更新」で保存してください', variant: 'destructive', duration: 3000 })
+                                                return
+                                            }
+                                            if (!confirm('本見積を作成します。\n事前相談見積の内容をコピーして本見積を作成し、そちらに移動します。\nよろしいですか？')) return
+                                            setIsConfirming(true)
+                                            try {
+                                                const result = await confirmEstimate(estimate.id)
+                                                toast({ title: '本見積を作成しました', variant: 'success', duration: 2000 })
+                                                router.push(`/estimates/${result.id}`)
+                                            } catch (e: any) {
+                                                toast({ title: '本見積の作成に失敗しました', variant: 'destructive', duration: 3000 })
+                                            } finally {
+                                                setIsConfirming(false)
+                                            }
+                                        }}
+                                        className={`rounded border-0 px-6 py-3 text-white ${
+                                            isConfirming || isDirty ? 'cursor-not-allowed bg-gray-300' : 'cursor-pointer bg-blue-700'
+                                        }`}
+                                        title={isDirty ? '先に「更新」で保存してください' : '事前相談見積から本見積を作成'}
+                                    >
+                                        {isConfirming ? '作成中...' : '本見積を作成'}
+                                    </button>
+                                </>
+                            )}
+                            {/* 事前相談見積（読み取り専用）: 本見積作成済みのため編集不可 */}
+                            {isConfirmed && estimate.estimateType === 'PRE_CONSULTATION' && (
+                                <div className="flex items-center gap-3">
+                                    <span className="rounded bg-gray-200 px-4 py-2 text-sm text-gray-600">
+                                        事前相談見積（本見積作成済み・閲覧のみ）
+                                    </span>
+                                </div>
+                            )}
+                            {/* 本見積（FORMAL）: 通常の更新ボタン */}
+                            {estimate.estimateType === 'FORMAL' && (
                                 <button
                                     type="submit"
                                     disabled={isSubmitting}
@@ -342,41 +403,7 @@ export default function EstimateEditPage() {
                                         isSubmitting ? 'cursor-not-allowed bg-gray-300' : 'cursor-pointer bg-green-600'
                                     }`}
                                 >
-                                    {isSubmitting ? '保存中...' : watchedStatus === 'CONFIRMED' ? '確定' : '更新'}
-                                </button>
-                            )}
-                            {isConfirmed && (
-                                <button
-                                    type="button"
-                                    onClick={async () => {
-                                        if (
-                                            !confirm(
-                                                '本見積（確定）を解除して編集可能に戻します。\n客先と合意済みの見積を変更することになります。よろしいですか？'
-                                            )
-                                        )
-                                            return
-                                        try {
-                                            await unconfirmEstimate(estimate.id)
-                                            setIsConfirmedOnServer(false)
-                                            setValue('status', 'DRAFT')
-                                            toast({
-                                                title: '確定を解除しました',
-                                                variant: 'success',
-                                                duration: 2000,
-                                            })
-                                            router.refresh()
-                                        } catch (e: any) {
-                                            toast({
-                                                title: '確定解除に失敗しました',
-                                                variant: 'destructive',
-                                                duration: 3000,
-                                            })
-                                        }
-                                    }}
-                                    className="cursor-pointer rounded border-0 bg-orange-600 px-6 py-3 text-white"
-                                    title="本見積を編集可能な状態（事前相談見積）に戻す"
-                                >
-                                    確定解除
+                                    {isSubmitting ? '保存中...' : '更新（本見積）'}
                                 </button>
                             )}
                         </div>

@@ -2,22 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-middleware'
 import { serializeBigInt } from '@/lib/prisma-utils'
-
-function calculateTotals(items: any[], membershipPaidAmount: number, freeItems: any[] = []) {
-    const itemsSubtotal = items.reduce((sum, item) => sum + (item.amount || 0), 0)
-    const freeSubtotal = freeItems.reduce((sum, item) => sum + (item.unitPriceGeneral || 0) * (item.qty || 1), 0)
-    const subtotal = itemsSubtotal + freeSubtotal
-    const tax = Math.round(subtotal * 0.1)
-    const total = subtotal + tax
-    const grandTotal = total - membershipPaidAmount
-    return {
-        subtotal,
-        tax,
-        total,
-        membershipPaidAmount,
-        grandTotal: Math.max(0, grandTotal),
-    }
-}
+import { calculateDocumentTotals } from '@/lib/documentTotals'
+import { buildDocNoPrefix, buildDocNo } from '@/lib/documentUtils'
 
 export async function GET(request: NextRequest) {
     try {
@@ -135,7 +121,7 @@ export async function POST(request: NextRequest) {
         )
 
         // 合計を計算
-        const totals = calculateTotals(data.items || [], membershipPaidAmount, data.freeItems || [])
+        const totals = calculateDocumentTotals(data.items || [], membershipPaidAmount, data.freeItems || [])
 
         // enum型の値を検証・変換
         const validCremationProcessTypes = ['FAMILY', 'NEIGHBORHOOD', 'COMPANY'] as const
@@ -151,16 +137,12 @@ export async function POST(request: NextRequest) {
                 : null
 
         // docNo の自動採番: customers.reception_atの年月(yyyymm) + 同プレフィックスの最大連番+1(3桁)
-        const receptionDate = customer.receptionAt ? new Date(customer.receptionAt) : new Date()
-        const yyyy = receptionDate.getFullYear()
-        const mm = String(receptionDate.getMonth() + 1).padStart(2, '0')
-        const prefix = `${yyyy}${mm}`
+        const prefix = buildDocNoPrefix(customer.receptionAt)
         const latestDoc = await prisma.estimate.findFirst({
             where: { docNo: { startsWith: prefix } },
             orderBy: { docNo: 'desc' },
         })
-        const nextSeq = latestDoc?.docNo ? parseInt(latestDoc.docNo.slice(6)) + 1 : 1
-        const docNo = data.docNo || `${prefix}${String(nextSeq).padStart(3, '0')}`
+        const docNo = buildDocNo(prefix, latestDoc?.docNo, data.docNo)
 
         // 見積を作成
         const estimate = await prisma.estimate.create({

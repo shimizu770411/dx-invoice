@@ -1,8 +1,11 @@
 import { useCallback } from 'react'
 import { UseFormSetValue } from 'react-hook-form'
+import { useRouter } from 'next/navigation'
 import { getCities, getTowns, AddressCity, AddressTown } from '@/lib/address'
 import { getCustomer } from '@/lib/customers'
 import { CaseFormData } from '../schemas/CaseFormSchema'
+import { toast } from '@/hooks/use-toast'
+import { handleLoadError } from '@/lib/errorHandler'
 
 export function useCaseFormData() {
     const normalizeDateString = (value: string): string => {
@@ -60,6 +63,7 @@ export function useCaseFormLoader(setValue: UseFormSetValue<any>): {
     }>
     handleCityChange: (cityId: string) => Promise<AddressTown[]>
 } {
+    const router = useRouter()
     const { formatDateForInput } = useCaseFormData()
 
     const loadCities = useCallback(async (): Promise<AddressCity[]> => {
@@ -76,6 +80,12 @@ export function useCaseFormLoader(setValue: UseFormSetValue<any>): {
         async (customerId: string) => {
             try {
                 const [customerData, citiesData] = await Promise.all([getCustomer(customerId), getCities()])
+
+                if (!customerData) {
+                    toast({ title: '案件が見つかりません', variant: 'destructive', duration: 3000 })
+                    router.push('/cases')
+                    return { customer: null, cities: citiesData }
+                }
 
                 // フォームデータに変換
                 const formattedData: CaseFormData = {
@@ -192,11 +202,11 @@ export function useCaseFormLoader(setValue: UseFormSetValue<any>): {
 
                 return { customer: customerData, cities: citiesData }
             } catch (error) {
-                console.error('Failed to load cities and customer:', error)
+                handleLoadError(error)
                 return { customer: null, cities: [] }
             }
         },
-        [setValue, formatDateForInput]
+        [setValue, formatDateForInput, router]
     )
 
     const handleCityChange = useCallback(async (cityId: string) => {
