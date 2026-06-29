@@ -5,6 +5,7 @@ import { useForm, FormProvider } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { createBillingTarget, updateBillingTarget, FlowerBillingTarget } from '@/lib/flowers'
 import { toast } from '@/hooks/use-toast'
+import { handleSaveError } from '@/lib/errorHandler'
 import { billingTargetFormSchema, BillingTargetFormData, BILLING_TARGET_DEFAULT } from '../schemas/FlowerFormSchema'
 import { FormInput } from '@/components/form/FormInput'
 import { FormInputWithPostalSearch } from '@/components/form/FormInputWithPostalSearch'
@@ -57,8 +58,7 @@ export function BillingTargetDialog({ open, onOpenChange, customerId, target, on
             onOpenChange(false)
             onSuccess()
         } catch (error) {
-            console.error('Failed to save billing target:', error)
-            toast({ title: '保存に失敗しました', variant: 'destructive', duration: 3000 })
+            handleSaveError(error)
         }
     }
 

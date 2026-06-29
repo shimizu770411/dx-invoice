@@ -4,6 +4,7 @@ import { getProducts, ProductItem, ProductVariant } from '@/lib/products'
 import { expandMultiRowToItems } from '@/lib/expandMultiRow'
 import { sortByProductItemId } from '@/lib/documentUtils'
 import { toast } from '@/hooks/use-toast'
+import { handleOperationError } from '@/lib/errorHandler'
 
 type DocumentItemBase = {
     productItemId?: string
@@ -35,8 +36,7 @@ export function useDocumentProductSearch<T extends DocumentItemBase>(
             const results = await getProducts(query !== undefined ? query : searchProductName)
             setProducts(results)
         } catch (error) {
-            console.error('Failed to search products:', error)
-            toast({ title: '品目の検索に失敗しました', variant: 'destructive', duration: 3000 })
+            handleOperationError(error, '品目の検索に失敗しました')
         }
     }
 

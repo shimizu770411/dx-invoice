@@ -7,6 +7,8 @@ import { CaseFormData } from '../schemas/CaseFormSchema'
 import { toast } from '@/hooks/use-toast'
 import { handleLoadError } from '@/lib/errorHandler'
 
+const DEFAULT_PAYMENT_AMOUNT_ONCE = 3000
+
 export function useCaseFormData() {
     const normalizeDateString = (value: string): string => {
         // Convert 'YYYY-MM-DD HH:mm:ss.SSS +0900' -> 'YYYY-MM-DDTHH:mm:ss.SSS+09:00'
@@ -71,7 +73,7 @@ export function useCaseFormLoader(setValue: UseFormSetValue<any>): {
             const citiesData = await getCities()
             return citiesData
         } catch (error) {
-            console.error('Failed to load cities:', error)
+            handleLoadError(error)
             return []
         }
     }, [])
@@ -136,7 +138,7 @@ export function useCaseFormLoader(setValue: UseFormSetValue<any>): {
                             memberName: '',
                             courseUnits: undefined,
                             maturityAmount: undefined,
-                            paymentAmountOnce: 3000,
+                            paymentAmountOnce: DEFAULT_PAYMENT_AMOUNT_ONCE,
                             paymentTimes: undefined,
                             paymentAmount: undefined,
                             salesStaffName: '',
@@ -149,7 +151,7 @@ export function useCaseFormLoader(setValue: UseFormSetValue<any>): {
                             memberName: '',
                             courseUnits: undefined,
                             maturityAmount: undefined,
-                            paymentAmountOnce: 3000,
+                            paymentAmountOnce: DEFAULT_PAYMENT_AMOUNT_ONCE,
                             paymentTimes: undefined,
                             paymentAmount: undefined,
                             salesStaffName: '',
@@ -162,7 +164,7 @@ export function useCaseFormLoader(setValue: UseFormSetValue<any>): {
                             memberName: '',
                             courseUnits: undefined,
                             maturityAmount: undefined,
-                            paymentAmountOnce: 3000,
+                            paymentAmountOnce: DEFAULT_PAYMENT_AMOUNT_ONCE,
                             paymentTimes: undefined,
                             paymentAmount: undefined,
                             salesStaffName: '',
@@ -215,7 +217,7 @@ export function useCaseFormLoader(setValue: UseFormSetValue<any>): {
                 const townsData = await getTowns(cityId)
                 return townsData
             } catch (error) {
-                console.error('Failed to load towns:', error)
+                handleLoadError(error)
                 return []
             }
         } else {

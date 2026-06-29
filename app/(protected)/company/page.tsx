@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { useForm, FormProvider } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from '@/hooks/use-toast'
+import { handleSaveError } from '@/lib/errorHandler'
 import { companyFormSchema, CompanyFormData, DEFAULT_FORM_VALUES } from './schemas/CompanyFormSchema'
 import { useCompanyProfileQuery, useUpdateCompanyProfileMutation } from './hooks/useCompanyForm'
 import { BasicInfoSection, BankInfoSection } from './components/CompanyFormSections'
@@ -61,12 +62,8 @@ export default function CompanyPage() {
         try {
             await updateMutation.mutateAsync(data)
             toast({ title: '更新しました' })
-        } catch (error: any) {
-            toast({
-                title: '更新に失敗しました',
-                description: error?.response?.data?.message,
-                variant: 'destructive',
-            })
+        } catch (error) {
+            handleSaveError(error)
         }
     }
 

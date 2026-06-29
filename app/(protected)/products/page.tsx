@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getAllProducts, reorderProducts, ProductItem } from '@/lib/products'
 import { CreateButton } from '@/components/button/CreateButton'
 import { toast } from '@/hooks/use-toast'
+import { handleSaveError } from '@/lib/errorHandler'
 
 export default function ProductsPage() {
     const router = useRouter()
@@ -74,12 +75,8 @@ export default function ProductsPage() {
             toast({ title: '並び順を保存しました', variant: 'success', duration: 1800 })
             queryClient.invalidateQueries({ queryKey: ['products'] })
             setOrderMode(false)
-        } catch (err: any) {
-            toast({
-                title: err?.response?.data?.message || '保存に失敗しました',
-                variant: 'destructive',
-                duration: 2500,
-            })
+        } catch (err) {
+            handleSaveError(err)
         } finally {
             setSaving(false)
         }

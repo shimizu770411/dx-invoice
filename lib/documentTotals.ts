@@ -1,6 +1,8 @@
 import { scopeApplies } from '@/lib/productScope'
 import { computeMultiRowAmount } from '@/lib/expandMultiRow'
 
+const TAX_RATE = 0.1
+
 type DocumentFormItem = {
     qty: number
     unitPriceGeneral: number
@@ -57,7 +59,7 @@ export function calculateDocumentFormTotals(
         return sum + unitPrice * qty
     }, 0)
     const subtotal = regularSubtotal + freeSubtotal
-    const tax = Math.round(subtotal * 0.1)
+    const tax = Math.round(subtotal * TAX_RATE)
     const total = subtotal + tax
     const membershipPaidAmount =
         customer?.memberships?.reduce((sum: number, m: any) => sum + (m.paymentAmount || 0), 0) || 0
@@ -74,7 +76,7 @@ export function calculateDocumentTotals(
     const itemsSubtotal = items.reduce((sum, item) => sum + (item.amount || 0), 0)
     const freeSubtotal = freeItems.reduce((sum, item) => sum + (item.unitPriceGeneral || 0) * (item.qty || 1), 0)
     const subtotal = itemsSubtotal + freeSubtotal
-    const tax = Math.round(subtotal * 0.1)
+    const tax = Math.round(subtotal * TAX_RATE)
     const total = subtotal + tax
     const grandTotal = total - membershipPaidAmount
     return {
