@@ -84,35 +84,6 @@ export default function EditCustomerPage() {
         }
     }, [customer, isLoading, methods])
 
-    const hasEstimate = customer?.estimates && customer.estimates.length > 0
-    const hasInvoice = customer?.invoices && customer.invoices.length > 0
-
-    const handleNavigateToEstimate = () => {
-        if (!customer) {
-            toast({ title: '顧客情報が取得できていません', variant: 'destructive', duration: 3000 })
-            router.push('/cases')
-            return
-        }
-        if (hasEstimate && customer.estimates[0]) {
-            router.push(`/estimates/${customer.estimates[0].id}`)
-        } else {
-            router.push(`/estimates/new?customerId=${customerId}`)
-        }
-    }
-
-    const handleNavigateToInvoice = () => {
-        if (!customer) {
-            toast({ title: '顧客情報が取得できていません', variant: 'destructive', duration: 3000 })
-            router.push('/cases')
-            return
-        }
-        if (hasInvoice && customer.invoices[0]) {
-            router.push(`/invoices/${customer.invoices[0].id}`)
-        } else {
-            router.push(`/invoices/new?customerId=${customerId}`)
-        }
-    }
-
     const handleNavigateToFlowers = () => {
         if (!customer) {
             toast({ title: '顧客情報が取得できていません', variant: 'destructive', duration: 3000 })
@@ -254,32 +225,6 @@ export default function EditCustomerPage() {
 
                         {/* 関連機能へのリンク */}
                         <div className="flex gap-2 flex-wrap">
-                            <button
-                                type="button"
-                                onClick={handleNavigateToEstimate}
-                                style={{
-                                    ...linkBtnBase,
-                                    backgroundColor: hasEstimate ? '#ffffff' : 'var(--brand-navy)',
-                                    color: hasEstimate ? 'var(--brand-navy)' : '#ffffff',
-                                    borderColor: 'var(--brand-navy)',
-                                    boxShadow: '0 1px 2px rgba(1, 8, 62, 0.08)',
-                                }}
-                            >
-                                {hasEstimate ? '見積書編集' : '見積書作成'}
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleNavigateToInvoice}
-                                style={{
-                                    ...linkBtnBase,
-                                    backgroundColor: hasInvoice ? '#ffffff' : 'var(--brand-navy)',
-                                    color: hasInvoice ? 'var(--brand-navy)' : '#ffffff',
-                                    borderColor: 'var(--brand-navy)',
-                                    boxShadow: '0 1px 2px rgba(1, 8, 62, 0.08)',
-                                }}
-                            >
-                                {hasInvoice ? '請求書編集' : '請求書作成'}
-                            </button>
                             <button
                                 type="button"
                                 onClick={handleNavigateToFlowers}

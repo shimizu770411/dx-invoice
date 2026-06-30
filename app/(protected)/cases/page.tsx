@@ -6,8 +6,12 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { CustomerListItem, SearchCustomersParams } from '@/lib/customers'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useCustomersQuery } from '@/hooks/useCustomer'
 import { useCreatePaymentMutation, useCancelPaymentMutation } from '@/hooks/usePayment'
+import { createInvoiceFromEstimate } from '@/lib/invoices'
+import { toast } from '@/hooks/use-toast'
+import { handleOperationError } from '@/lib/errorHandler'
 import { CaseSearchForm } from './components/CaseSearchForm'
 
 interface FormParams extends SearchCustomersParams {
@@ -32,7 +36,10 @@ export default function CasesPage() {
     }>({ open: false, invoiceId: null, customerId: null, isPaid: false })
     const [paymentData, setPaymentData] = useState({ paidAt: '', memo: '' })
 
+    const [creatingInvoiceForId, setCreatingInvoiceForId] = useState<string | null>(null)
+
     // React Query フック
+    const queryClient = useQueryClient()
     const { data: customers = [], isLoading: customersLoading } = useCustomersQuery(searchParams)
     const createPaymentMutation = useCreatePaymentMutation()
     const cancelPaymentMutation = useCancelPaymentMutation()
@@ -372,10 +379,11 @@ export default function CasesPage() {
                               ? '本見積編集'
                               : '事前相談見積'
 
-                        // 請求書: 見積書なし → disabled、請求書なし → primary(次ステップ)、あり → done
-                        const invDisabled = !hasEst
+                        // 請求書: 本見積なし → disabled、請求書なし → primary(次ステップ)、あり → done
+                        const invDisabled = !hasFormalEst
                         const invVariant: Variant = hasInv ? 'done' : 'primary'
-                        const invLabel = hasInv ? '請求書編集' : '請求書作成'
+                        const isCreatingInvoice = creatingInvoiceForId === item.id
+                        const invLabel = isCreatingInvoice ? '作成中…' : hasInv ? '請求書編集' : '請求書作成'
 
                         // 入金: 請求書なし → disabled、未入金 → alert(要対応)、入金済 → done
                         const payDisabled = !hasInv
@@ -423,17 +431,7 @@ export default function CasesPage() {
                                     }}
                                 />
                                 {/* メインフロー: 見積 → 請求 → 入金 → 領収書 */}
-                                <button
-                                    onClick={() => {
-                                        if (hasEst) router.push(`/estimates/${item.estimateId}`)
-                                        else router.push(`/estimates/new?customerId=${item.id}`)
-                                    }}
-                                    style={btnStyle(estVariant)}
-                                    className="font-mincho"
-                                >
-                                    {estLabel}
-                                </button>
-                                {/* 本見積作成済みの場合、事前相談見積も別ボタンで表示 */}
+                                {/* 本見積あり: 事前相談見積（左）→ 本見積編集（右）の時系列順 */}
                                 {hasFormalEst && item.preConsultEstimateId && (
                                     <button
                                         onClick={() => router.push(`/estimates/${item.preConsultEstimateId}`)}
@@ -444,17 +442,40 @@ export default function CasesPage() {
                                         事前相談見積
                                     </button>
                                 )}
-                                <Arrow />
                                 <button
                                     onClick={() => {
-                                        if (invDisabled) return
-                                        if (hasInv && item.invoiceId) router.push(`/invoices/${item.invoiceId}`)
-                                        else router.push(`/invoices/new?customerId=${item.id}`)
+                                        if (hasEst) router.push(`/estimates/${item.estimateId}`)
+                                        else router.push(`/estimates/new?customerId=${item.id}`)
                                     }}
-                                    disabled={invDisabled}
-                                    style={btnStyle(invVariant, invDisabled)}
+                                    style={btnStyle(estVariant)}
                                     className="font-mincho"
-                                    title={invDisabled ? '見積書作成後に使用できます' : undefined}
+                                >
+                                    {estLabel}
+                                </button>
+                                <Arrow />
+                                <button
+                                    onClick={async () => {
+                                        if (invDisabled || isCreatingInvoice) return
+                                        if (hasInv && item.invoiceId) {
+                                            router.push(`/invoices/${item.invoiceId}`)
+                                            return
+                                        }
+                                        setCreatingInvoiceForId(item.id)
+                                        try {
+                                            const newInvoice = await createInvoiceFromEstimate(item.id, item.estimateId!)
+                                            toast({ title: '請求書を作成しました', variant: 'success', duration: 2000 })
+                                            queryClient.invalidateQueries({ queryKey: ['customers'] })
+                                            router.push(`/invoices/${newInvoice.id}`)
+                                        } catch (error) {
+                                            handleOperationError(error, '請求書の作成に失敗しました')
+                                        } finally {
+                                            setCreatingInvoiceForId(null)
+                                        }
+                                    }}
+                                    disabled={invDisabled || isCreatingInvoice}
+                                    style={btnStyle(invVariant, invDisabled || isCreatingInvoice)}
+                                    className="font-mincho"
+                                    title={invDisabled ? '本見積作成後に使用できます' : undefined}
                                 >
                                     {invDisabled && <LockIcon />}
                                     {invLabel}

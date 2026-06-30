@@ -10,7 +10,7 @@ import { toast } from '@/hooks/use-toast'
 import { handleLoadError, handleSaveError } from '@/lib/errorHandler'
 import { calculateDocumentFormTotals } from '@/lib/documentTotals'
 import { useDocumentItems } from '@/hooks/useDocumentItems'
-import { expandEachModeItems, padDocumentFreeItems, buildDocumentFreeItems, MATURITY_SERVICE_NAME } from '@/lib/documentUtils'
+import { expandEachModeItems, buildDocumentFreeItems, MATURITY_SERVICE_NAME } from '@/lib/documentUtils'
 import { useDocumentProductSearch } from '@/hooks/useDocumentProductSearch'
 import { EstimateFormData, DEFAULT_FORM_VALUES } from '../schemas/EstimateFormSchema'
 
@@ -170,7 +170,7 @@ export function useEstimateCreate(customerId: string, reset: UseFormReset<Estima
             const filteredProducts = filterProductsByStore(allProducts, storeId)
             const initialItems = buildNewEstimateItems(filteredProducts)
             setItems(initialItems)
-            const initialFreeItems = padDocumentFreeItems<EstimateFreeItem>([], [MATURITY_SERVICE_NAME])
+            const initialFreeItems = buildDocumentFreeItems<EstimateFreeItem>([], initialItems, [MATURITY_SERVICE_NAME], { ignoreQtyFilter: true })
             setFreeItems(initialFreeItems)
             reset({
                 ...DEFAULT_FORM_VALUES,
