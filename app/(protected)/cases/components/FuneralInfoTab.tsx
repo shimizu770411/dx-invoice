@@ -2,7 +2,6 @@ import { useFormContext } from 'react-hook-form'
 import { useQuery } from '@tanstack/react-query'
 import { CaseFormData } from '../schemas/CaseFormSchema'
 import { FormInput } from '@/components/form/FormInput'
-import { FormTextarea } from '@/components/form/FormTextarea'
 import { FormAutocomplete } from '@/components/form/FormAutocomplete'
 import { FormSelect } from '@/components/form/FormSelect'
 import { FUNERAL_PLACE_OPTIONS } from '../constants/casesOptions'
@@ -62,10 +61,6 @@ export function FuneralInfoTab() {
                 error={errors.funeralTo}
             />
 
-            {/* 備考 */}
-            <div style={{ gridColumn: '1 / -1' }}>
-                <FormTextarea<CaseFormData> name="notes" control={control} label="備考" rows={8} error={errors.notes} />
-            </div>
         </div>
     )
 }

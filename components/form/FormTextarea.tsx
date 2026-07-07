@@ -13,6 +13,7 @@ interface FormTextareaProps<T extends FieldValues> {
     disabled?: boolean
     noResize?: boolean
     maxRows?: number
+    maxLength?: number
 }
 
 export function FormTextarea<T extends FieldValues>({
@@ -26,6 +27,7 @@ export function FormTextarea<T extends FieldValues>({
     disabled,
     noResize,
     maxRows,
+    maxLength,
 }: FormTextareaProps<T>) {
     return (
         <Controller
@@ -44,6 +46,7 @@ export function FormTextarea<T extends FieldValues>({
                     disabled={disabled}
                     noResize={noResize}
                     maxRows={maxRows}
+                    maxLength={maxLength}
                 />
             )}
         />

@@ -166,6 +166,7 @@ export async function POST(request: NextRequest) {
                 transportStaff: data.transportStaff || null,
                 decorationStaff: data.decorationStaff || null,
                 returnStaff: data.returnStaff || null,
+                remarks: data.remarks || null,
                 issuedAt: data.issuedAt ? new Date(data.issuedAt) : null,
                 items: {
                     create: (data.items || []).map((item: any, index: number) => ({

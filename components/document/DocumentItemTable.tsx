@@ -32,6 +32,7 @@ export type DocumentFormData = {
     transportStaff: string
     decorationStaff: string
     returnStaff: string
+    remarks: string
     items: { qty: number; description: string }[]
     freeItems: { parentProductItemId?: string | null; productItemName: string; description: string; unitPriceGeneral: number; qty: number }[]
 }

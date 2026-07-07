@@ -158,7 +158,7 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
             .then(setCompany)
             .catch(() => {})
     }, [])
-    const notesLong = (customer?.notes?.length ?? 0) >= 100
+
 
     return (
         <div
@@ -490,27 +490,10 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
                         <div className="min-h-0 flex-1 overflow-hidden border border-t-0 border-black px-1 text-sm">
                             <div>備考</div>
                             <div className="mx-2">
-                                {notesLong ? (
-                                    <div>別紙記載</div>
-                                ) : customer?.notes ? (
-                                    <div className="whitespace-pre-wrap break-words">{customer.notes}</div>
+                                {doc.remarks ? (
+                                    <div className="whitespace-pre-wrap break-words">{doc.remarks}</div>
                                 ) : null}
                             </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div style={notesLong ? { breakBefore: 'page' } : {}}>
-                <div className="mt-4 border border-[#999] p-4 rounded-lg">
-                    {/* 備考（長すぎる場合） */}
-                    <div className="min-h-0 flex-1 overflow-hidden border p-1 border-black px-1 text-sm">
-                        <div>(備考)</div>
-                        <div className="my-1 mx-2">
-                            {(customer?.notes ?? '').split('\n').map((line, i) => (
-                                <div key={i} className="whitespace-pre-wrap break-words">
-                                    {line || '\u00a0'}
-                                </div>
-                            ))}
                         </div>
                     </div>
                 </div>

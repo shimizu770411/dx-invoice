@@ -84,6 +84,7 @@ export async function POST(
                 transportStaff: estimate.transportStaff,
                 decorationStaff: estimate.decorationStaff,
                 returnStaff: estimate.returnStaff,
+                remarks: estimate.remarks,
                 items: {
                     create: estimate.items.map((item: any) => ({
                         productItemId: item.productItemId,

@@ -12,6 +12,7 @@ interface TextareaUIProps {
     disabled?: boolean
     noResize?: boolean
     maxRows?: number
+    maxLength?: number
 }
 
 export function TextareaUI({
@@ -26,6 +27,7 @@ export function TextareaUI({
     disabled,
     noResize,
     maxRows,
+    maxLength,
 }: TextareaUIProps) {
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (maxRows !== undefined && e.key === 'Enter') {
@@ -62,8 +64,14 @@ export function TextareaUI({
                     cursor: disabled ? 'not-allowed' : 'text',
                     resize: noResize ? 'none' : undefined,
                 }}
+                maxLength={maxLength}
                 disabled={disabled}
             />
+            {maxLength !== undefined && (
+                <div style={{ textAlign: 'right', fontSize: '0.75rem', marginTop: '0.25rem', color: value.length >= maxLength ? '#dc3545' : '#888' }}>
+                    {value.length} / {maxLength}
+                </div>
+            )}
             {error && <div style={{ color: '#dc3545', fontSize: '0.875rem', marginTop: '0.25rem' }}>{error}</div>}
         </div>
     )

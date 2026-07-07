@@ -75,7 +75,6 @@ export type PdfDocumentCustomer = {
     returnPlace?: string | null
     religion?: string | null
     memberCardNote?: string | null
-    notes?: string | null
     cremationProcessType?: string | null
     altarPlaceType?: string | null
     altarPlaceOther?: string | null
@@ -116,6 +115,7 @@ export type PdfDocument = {
     grandTotal: number
     items: PdfDocumentItem[]
     freeItems?: PdfFreeItem[]
+    remarks?: string | null
     customer?: PdfDocumentCustomer | null
 }
 
@@ -378,7 +378,6 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
           }
         : undefined
     const displayRows = buildDisplayRows(products, items, doc.freeItems)
-    const notesLong = (customer?.notes?.length ?? 0) >= 20
     return (
         <div
             id={contentId}
@@ -899,10 +898,8 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                         <div className="min-h-0 flex-1 overflow-hidden border-b border-black px-1 text-[0.75rem]">
                             <div>(備考)</div>
                             <div className="mx-2">
-                                {notesLong ? (
-                                    <div>別紙記載</div>
-                                ) : customer?.notes ? (
-                                    <div className="whitespace-pre-wrap break-words">{customer.notes}</div>
+                                {doc.remarks ? (
+                                    <div className="whitespace-pre-wrap break-words">{doc.remarks}</div>
                                 ) : null}
                             </div>
                         </div>
@@ -1025,21 +1022,8 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
 
             {/* ２ページ目 */}
             {/* 会員情報ブロック */}
-            <div style={notesLong ? { breakBefore: 'page' } : {}}>
+            <div>
                 <PdfMembershipTable memberships={customer?.memberships} />
-                {/* 備考 */}
-                {notesLong && (
-                    <div className="mt-2 p-1 border-2 border-black text-[0.75rem]">
-                        <div>(備考)</div>
-                        <div className="my-1 mx-2">
-                            {(customer?.notes ?? '').split('\n').map((line, i) => (
-                                <div key={i} className="whitespace-pre-wrap break-words">
-                                    {line || '\u00a0'}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
             </div>
 
             {/* 選択オプション画像ページ */}

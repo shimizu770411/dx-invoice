@@ -152,6 +152,7 @@ export function useInvoiceEdit(invoiceId: string, reset: UseFormReset<InvoiceFor
                 transportStaff: (invoiceData as any).transportStaff || '',
                 decorationStaff: (invoiceData as any).decorationStaff || '',
                 returnStaff: (invoiceData as any).returnStaff || '',
+                remarks: (invoiceData as any).remarks || '',
                 items: mergedItems.map((item) => ({
                     qty: item.qty,
                     description: item.description || '',

@@ -99,7 +99,6 @@ function toCustomerFormData(customerData: any, formatDateForInput: (v: any) => s
         funeralFrom: formatDateForInput(customerData.funeralFrom),
         funeralTo: formatDateForInput(customerData.funeralTo),
         funeralPlace: customerData.funeralPlace || '',
-        notes: customerData.notes || '',
         memberships: customerData.memberships?.map((m: any) => ({
             rowNo: m.rowNo,
             memberNo: m.memberNo || '',
@@ -125,7 +124,7 @@ function applyCustomerFormData(data: CaseFormData, setValue: UseFormSetValue<any
         'chiefMournerTownId', 'chiefMournerAddress', 'chiefMournerTel',
         'payerName', 'payerRelation', 'payerAddress', 'payerTel',
         'pickupPlace', 'wakeAt', 'wakePlace', 'departureAt', 'departurePlace',
-        'funeralFrom', 'funeralTo', 'funeralPlace', 'notes', 'memberships',
+        'funeralFrom', 'funeralTo', 'funeralPlace', 'memberships',
     ]
     fields.forEach((key) => setValue(key, data[key]))
 }

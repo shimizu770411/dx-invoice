@@ -292,6 +292,7 @@ export function useEstimateEdit(estimateId: string, reset: UseFormReset<Estimate
                 transportStaff: (estimateData as any).transportStaff || '',
                 decorationStaff: (estimateData as any).decorationStaff || '',
                 returnStaff: (estimateData as any).returnStaff || '',
+                remarks: (estimateData as any).remarks || '',
                 items: mergedItems.map((item) => ({
                     qty: item.qty,
                     description: item.description || '',

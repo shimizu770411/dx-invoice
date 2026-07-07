@@ -17,6 +17,7 @@ export const invoiceFormSchema = z.object({
     transportStaff: z.string(),
     decorationStaff: z.string(),
     returnStaff: z.string(),
+    remarks: z.string(),
     items: z.array(invoiceItemFieldSchema),
     freeItems: z.array(invoiceFreeItemFieldSchema),
     _changeMarker: z.string().optional(),
@@ -39,6 +40,7 @@ export const DEFAULT_INVOICE_FORM_VALUES: InvoiceFormData = {
     transportStaff: '',
     decorationStaff: '',
     returnStaff: '',
+    remarks: '',
     items: [],
     freeItems: [],
 }

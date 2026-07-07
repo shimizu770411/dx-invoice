@@ -127,7 +127,6 @@ model Customer {
   funeralPlace          String?   @db.VarChar(255) @map("funeral_place")
   returnAt              DateTime? @db.Timestamptz(6) @map("return_at")
   returnPlace           String?   @db.VarChar(255) @map("return_place")
-  notes                 String?   @db.Text
   memberCardNote        String?   @db.VarChar(255) @map("member_card_note")
   createdAt             DateTime  @default(now()) @db.Timestamptz(6) @map("created_at")
   updatedAt             DateTime  @updatedAt @db.Timestamptz(6) @map("updated_at")
@@ -332,6 +331,7 @@ model Estimate {
   transportStaff      String?             @db.VarChar(100) @map("transport_staff")
   decorationStaff     String?             @db.VarChar(100) @map("decoration_staff")
   returnStaff         String?             @db.VarChar(100) @map("return_staff")
+  remarks             String?             @db.Text
   issuedAt            DateTime?           @db.Timestamptz(6) @map("issued_at")
   createdAt           DateTime            @default(now()) @db.Timestamptz(6) @map("created_at")
   updatedAt           DateTime            @updatedAt @db.Timestamptz(6) @map("updated_at")
@@ -413,6 +413,7 @@ model Invoice {
   transportStaff      String?             @db.VarChar(100) @map("transport_staff")
   decorationStaff     String?             @db.VarChar(100) @map("decoration_staff")
   returnStaff         String?             @db.VarChar(100) @map("return_staff")
+  remarks             String?             @db.Text
   issuedAt            DateTime?           @db.Timestamptz(6) @map("issued_at")
   createdAt           DateTime            @default(now()) @db.Timestamptz(6) @map("created_at")
   updatedAt           DateTime            @updatedAt @db.Timestamptz(6) @map("updated_at")

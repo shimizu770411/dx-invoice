@@ -138,7 +138,6 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
             funeralPlace: toNullIfEmpty(data.funeralPlace),
             returnAt: data.returnAt ? new Date(data.returnAt) : null,
             returnPlace: toNullIfEmpty(data.returnPlace),
-            notes: toNullIfEmpty(data.notes),
             memberCardNote: toNullIfEmpty(data.memberCardNote),
         }
 

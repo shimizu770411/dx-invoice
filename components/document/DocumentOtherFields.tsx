@@ -4,7 +4,10 @@ import { Control, useWatch } from 'react-hook-form'
 import { CREMATION_OPTIONS, ALTAR_OPTIONS } from '@/app/(protected)/estimates/constants/estimateOptions'
 import { FormInput } from '@/components/form/FormInput'
 import { FormSelect } from '@/components/form/FormSelect'
+import { FormTextarea } from '@/components/form/FormTextarea'
 import type { DocumentFormData } from './DocumentItemTable'
+
+const MAX_REMARKS_LENGTH = 50
 
 type Props = {
     control: Control<DocumentFormData>
@@ -47,6 +50,16 @@ export function DocumentOtherFields({ control, disabled, estimateStaffLabel = '�
                 <FormInput name="transportStaff" control={control} label="搬送担当" />
                 <FormInput name="decorationStaff" control={control} label="飾り担当" />
                 <FormInput name="returnStaff" control={control} label="引上担当" />
+            </div>
+            <div className="mt-4">
+                <FormTextarea
+                    name="remarks"
+                    control={control}
+                    label="備考"
+                    rows={6}
+                    maxLength={MAX_REMARKS_LENGTH}
+                    noResize
+                />
             </div>
         </div>
     )

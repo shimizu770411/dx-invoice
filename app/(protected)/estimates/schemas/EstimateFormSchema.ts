@@ -18,6 +18,7 @@ export const estimateFormSchema = z.object({
     transportStaff: z.string(),
     decorationStaff: z.string(),
     returnStaff: z.string(),
+    remarks: z.string(),
     items: z.array(estimateItemFieldSchema),
     freeItems: z.array(estimateFreeItemFieldSchema),
     // 種類変更等、フォーム外の変更を dirty 化するための隠しマーカー
@@ -42,6 +43,7 @@ export const DEFAULT_FORM_VALUES: EstimateFormData = {
     transportStaff: '',
     decorationStaff: '',
     returnStaff: '',
+    remarks: '',
     items: [],
     freeItems: [],
 }

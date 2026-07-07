@@ -358,7 +358,6 @@ export async function POST(request: NextRequest) {
             funeralPlace: toNullIfEmpty(data.funeralPlace),
             returnAt: data.returnAt ? new Date(data.returnAt) : null,
             returnPlace: toNullIfEmpty(data.returnPlace),
-            notes: toNullIfEmpty(data.notes),
             memberCardNote: toNullIfEmpty(data.memberCardNote),
         }
 
