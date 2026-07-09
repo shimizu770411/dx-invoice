@@ -421,7 +421,7 @@ export default function CasesPage() {
                                     className="font-mincho"
                                     title="案件詳細・会員情報を編集"
                                 >
-                                    案件編集
+                                    情報編集
                                 </button>
                                 <span
                                     className="mx-2 self-stretch"

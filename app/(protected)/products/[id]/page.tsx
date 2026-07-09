@@ -1975,7 +1975,7 @@ export default function ProductEditPage() {
                                             style={inputStyle}
                                         />
                                     </div>
-                                    {/* 初期セット ＋ セット価格（子商品のみ表示） */}
+                                    {/* 初期セット（子商品のみ表示） */}
                                     {kind === 'CHILD' && (
                                         <>
                                             <div>
@@ -2019,24 +2019,6 @@ export default function ProductEditPage() {
                                                     />
                                                     初期セット
                                                 </label>
-                                            </div>
-                                            <div>
-                                                <label className="brand-label">セット価格（円）</label>
-                                                <CurrencyTextInput
-                                                    value={v.setPrice}
-                                                    onChange={(val) =>
-                                                        setVariant(i, { setPrice: val })
-                                                    }
-                                                    disabled={v.isDefaultSet}
-                                                    style={{
-                                                        ...inputStyle,
-                                                        backgroundColor: v.isDefaultSet
-                                                            ? '#f0eee8'
-                                                            : 'var(--brand-ivory-light)',
-                                                        cursor: v.isDefaultSet ? 'not-allowed' : 'text',
-                                                        opacity: v.isDefaultSet ? 0.6 : 1,
-                                                    }}
-                                                />
                                             </div>
                                         </>
                                     )}

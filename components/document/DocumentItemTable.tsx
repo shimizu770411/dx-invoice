@@ -240,9 +240,11 @@ export function DocumentItemTable({
         }
         setPendingIsService(!!item?.isService)
         setPendingIsMaturityService(!!item?.isMaturityService)
+        // 子商品は adhocSetScope を引き継がない（子商品では adhocSetScope UI が非表示のため）
+        const isThisChildItem = !!item?.productItem?.isSetChild
         const adhoc = (item as any)?.adhocSetScope
         setPendingAdhocSetScope(
-            adhoc === 'MEMBER_ONLY' || adhoc === 'BOTH' ? adhoc : 'NONE'
+            !isThisChildItem && (adhoc === 'MEMBER_ONLY' || adhoc === 'BOTH') ? adhoc : 'NONE'
         )
         setVariantDialogIndex(index)
     }
@@ -413,11 +415,14 @@ export function DocumentItemTable({
                                 const isParent = item?.productItem?.isSetParent
                                 const isChild = item?.productItem?.isSetChild
                                 // 任意セット扱い (adhocSetScope) が現在モードに該当
+                                // adhocSetScope は非子商品専用。isSetChild=true の商品には適用しない
                                 const adhocScope = (item as any)?.adhocSetScope
                                 const isAdhocSetIncluded =
-                                    adhocScope === 'BOTH' ||
-                                    (adhocScope === 'MEMBER_ONLY' && isMember) ||
-                                    (adhocScope === 'GENERAL_ONLY' && !isMember)
+                                    !isChild && (
+                                        adhocScope === 'BOTH' ||
+                                        (adhocScope === 'MEMBER_ONLY' && isMember) ||
+                                        (adhocScope === 'GENERAL_ONLY' && !isMember)
+                                    )
                                 // 子商品 + 初期セット種類 + setableScope が現在モードに適用: セット扱い
                                 const isSetIncluded =
                                     !!(
@@ -972,8 +977,6 @@ export function DocumentItemTable({
                             )
                             // 満期サービス可否が「可」の商品のみチェック可能
                             const canBeMaturityService = !!item?.productItem?.isMaturityServiceable
-                            // 子商品の場合はセット価格モードで表示（一般/会員共通、setPrice は会員のみ参照）
-                            const showSetPrice = isMember && isChildItem
                             return (
                                 <div className="min-h-0 flex-1 overflow-y-auto pr-1">
                                     <p className="mb-4 text-lg font-medium">{item?.productItem?.name}</p>
@@ -1353,20 +1356,6 @@ export function DocumentItemTable({
                                                         <p className="text-lg text-gray-500">
                                                             会員: ¥{v.priceMember.toLocaleString()}
                                                         </p>
-                                                        {showSetPrice && (
-                                                            v.isDefaultSet ? (
-                                                                <p
-                                                                    className="text-lg font-semibold"
-                                                                    style={{ color: 'var(--brand-gold-soft)' }}
-                                                                >
-                                                                    セット
-                                                                </p>
-                                                            ) : (
-                                                                <p className="text-lg text-gray-500">
-                                                                    セット: ¥{(v.setPrice ?? 0).toLocaleString()}
-                                                                </p>
-                                                            )
-                                                        )}
                                                     </button>
                                                 )
                                             })}
