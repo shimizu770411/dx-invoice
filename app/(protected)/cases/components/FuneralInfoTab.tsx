@@ -61,6 +61,26 @@ export function FuneralInfoTab() {
                 error={errors.funeralTo}
             />
 
+            {/* 引上日時 */}
+            <FormInput<CaseFormData>
+                name="returnAt"
+                control={control}
+                label="引上日時"
+                type="datetime-local"
+                minYear={1950}
+                maxYear={new Date().getFullYear()}
+                error={errors.returnAt}
+            />
+
+            {/* 引上場所 */}
+            <FormAutocomplete<CaseFormData>
+                name="returnPlace"
+                control={control}
+                label="引上場所"
+                options={[...FUNERAL_PLACE_OPTIONS]}
+                error={errors.returnPlace}
+            />
+
         </div>
     )
 }

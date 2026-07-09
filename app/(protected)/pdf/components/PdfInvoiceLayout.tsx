@@ -283,10 +283,9 @@ const ALTAR_LABEL: Record<string, string> = {
 function fmtDate(v?: string | Date | null): string {
     if (!v) return ''
     const d = new Date(v)
-    const yyyy = d.getFullYear()
     const mm = String(d.getMonth() + 1).padStart(2, '0')
     const dd = String(d.getDate()).padStart(2, '0')
-    return `${yyyy}年${mm}月${dd}日`
+    return `${mm}月${dd}日`
 }
 
 function fmtTime(v?: string | Date | null): string {
@@ -377,6 +376,7 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
               returnStaff: docAny.returnStaff ?? null,
           }
         : undefined
+    const FIXED_ITEM_ROWS = 37
     const displayRows = buildDisplayRows(products, items, doc.freeItems)
     return (
         <div
@@ -420,10 +420,6 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                     <div className="grid grid-cols-[2.8fr_1.2fr] gap-4 px-3 py-1 text-[0.8rem] leading-[1] tracking-tight">
                         <div className="flex w-[28rem] justify-between">
                             <div>告別式</div>
-                            {/* 年 */}
-                            <div>
-                                {customer?.funeralFrom ? new Date(customer.funeralFrom).getFullYear() + '年' : ''}
-                            </div>
                             {/* 月 */}
                             <div>
                                 {customer?.funeralFrom
@@ -484,10 +480,16 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                     {/* 明細ブロック */}
                     <div className="w-[60%] border-r-2 border-black">
                         <table className="w-full border-collapse text-[0.75rem]">
+                            <colgroup>
+                                <col style={{ width: '24%' }} />
+                                <col />
+                                <col style={{ width: '18%' }} />
+                                <col style={{ width: '18%' }} />
+                            </colgroup>
                             <thead>
                                 <tr>
                                     <th className="border border-l-0 border-t-0 border-black px-2 text-center">
-                                        <div className="mx-auto flex w-[6rem] justify-between">
+                                        <div className="mx-auto flex w-[4rem] justify-between">
                                             {'品名'.split('').map((char, i) => (
                                                 <span key={i} className="text-center">
                                                     {char}
@@ -496,7 +498,7 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                         </div>
                                     </th>
                                     <th className="border border-l-0 border-t-0 border-black text-center">
-                                        <div className="mx-auto flex w-[5.5rem] justify-between">
+                                        <div className="mx-auto flex w-[4rem] justify-between">
                                             {'摘要'.split('').map((char, i) => (
                                                 <span key={i} className="text-center">
                                                     {char}
@@ -505,7 +507,7 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                         </div>
                                     </th>
                                     <th className="border border-l-0 border-t-0 border-black px-1 text-center">
-                                        <div className="mx-auto flex w-[4rem] justify-between">
+                                        <div className="mx-auto flex w-[3rem] justify-between">
                                             {'一般価格'.split('').map((char, i) => (
                                                 <span key={i} className="text-center">
                                                     {char}
@@ -514,7 +516,7 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                         </div>
                                     </th>
                                     <th className="border border-x-0 border-t-0 border-black px-1 text-center">
-                                        <div className="mx-auto flex w-[4rem] justify-between">
+                                        <div className="mx-auto flex w-[3rem] justify-between">
                                             {'会員価格'.split('').map((char, i) => (
                                                 <span key={i} className="text-center">
                                                     {char}
@@ -630,6 +632,14 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                     </Fragment>
                                     )
                                 })}
+                                {Array.from({ length: Math.max(0, FIXED_ITEM_ROWS - displayRows.length) }).map((_, i) => (
+                                    <tr key={`pad-${i}`}>
+                                        <td className="border border-l-0 border-black px-2">&nbsp;</td>
+                                        <td className="border border-l-0 border-black px-0.5">&nbsp;</td>
+                                        <td className="border border-black px-1">&nbsp;</td>
+                                        <td className="border border-r-0 border-black px-1">&nbsp;</td>
+                                    </tr>
+                                ))}
                             </tbody>
                             {/* 金額合計 */}
                             <tfoot className="border-0 border-t-2 border-black">
@@ -840,6 +850,7 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                             {
                                                 label: '受付日',
                                                 data: `${fmtDate(customer?.receptionAt)} ${fmtTime(customer?.receptionAt)}`,
+                                                placeTemplate: '（　場　所　）',
                                             },
                                             {
                                                 label: '本通夜',
@@ -866,12 +877,20 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                                     : '未定',
                                                 place: customer?.funeralPlace,
                                             },
+                                            {
+                                                label: '引上日',
+                                                data: customer?.returnAt
+                                                    ? `${fmtDate(customer.returnAt)} ${fmtTime(customer.returnAt)}`
+                                                    : '',
+                                                place: customer?.returnPlace,
+                                            },
                                         ] as {
                                             label: string
                                             data?: string | null
                                             place?: string | null
+                                            placeTemplate?: string
                                         }[]
-                                    ).map(({ label, data, place }, i) => (
+                                    ).map(({ label, data, place, placeTemplate }, i) => (
                                         <tr key={i}>
                                             <th
                                                 className="w-[3em] border-0 border-black py-1 pr-1 font-normal"
@@ -884,10 +903,12 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                                 </div>
                                             </th>
                                             <td className="border-b border-black p-1">
-                                                <div>{data ?? '未定'}</div>
-                                                {place !== undefined && (
-                                                    <div className="text-xs">(場所: {place ? `${place}` : '---'})</div>
-                                                )}
+                                                <div className="flex items-baseline justify-between">
+                                                    <div>{data ?? ''}</div>
+                                                    {(placeTemplate ?? place) !== undefined && (
+                                                        <div>{placeTemplate ?? `（${place ?? ''}）`}</div>
+                                                    )}
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
@@ -905,109 +926,116 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                         </div>
                         {/* その他情報 */}
                         <table className="w-full border-collapse border-t border-black text-xs">
+                            <colgroup>
+                                <col style={{ width: '20%' }} />
+                                <col style={{ width: '30%' }} />
+                                <col style={{ width: '20%' }} />
+                                <col style={{ width: '30%' }} />
+                            </colgroup>
                             <tbody>
-                                <tr className="border-b border-black">
-                                    <th className="w-[8em] border-r border-black px-1 text-left font-normal">
-                                        <div className="flex justify-between">
-                                            {'火葬許可証手続'.split('').map((char, j) => (
-                                                <span key={j}>{char}</span>
-                                            ))}
-                                        </div>
-                                    </th>
-                                    <td className="px-1">
-                                        {customer?.cremationProcessType
-                                            ? (CREMATION_LABEL[customer.cremationProcessType] ??
-                                              customer.cremationProcessType)
-                                            : ''}
-                                    </td>
-                                </tr>
-                                <tr className="border-b border-black">
-                                    <th className="w-[8em] border-r border-black px-1 text-left font-normal">
-                                        <div className="flex justify-between">
-                                            {'祭壇設置場所'.split('').map((char, j) => (
-                                                <span key={j}>{char}</span>
-                                            ))}
-                                        </div>
-                                    </th>
-                                    <td className="px-1">
-                                        {customer?.altarPlaceType === 'OTHER'
-                                            ? `その他（${customer.altarPlaceOther ?? ''}）`
-                                            : customer?.altarPlaceType
-                                              ? (ALTAR_LABEL[customer.altarPlaceType] ?? customer.altarPlaceType)
-                                              : ''}
-                                    </td>
-                                </tr>
+                                {/* 会員証 */}
                                 <tr className="border-b border-black">
                                     <th className="border-r border-black px-1 text-left font-normal">
                                         <div className="flex justify-between">
-                                            {'天井高'.split('').map((char, j) => (
-                                                <span key={j}>{char}</span>
-                                            ))}
+                                            {'会員証'.split('').map((char, j) => <span key={j}>{char}</span>)}
                                         </div>
                                     </th>
-                                    <td className="px-1">
-                                        {customer?.ceilingHeight ? `${customer.ceilingHeight}尺` : ''}
+                                    <td className="px-1" colSpan={3}>{customer?.memberCardNote ?? ''}</td>
+                                </tr>
+                                {/* 火葬許可証手続: 全選択肢を表示、選択中は下線+太字 */}
+                                <tr className="border-b border-black">
+                                    <th className="border-r border-black px-1 text-left font-normal" style={{ fontSize: '0.6rem' }}>
+                                        <div className="flex justify-between">
+                                            {'火葬許可証手続'.split('').map((char, j) => <span key={j}>{char}</span>)}
+                                        </div>
+                                    </th>
+                                    <td className="px-1" colSpan={3}>
+                                        {(['FAMILY', 'NEIGHBORHOOD', 'COMPANY'] as const).map((key, i) => (
+                                            <Fragment key={key}>
+                                                {i > 0 && '・'}
+                                                <span className={customer?.cremationProcessType === key ? 'underline font-bold' : ''}>
+                                                    {CREMATION_LABEL[key]}
+                                                </span>
+                                            </Fragment>
+                                        ))}
                                     </td>
                                 </tr>
+                                {/* 祭壇設置場所: 全選択肢を表示、選択中は下線+太字 */}
                                 <tr className="border-b border-black">
-                                    <th className="border-x border-black px-1 text-left font-normal">
+                                    <th className="border-r border-black px-1 text-left font-normal" style={{ fontSize: '0.6rem' }}>
                                         <div className="flex justify-between">
-                                            {'搬送担当'.split('').map((char, j) => (
-                                                <span key={j}>{char}</span>
-                                            ))}
+                                            {'祭壇設置場所'.split('').map((char, j) => <span key={j}>{char}</span>)}
+                                        </div>
+                                    </th>
+                                    <td className="px-1" colSpan={3}>
+                                        <div className="flex items-baseline justify-between">
+                                            <div>
+                                                {(['HOME', 'FUNERAL_HALL'] as const).map((key, i) => (
+                                                    <Fragment key={key}>
+                                                        {i > 0 && '・'}
+                                                        <span className={customer?.altarPlaceType === key ? 'underline font-bold' : ''}>
+                                                            {ALTAR_LABEL[key]}
+                                                        </span>
+                                                    </Fragment>
+                                                ))}
+                                                {'・'}
+                                                <span className={customer?.altarPlaceType === 'OTHER' ? 'underline font-bold' : ''}>
+                                                    その他（{customer?.altarPlaceType === 'OTHER' ? (customer.altarPlaceOther ?? '') : ''}
+                                                </span>
+                                            </div>
+                                            <span>）</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {/* 天井高 | 搬送担当 */}
+                                <tr className="border-b border-black">
+                                    <th className="border-r border-black px-1 text-left font-normal">
+                                        <div className="flex justify-between">
+                                            {'天井高'.split('').map((char, j) => <span key={j}>{char}</span>)}
+                                        </div>
+                                    </th>
+                                    <td className="border-r border-black px-1 text-right">
+                                        {customer?.ceilingHeight ?? ''}&nbsp;尺
+                                    </td>
+                                    <th className="border-r border-black px-1 text-left font-normal">
+                                        <div className="flex justify-between">
+                                            {'搬送担当'.split('').map((char, j) => <span key={j}>{char}</span>)}
                                         </div>
                                     </th>
                                     <td className="px-1">{customer?.transportStaff ?? ''}</td>
                                 </tr>
+                                {/* 見積担当 | 飾り担当 */}
                                 <tr className="border-b border-black">
                                     <th className="border-r border-black px-1 text-left font-normal">
                                         <div className="flex justify-between">
-                                            {(title.includes('請求書')
-                                                ? '請求書発行担当'
-                                                : docAny.status === 'DRAFT'
-                                                  ? '事前相談見積担当'
-                                                  : '本見積担当'
-                                            )
-                                                .split('')
-                                                .map((char, j) => (
-                                                    <span key={j}>{char}</span>
-                                                ))}
+                                            {'見積担当'.split('').map((char, j) => <span key={j}>{char}</span>)}
                                         </div>
                                     </th>
-                                    <td className="px-1 ">
+                                    <td className="border-r border-black px-1">
                                         {title.includes('請求書')
                                             ? (customer?.estimateStaff ?? '')
                                             : docAny.status === 'DRAFT'
                                               ? (customer?.preConsultStaff ?? '')
                                               : (customer?.estimateStaff ?? '')}
                                     </td>
-                                </tr>
-                                <tr className="border-b border-black">
-                                    <th className="border-x border-black px-1 text-left font-normal">
+                                    <th className="border-r border-black px-1 text-left font-normal">
                                         <div className="flex justify-between">
-                                            {'飾り担当'.split('').map((char, j) => (
-                                                <span key={j}>{char}</span>
-                                            ))}
+                                            {'飾り担当'.split('').map((char, j) => <span key={j}>{char}</span>)}
                                         </div>
                                     </th>
                                     <td className="px-1">{customer?.decorationStaff ?? ''}</td>
                                 </tr>
+                                {/* 式担当 | 引上担当 */}
                                 <tr className="border-b border-black">
                                     <th className="border-r border-black px-1 text-left font-normal">
                                         <div className="flex justify-between">
-                                            {'式担当'.split('').map((char, j) => (
-                                                <span key={j}>{char}</span>
-                                            ))}
+                                            {'式担当'.split('').map((char, j) => <span key={j}>{char}</span>)}
                                         </div>
                                     </th>
-                                    <td className="px-1">{customer?.ceremonyStaff ?? ''}</td>
-                                </tr>
-                                <tr className="border-b border-black">
-                                    <th className="border-x border-black px-1 text-left font-normal">
+                                    <td className="border-r border-black px-1">{customer?.ceremonyStaff ?? ''}</td>
+                                    <th className="border-r border-black px-1 text-left font-normal">
                                         <div className="flex justify-between">
-                                            {'引上担当'.split('').map((char, j) => (
-                                                <span key={j}>{char}</span>
-                                            ))}
+                                            {'引上担当'.split('').map((char, j) => <span key={j}>{char}</span>)}
                                         </div>
                                     </th>
                                     <td className="px-1">{customer?.returnStaff ?? ''}</td>
@@ -1019,12 +1047,8 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                     </div>
                 </div>
             </div>
-
-            {/* ２ページ目 */}
-            {/* 会員情報ブロック */}
-            <div>
-                <PdfMembershipTable memberships={customer?.memberships} />
-            </div>
+            {/* 互助会テーブル（差引合計の下・全幅・独立枠） */}
+            <PdfMembershipTable memberships={customer?.memberships} />
 
             {/* 選択オプション画像ページ */}
             {(() => {

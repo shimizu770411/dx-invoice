@@ -7,8 +7,6 @@ type Props = {
 const HEADERS = ['会員番号', '入金', '会員名', 'コース', '入金回数', '入金金額', '営業担当者名', '故人との続柄']
 
 export function PdfMembershipTable({ memberships = [] }: Props) {
-    if (memberships.length === 0 || memberships.every((m) => m.memberNo == null)) return null
-
     const rows = [0, 1, 2].map((i) => memberships[i] || ({} as PdfMembership))
 
     return (
@@ -36,7 +34,7 @@ export function PdfMembershipTable({ memberships = [] }: Props) {
                     {rows.map((m, i) => (
                         <tr key={i} className="border border-x-0 border-b-0 border-black text-center">
                             <td className="border border-y-0 border-l-0 border-black p-2 text-center">
-                                {m.memberNo ?? '-'}
+                                {m.memberNo ?? ''}
                             </td>
                             <td className="border border-y-0 border-black px-2 text-left">
                                 {m.paymentAmount != null ? `¥ ${Number(m.paymentAmount).toLocaleString()}` : ''}

@@ -86,6 +86,8 @@ export const caseFormSchema = z.object({
     funeralFrom: z.string().optional(),
     funeralTo: z.string().optional(),
     funeralPlace: z.string().optional(),
+    returnAt: z.string().optional(),
+    returnPlace: z.string().optional(),
     // 会員情報
     memberships: z.array(customerMembershipSchema),
 })

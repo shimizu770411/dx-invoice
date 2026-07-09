@@ -376,6 +376,20 @@ export default function ProductEditPage() {
         }
     }
 
+    const moveRowVariant = (rIdx: number, vIdx: number, dir: -1 | 1) => {
+        const target = vIdx + dir
+        setMultiRows((prev) =>
+            prev.map((r, i) => {
+                if (i !== rIdx) return r
+                if (target < 0 || target >= r.variants.length) return r
+                const next = r.variants.slice()
+                const [v] = next.splice(vIdx, 1)
+                next.splice(target, 0, v)
+                return { ...r, variants: next }
+            })
+        )
+    }
+
     const updateRowVariant = (
         rIdx: number,
         vIdx: number,
@@ -1601,6 +1615,44 @@ export default function ProductEditPage() {
                                                             </div>
                                                         </div>
 
+                                                        {/* 並び替え＋削除 */}
+                                                        <div className="flex flex-col gap-2 items-end">
+                                                            <div className="flex gap-1">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => moveRowVariant(rIdx, vIdx, -1)}
+                                                                    disabled={vIdx === 0}
+                                                                    className="flex items-center justify-center transition-colors"
+                                                                    style={{
+                                                                        width: '28px',
+                                                                        height: '28px',
+                                                                        border: '1px solid var(--brand-navy)',
+                                                                        backgroundColor: vIdx === 0 ? '#f0eee8' : '#ffffff',
+                                                                        color: vIdx === 0 ? '#c4bfb0' : 'var(--brand-navy)',
+                                                                        cursor: vIdx === 0 ? 'not-allowed' : 'pointer',
+                                                                    }}
+                                                                    title="上へ"
+                                                                >
+                                                                    <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>arrow_upward</span>
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => moveRowVariant(rIdx, vIdx, 1)}
+                                                                    disabled={vIdx === row.variants.length - 1}
+                                                                    className="flex items-center justify-center transition-colors"
+                                                                    style={{
+                                                                        width: '28px',
+                                                                        height: '28px',
+                                                                        border: '1px solid var(--brand-navy)',
+                                                                        backgroundColor: vIdx === row.variants.length - 1 ? '#f0eee8' : '#ffffff',
+                                                                        color: vIdx === row.variants.length - 1 ? '#c4bfb0' : 'var(--brand-navy)',
+                                                                        cursor: vIdx === row.variants.length - 1 ? 'not-allowed' : 'pointer',
+                                                                    }}
+                                                                    title="下へ"
+                                                                >
+                                                                    <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>arrow_downward</span>
+                                                                </button>
+                                                            </div>
                                                         {/* 削除 */}
                                                         <button
                                                             type="button"
@@ -1633,6 +1685,7 @@ export default function ProductEditPage() {
                                                         >
                                                             この種類を削除
                                                         </button>
+                                                        </div>{/* /並び替え＋削除 */}
                                                     </div>
                                                 ))}
                                             </div>
