@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import { Control, FieldArrayWithId, UseFormSetValue, useWatch } from 'react-hook-form'
 import { FormInput } from '@/components/form/FormInput'
@@ -97,6 +97,17 @@ export function EstimateItemWizard({
     const allSteps: Step[] = [...productSteps, ...freeSteps]
     const total = allSteps.length
 
+    const selectedCount = useMemo(() => {
+        const productCount = (watchedItems || []).reduce((c, f) => c + (f?.qty > 0 ? 1 : 0), 0)
+        const freeCount = (watchedFreeItems || []).reduce(
+            (c, f) => c + (f?.qty > 0 && (f?.productItemName ?? '').trim() !== '' ? 1 : 0),
+            0
+        )
+        return productCount + freeCount
+    }, [watchedItems, watchedFreeItems])
+
+    const changeMarkerRef = useRef(0)
+
     if (total === 0) {
         return (
             <div
@@ -141,15 +152,6 @@ export function EstimateItemWizard({
         }
     })
 
-    const selectedCount = useMemo(() => {
-        const productCount = (watchedItems || []).reduce((c, f) => c + (f?.qty > 0 ? 1 : 0), 0)
-        const freeCount = (watchedFreeItems || []).reduce(
-            (c, f) => c + (f?.qty > 0 && (f?.productItemName ?? '').trim() !== '' ? 1 : 0),
-            0
-        )
-        return productCount + freeCount
-    }, [watchedItems, watchedFreeItems])
-
     const handleSelectVariant = (v: ProductVariant) => {
         if (step.kind !== 'product') return
         onVariantChange?.(index, v)
@@ -157,7 +159,8 @@ export function EstimateItemWizard({
             setValue?.(`items.${index}.qty` as `items.${number}.qty`, 1, { shouldDirty: true })
         }
         // 種類変更を dirty 化
-        setValue?.('_changeMarker' as any, String(Date.now()), { shouldDirty: true })
+        changeMarkerRef.current += 1
+        setValue?.('_changeMarker' as any, String(changeMarkerRef.current), { shouldDirty: true })
     }
 
     const handleSkip = () => {
@@ -372,7 +375,8 @@ export function EstimateItemWizard({
                                             } else if (next.length === 0) {
                                                 setValue?.(`items.${index}.qty` as `items.${number}.qty`, 0, { shouldDirty: true })
                                             }
-                                            setValue?.('_changeMarker' as any, String(Date.now()), { shouldDirty: true })
+                                            changeMarkerRef.current += 1
+                                            setValue?.('_changeMarker' as any, String(changeMarkerRef.current), { shouldDirty: true })
                                         }
                                         : () => handleSelectVariant(v)
                                     return (
