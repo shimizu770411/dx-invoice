@@ -1,7 +1,9 @@
 'use client'
 
 import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { User } from '@/lib/users'
+import { getMe } from '@/lib/auth'
 import { toast } from '@/hooks/use-toast'
 import { UserFormData } from './schemas/UserFormSchema'
 import { useUsersQuery, useCreateUserMutation, useUpdateUserMutation } from './hooks/useUserForm'
@@ -20,6 +22,7 @@ export default function UsersPage() {
     })
 
     const { data: users = [], isLoading } = useUsersQuery(appliedSearch || undefined)
+    const { data: currentUser } = useQuery({ queryKey: ['me'], queryFn: getMe })
     const createMutation = useCreateUserMutation()
     const updateMutation = useUpdateUserMutation()
 
@@ -52,6 +55,9 @@ export default function UsersPage() {
                     tel: data.tel,
                     email: data.email || undefined,
                     birthDate: data.birthDate || undefined,
+                    role: data.role,
+                    isAdmin: data.isAdmin,
+                    requirePasswordChange: data.requirePasswordChange,
                     ...(data.password ? { password: data.password } : {}),
                 }
                 await updateMutation.mutateAsync({ id: editDialog.user.id, data: updateData })
@@ -63,6 +69,9 @@ export default function UsersPage() {
                     password: data.password!,
                     email: data.email || undefined,
                     birthDate: data.birthDate || undefined,
+                    role: data.role,
+                    isAdmin: data.isAdmin,
+                    requirePasswordChange: data.requirePasswordChange,
                 })
                 toast({ title: '登録しました' })
             }
@@ -166,7 +175,12 @@ export default function UsersPage() {
             </section>
 
             {/* ユーザー一覧 */}
-            <UserTable users={users} onEdit={handleEditUser} />
+            <UserTable
+                users={users}
+                onEdit={handleEditUser}
+                currentUserId={currentUser?.id}
+                currentUserIsAdmin={currentUser?.isAdmin ?? false}
+            />
 
             {/* 編集ダイアログ */}
             <UserFormDialog

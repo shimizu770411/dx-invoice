@@ -1,4 +1,7 @@
 import { z } from 'zod'
+import { UserRole } from '@/lib/users'
+
+export const USER_ROLES: UserRole[] = ['STAFF', 'CLERK', 'APPROVER']
 
 const userFormBaseSchema = z.object({
     name: z.string().min(1, '必須です'),
@@ -6,6 +9,9 @@ const userFormBaseSchema = z.object({
     password: z.string().optional(),
     email: z.string().email('メールアドレスの形式が正しくありません').or(z.literal('')).optional(),
     birthDate: z.string().optional(),
+    role: z.enum(['STAFF', 'CLERK', 'APPROVER']),
+    isAdmin: z.boolean(),
+    requirePasswordChange: z.boolean(),
 })
 
 export const createUserFormSchema = userFormBaseSchema.extend({
@@ -24,4 +30,7 @@ export const DEFAULT_FORM_VALUES: UserFormData = {
     password: '',
     email: '',
     birthDate: '',
+    role: 'STAFF',
+    isAdmin: false,
+    requirePasswordChange: false,
 }

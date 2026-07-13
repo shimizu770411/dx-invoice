@@ -28,7 +28,12 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
                 },
                 items: {
                     include: {
-                        productItem: { include: { rows: { include: { variants: true } } } },
+                        productItem: {
+                            include: {
+                                rows: { include: { variants: true } },
+                                variantGroups: { include: { variants: true } },
+                            },
+                        },
                         productVariant: true,
                         freeItems: {
                             orderBy: { sortNo: 'asc' },
@@ -36,6 +41,9 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
                     },
                     orderBy: { sortNo: 'asc' },
                 },
+                staffConfirmedBy: { select: { id: true, name: true } },
+                clerkConfirmedBy: { select: { id: true, name: true } },
+                approverConfirmedBy: { select: { id: true, name: true } },
             },
         })
 
@@ -173,6 +181,9 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
                             productRowId: item.productRowId ? BigInt(item.productRowId) : null,
                             productRowVariantId: item.productRowVariantId
                                 ? BigInt(item.productRowVariantId)
+                                : null,
+                            productVariantGroupId: item.productVariantGroupId
+                                ? BigInt(item.productVariantGroupId)
                                 : null,
                             calcType:
                                 item.calcType === 'FIXED' || item.calcType === 'UNIT_PRICE_X_QTY'

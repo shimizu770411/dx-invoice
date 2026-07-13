@@ -9,7 +9,7 @@ import { toast } from '@/hooks/use-toast'
 import { handleLoadError, handleSaveError } from '@/lib/errorHandler'
 import { calculateDocumentFormTotals } from '@/lib/documentTotals'
 import { useDocumentItems } from '@/hooks/useDocumentItems'
-import { expandEachModeItems, buildDocumentFreeItems, MATURITY_SERVICE_NAME, CANCELLATION_FEE_NAME } from '@/lib/documentUtils'
+import { expandEachModeItems, expandVariantGroupItems, buildDocumentFreeItems, MATURITY_SERVICE_NAME, CANCELLATION_FEE_NAME } from '@/lib/documentUtils'
 import { useDocumentProductSearch } from '@/hooks/useDocumentProductSearch'
 import { InvoiceFormData } from '../schemas/InvoiceFormSchema'
 
@@ -95,6 +95,47 @@ export function useInvoiceEdit(invoiceId: string, reset: UseFormReset<InvoiceFor
                     (item) =>
                         item.productItemId === product.id && !(item as any).productRowId
                 )
+                if (product.hasVariantGroups) {
+                    const groupExisting = allExisting.filter((item) => (item as any).productVariantGroupId)
+                    if (groupExisting.length > 0) {
+                        const groupSelectionsMap: Record<string, string[]> = {}
+                        for (const gi of groupExisting) {
+                            const gid = String((gi as any).productVariantGroupId)
+                            if (!groupSelectionsMap[gid]) groupSelectionsMap[gid] = []
+                            if ((gi as any).multiSelectVariantIds) {
+                                try {
+                                    const ids: string[] = JSON.parse((gi as any).multiSelectVariantIds)
+                                    groupSelectionsMap[gid].push(...ids)
+                                } catch { /* ignore */ }
+                            } else if (gi.productVariantId) {
+                                groupSelectionsMap[gid].push(String(gi.productVariantId))
+                            }
+                        }
+                        mergedItems.push({
+                            productItemId: product.id,
+                            description: product.defaultDescription ?? '',
+                            unitPriceGeneral: groupExisting.reduce((s, gi) => s + gi.unitPriceGeneral * (gi.qty || 1), 0),
+                            unitPriceMember: groupExisting.reduce((s, gi) => s + gi.unitPriceMember * (gi.qty || 1), 0),
+                            qty: 1,
+                            amount: 0,
+                            sortNo: mergedItems.length,
+                            productItem: { ...product },
+                            groupSelections: JSON.stringify(groupSelectionsMap),
+                        } as InvoiceItem)
+                    } else {
+                        mergedItems.push({
+                            productItemId: product.id,
+                            description: product.defaultDescription ?? '',
+                            unitPriceGeneral: 0,
+                            unitPriceMember: 0,
+                            qty: 0,
+                            amount: 0,
+                            sortNo: mergedItems.length,
+                            productItem: { ...product },
+                        } as InvoiceItem)
+                    }
+                    continue
+                }
                 if (allExisting.length > 0) {
                     // EACH モード (isMultiSelect=true, multiSelectMerge=false): 複数EACH行を1スロットに集約
                     if ((product as any).isMultiSelect && (product as any).multiSelectMerge === false && allExisting.length > 1) {
@@ -202,7 +243,8 @@ export function useInvoiceEdit(invoiceId: string, reset: UseFormReset<InvoiceFor
                 })
                 return
             }
-            const finalItems = expandEachModeItems(activeItems, isMember)
+            const groupExpandedItems = expandVariantGroupItems(activeItems, isMember)
+            const finalItems = expandEachModeItems(groupExpandedItems, isMember)
             const mergedFreeItems = freeItems
                 .map((item, i) => {
                     const productItemName = formValues.freeItems[i]?.productItemName ?? item.productItemName ?? ''
@@ -235,7 +277,7 @@ export function useInvoiceEdit(invoiceId: string, reset: UseFormReset<InvoiceFor
         }
     }
 
-    return { loading, customer, invoice, items, setItems, freeItems, setFreeItems, onSubmit }
+    return { loading, customer, invoice, setInvoice, items, setItems, freeItems, setFreeItems, onSubmit }
 }
 
 // -------------------------------------------------------

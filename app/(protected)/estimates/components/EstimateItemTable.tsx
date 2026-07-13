@@ -20,6 +20,7 @@ type Props = {
     readOnly?: boolean
     currentStoreId?: string | null
     onMultiSelectChange?: (index: number, variantIds: string[], options?: { adhocSetScope?: 'NONE' | 'MEMBER_ONLY' | 'BOTH'; isService?: boolean; isMaturityService?: boolean }) => void
+    onGroupVariantChange?: (index: number, groupId: string, variantIds: string[]) => void
 }
 
 export function EstimateItemTable({ control, fields, freeFields, setValue, ...rest }: Props) {

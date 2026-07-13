@@ -1,4 +1,53 @@
 /**
+ * 日付文字列を西暦表示でフォーマット（例: 2025年3月31日）
+ */
+export function formatDateWestern(dateString: string | null | undefined): string {
+    if (!dateString) return ''
+    try {
+        const date = new Date(dateString)
+        if (isNaN(date.getTime())) return ''
+        return new Intl.DateTimeFormat('ja-JP', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+        }).format(date)
+    } catch {
+        return ''
+    }
+}
+
+/**
+ * 日付文字列を和暦表示でフォーマット（例: 令和7年3月31日）
+ */
+export function formatDateJapanese(dateString: string | null | undefined): string {
+    if (!dateString) return ''
+    try {
+        const date = new Date(dateString)
+        if (isNaN(date.getTime())) return ''
+        return new Intl.DateTimeFormat('ja-JP-u-ca-japanese', {
+            era: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+        }).format(date)
+    } catch {
+        return ''
+    }
+}
+
+/**
+ * dateFormat 設定に基づいて日付をフォーマット
+ */
+export function formatDateByFormat(
+    dateString: string | null | undefined,
+    dateFormat: 'WESTERN' | 'JAPANESE'
+): string {
+    return dateFormat === 'JAPANESE'
+        ? formatDateJapanese(dateString)
+        : formatDateWestern(dateString)
+}
+
+/**
  * 日付文字列を解析し、検索用の From/To 日付に変換
  * @param input - ユーザー入力 ("2026" | "2026-02" | "2026-02-18")
  * @returns { from: string, to: string } 形式

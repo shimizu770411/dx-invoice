@@ -54,6 +54,14 @@ type DocumentRow = {
     variants: DocumentRowVariant[]
 }
 
+type DocumentVariantGroup = {
+    id: string
+    label: string
+    selectionType: 'SINGLE' | 'MULTI'
+    isRequired?: boolean
+    variants: ProductVariant[]
+}
+
 type DocumentItem = {
     productItemId?: string | null
     productItem?: {
@@ -68,6 +76,8 @@ type DocumentItem = {
         canAddFreeRow?: boolean
         isMultiSelect?: boolean
         multiSelectMerge?: boolean
+        hasVariantGroups?: boolean
+        variantGroups?: DocumentVariantGroup[]
         rows?: DocumentRow[]
         children?: { id: string; name: string }[]
     } | null
@@ -91,6 +101,10 @@ type DocumentItem = {
     isService?: boolean
     isMaturityService?: boolean
     multiSelectVariantIds?: string | null
+    /** グループ商品（重箱など）の選択状態。JSON文字列: { [groupId]: variantId[] } */
+    groupSelections?: string | null
+    /** 保存後の行がどのバリアントグループ（重箱の基本セット／追加オプション等）由来かを示す */
+    productVariantGroupId?: string | null
 }
 
 type DocumentFreeItem = {
@@ -125,6 +139,7 @@ type Props = {
         variantIds: string[],
         options?: { adhocSetScope?: 'NONE' | 'MEMBER_ONLY' | 'BOTH'; isService?: boolean; isMaturityService?: boolean }
     ) => void
+    onGroupVariantChange?: (index: number, groupId: string, variantIds: string[]) => void
 }
 
 export function DocumentItemTable({
@@ -140,6 +155,7 @@ export function DocumentItemTable({
     readOnly = false,
     currentStoreId,
     onMultiSelectChange,
+    onGroupVariantChange,
 }: Props) {
     /** 保存済み variant の店舗が現在の顧客店舗と一致しないか判定 */
     const isStoreMismatch = (item: DocumentItem | undefined): boolean => {
@@ -160,6 +176,8 @@ export function DocumentItemTable({
         'NONE' | 'MEMBER_ONLY' | 'BOTH'
     >('NONE')
     const [pendingMultiVariantIds, setPendingMultiVariantIds] = useState<string[]>([])
+    // グループ商品（重箱など）: groupId -> 選択中の variantId 配列
+    const [pendingGroupSelections, setPendingGroupSelections] = useState<Record<string, string[]>>({})
     const [enlargedImage, setEnlargedImage] = useState<string | null>(null)
     const [checkedItems, setCheckedItems] = useState<boolean[]>([])
     const [prevQtySignature, setPrevQtySignature] = useState('')
@@ -215,6 +233,14 @@ export function DocumentItemTable({
             setPendingRowVariantsMap(initialMap)
             setPendingRowVariant(null)
             setPendingVariant(null)
+        } else if (item?.productItem?.hasVariantGroups) {
+            try {
+                setPendingGroupSelections(item?.groupSelections ? JSON.parse(item.groupSelections) : {})
+            } catch { setPendingGroupSelections({}) }
+            setPendingVariant(null)
+            setPendingMultiVariantIds([])
+            setPendingRowVariant(null)
+            setPendingRowVariantsMap({})
         } else {
             const isMultiSelectProduct = !!item?.productItem?.isMultiSelect
             if (isMultiSelectProduct) {
@@ -237,6 +263,7 @@ export function DocumentItemTable({
             }
             setPendingRowVariant(null)
             setPendingRowVariantsMap({})
+            setPendingGroupSelections({})
         }
         setPendingIsService(!!item?.isService)
         setPendingIsMaturityService(!!item?.isMaturityService)
@@ -283,6 +310,22 @@ export function DocumentItemTable({
                         }
                     }
                 })
+            } else if (item?.productItem?.hasVariantGroups) {
+                for (const group of item.productItem.variantGroups || []) {
+                    onGroupVariantChange?.(
+                        variantDialogIndex,
+                        String(group.id),
+                        pendingGroupSelections[String(group.id)] || []
+                    )
+                }
+                const hasAnySelection = Object.values(pendingGroupSelections).some((ids) => ids.length > 0)
+                if (hasAnySelection && !(item.qty && item.qty > 0)) {
+                    setValue?.(
+                        `items.${variantDialogIndex}.qty` as `items.${number}.qty`,
+                        1,
+                        { shouldDirty: true }
+                    )
+                }
             } else if (item?.productItem?.isMultiSelect) {
                 onMultiSelectChange?.(variantDialogIndex, pendingMultiVariantIds, {
                     adhocSetScope: pendingAdhocSetScope,
@@ -308,6 +351,7 @@ export function DocumentItemTable({
         setPendingRowVariant(null)
         setPendingRowVariantsMap({})
         setPendingMultiVariantIds([])
+        setPendingGroupSelections({})
         setPendingIsService(false)
         setPendingAdhocSetScope('NONE')
     }
@@ -328,28 +372,31 @@ export function DocumentItemTable({
             : []
     )
 
-    // 複数行構成商品グループ: 連続する同 productItemId の行を1まとまりとして扱う
+    // 複数行構成商品グループ・グループ商品（重箱など、保存後は複数行に展開済み）:
+    // 連続する同 productItemId の行を1まとまりとして扱う
     // 各 index に対して、グループ先頭の index を記録（先頭なら自分自身）
+    const isGroupableRow = (item: DocumentItem | undefined): boolean =>
+        !!item?.productRowId || !!item?.productVariantGroupId
     const groupStartIndexOf = (idx: number): number => {
         const item = items[idx]
-        if (!item?.productRowId) return idx // 通常商品は単独グループ
+        if (!isGroupableRow(item)) return idx // 通常商品は単独グループ
         const pid = String(item.productItemId)
         let start = idx
         while (start > 0) {
             const prev = items[start - 1]
-            if (!prev?.productRowId || String(prev.productItemId) !== pid) break
+            if (!isGroupableRow(prev) || String(prev.productItemId) !== pid) break
             start--
         }
         return start
     }
     const groupSizeOf = (startIdx: number): number => {
         const item = items[startIdx]
-        if (!item?.productRowId) return 1
+        if (!isGroupableRow(item)) return 1
         const pid = String(item.productItemId)
         let count = 0
         for (let i = startIdx; i < items.length; i++) {
             const it = items[i]
-            if (!it?.productRowId || String(it.productItemId) !== pid) break
+            if (!isGroupableRow(it) || String(it.productItemId) !== pid) break
             count++
         }
         return count
@@ -465,9 +512,11 @@ export function DocumentItemTable({
                                 const groupStart = groupStartIndexOf(index)
                                 const isGroupStart = groupStart === index
                                 const groupSize = isGroupStart ? groupSizeOf(index) : 0
+                                // グループ化して表示すべきか（複数行構成商品、または保存後に複数行展開されたグループ商品）
+                                const isGroupableItem = isMultiRowItem || !!item?.productVariantGroupId
                                 // グループ内で1つでもチェックされているか（商品単位の表示状態）
                                 const groupAnyChecked = (() => {
-                                    if (!isMultiRowItem) return checkedItems[index] ?? false
+                                    if (!isMultiRowItem && !item?.productVariantGroupId) return checkedItems[index] ?? false
                                     const start = groupStart
                                     const size = groupSizeOf(start)
                                     for (let i = start; i < start + size; i++) {
@@ -492,15 +541,15 @@ export function DocumentItemTable({
                                     <tr
                                         style={isChild ? { backgroundColor: '#fcfaf2' } : undefined}
                                     >
-                                        {(!isMultiRowItem || isGroupStart) && (
+                                        {(!isGroupableItem || isGroupStart) && (
                                             <td
                                                 className="border border-gray-300 p-1 text-center"
-                                                rowSpan={isMultiRowItem ? groupSize : undefined}
+                                                rowSpan={isGroupableItem ? groupSize : undefined}
                                             >
                                                 {!readOnly && (
                                                     <input
                                                         type="checkbox"
-                                                        checked={isMultiRowItem ? groupAnyChecked : (checkedItems[index] ?? false)}
+                                                        checked={isGroupableItem ? groupAnyChecked : (checkedItems[index] ?? false)}
                                                         onChange={(e) => {
                                                             const checked = e.target.checked
                                                             const currentItem = items[index]
@@ -524,8 +573,8 @@ export function DocumentItemTable({
                                                                 })
                                                             }
 
-                                                            // 複数行構成商品: 同グループの全行 index を取得
-                                                            const groupIndexes: number[] = isMultiRowItem
+                                                            // 複数行構成商品・グループ商品: 同グループの全行 index を取得
+                                                            const groupIndexes: number[] = isGroupableItem
                                                                 ? Array.from({ length: groupSize }, (_, k) => groupStart + k)
                                                                 : [index]
 
@@ -564,10 +613,10 @@ export function DocumentItemTable({
                                                 )}
                                             </td>
                                         )}
-                                        {(!isMultiRowItem || isGroupStart) && (
+                                        {(!isGroupableItem || isGroupStart) && (
                                             <td
                                                 className="border border-gray-300 p-3"
-                                                rowSpan={isMultiRowItem ? groupSize : undefined}
+                                                rowSpan={isGroupableItem ? groupSize : undefined}
                                             >
                                                 <div className="flex items-center gap-2 flex-wrap">
                                                     {isChild && (
@@ -618,10 +667,10 @@ export function DocumentItemTable({
                                                 </div>
                                             </td>
                                         )}
-                                        {(!isMultiRowItem || isGroupStart) && (
+                                        {(!isGroupableItem || isGroupStart) && (
                                             <td
                                                 className="border border-gray-300 p-3 text-center"
-                                                rowSpan={isMultiRowItem ? groupSize : undefined}
+                                                rowSpan={isGroupableItem ? groupSize : undefined}
                                             >
                                                 {!readOnly && (
                                                     <button
@@ -648,7 +697,7 @@ export function DocumentItemTable({
                                                 type="number"
                                                 min={0}
                                                 max={3000}
-                                                disabled={isMultiRowItem ? !groupAnyChecked : !checkedItems[index]}
+                                                disabled={isGroupableItem ? !groupAnyChecked : !checkedItems[index]}
                                             />
                                         </td>
                                         <td className="border border-gray-300 p-3 text-right">
@@ -682,6 +731,35 @@ export function DocumentItemTable({
                                                                     const names = (item?.productItem?.variants || [])
                                                                         .filter((v: any) => ids.includes(String(v.id)))
                                                                         .map((v: any) => v.name)
+                                                                    return names.length > 0 ? `${names.join('、')}（${names.length}種類）` : '-'
+                                                                } catch { return '-' }
+                                                              })()
+                                                            : (item?.productItem?.hasVariantGroups && item?.multiSelectVariantIds)
+                                                            ? (() => {
+                                                                try {
+                                                                    const ids: string[] = JSON.parse(item.multiSelectVariantIds as string)
+                                                                    const allVariants = (item?.productItem?.variantGroups || []).flatMap(
+                                                                        (g: any) => g.variants || []
+                                                                    )
+                                                                    const names = allVariants
+                                                                        .filter((v: any) => ids.includes(String(v.id)))
+                                                                        .map((v: any) => v.name)
+                                                                    return names.length > 0 ? `${names.join('、')}（${names.length}種類）` : '-'
+                                                                } catch { return '-' }
+                                                              })()
+                                                            : (item?.productItem?.hasVariantGroups && item?.groupSelections)
+                                                            ? (() => {
+                                                                try {
+                                                                    const selections: Record<string, string[]> = JSON.parse(item.groupSelections as string)
+                                                                    const names: string[] = []
+                                                                    for (const group of item?.productItem?.variantGroups || []) {
+                                                                        const ids = selections[String(group.id)] || []
+                                                                        names.push(
+                                                                            ...(group.variants || [])
+                                                                                .filter((v: any) => ids.includes(String(v.id)))
+                                                                                .map((v: any) => v.name)
+                                                                        )
+                                                                    }
                                                                     return names.length > 0 ? `${names.join('、')}（${names.length}種類）` : '-'
                                                                 } catch { return '-' }
                                                               })()
@@ -720,16 +798,21 @@ export function DocumentItemTable({
                                                 </>
                                             )}
                                         </td>
-                                        <td className="border border-gray-300 p-3">
-                                            <FormTextarea
-                                                name={`items.${index}.description`}
-                                                control={control}
-                                                rows={2}
-                                                noResize
-                                                maxRows={2}
-                                                disabled={isMultiRowItem ? !groupAnyChecked : !checkedItems[index]}
-                                            />
-                                        </td>
+                                        {(!isGroupableItem || isGroupStart) && (
+                                            <td
+                                                className="border border-gray-300 p-3"
+                                                rowSpan={isGroupableItem ? groupSize : undefined}
+                                            >
+                                                <FormTextarea
+                                                    name={`items.${index}.description`}
+                                                    control={control}
+                                                    rows={2}
+                                                    noResize
+                                                    maxRows={2}
+                                                    disabled={isGroupableItem ? !groupAnyChecked : !checkedItems[index]}
+                                                />
+                                            </td>
+                                        )}
                                     </tr>
                                     {linkedFreeIndex >= 0 && (
                                         <tr
@@ -745,7 +828,7 @@ export function DocumentItemTable({
                                                     control={control}
                                                     type="text"
                                                     placeholder="品目名（自由入力）"
-                                                    disabled={isMultiRowItem ? !groupAnyChecked : !checkedItems[index]}
+                                                    disabled={isGroupableItem ? !groupAnyChecked : !checkedItems[index]}
                                                 />
                                             </td>
                                             <td className="border border-gray-300 p-3 text-center text-sm text-gray-500">
@@ -758,14 +841,14 @@ export function DocumentItemTable({
                                                     type="number"
                                                     min={0}
                                                     max={3000}
-                                                    disabled={isMultiRowItem ? !groupAnyChecked : !checkedItems[index]}
+                                                    disabled={isGroupableItem ? !groupAnyChecked : !checkedItems[index]}
                                                 />
                                             </td>
                                             <td className="border border-gray-300 p-3 text-right">
                                                 <FormCurrencyInput
                                                     name={`freeItems.${linkedFreeIndex}.unitPriceGeneral`}
                                                     control={control}
-                                                    disabled={isMultiRowItem ? !groupAnyChecked : !checkedItems[index]}
+                                                    disabled={isGroupableItem ? !groupAnyChecked : !checkedItems[index]}
                                                 />
                                             </td>
                                             <td className="border border-gray-300 p-3">
@@ -775,7 +858,7 @@ export function DocumentItemTable({
                                                     rows={2}
                                                     noResize
                                                     maxRows={2}
-                                                    disabled={isMultiRowItem ? !groupAnyChecked : !checkedItems[index]}
+                                                    disabled={isGroupableItem ? !groupAnyChecked : !checkedItems[index]}
                                                 />
                                             </td>
                                         </tr>
@@ -966,6 +1049,10 @@ export function DocumentItemTable({
                             // 複数行構成行か（productRowId あり）
                             const isMultiRowItem = !!item?.productRowId
                             const isMultiSelectProduct = !!item?.productItem?.isMultiSelect
+                            const hasVariantGroupsProduct = !!item?.productItem?.hasVariantGroups
+                            const variantGroups = hasVariantGroupsProduct
+                                ? item?.productItem?.variantGroups || []
+                                : []
                             // 商品単位モード: 同じ商品の全行を取得し、各行の ProductRow を表示
                             const productRows = isMultiRowItem
                                 ? item?.productItem?.rows || []
@@ -1234,6 +1321,109 @@ export function DocumentItemTable({
                                                 })}
                                             </div>
                                         )
+                                    ) : hasVariantGroupsProduct ? (
+                                        <div className="space-y-6">
+                                            {variantGroups.length === 0 ? (
+                                                <p className="text-gray-500">グループが登録されていません</p>
+                                            ) : (
+                                                variantGroups.map((group) => {
+                                                    const selectedIds = pendingGroupSelections[String(group.id)] || []
+                                                    const toggleSingle = (variantId: string) => {
+                                                        setPendingGroupSelections((prev) => ({
+                                                            ...prev,
+                                                            [String(group.id)]: [variantId],
+                                                        }))
+                                                    }
+                                                    const toggleMulti = (variantId: string) => {
+                                                        setPendingGroupSelections((prev) => {
+                                                            const current = prev[String(group.id)] || []
+                                                            const next = current.includes(variantId)
+                                                                ? current.filter((id) => id !== variantId)
+                                                                : [...current, variantId]
+                                                            return { ...prev, [String(group.id)]: next }
+                                                        })
+                                                    }
+                                                    return (
+                                                        <div key={group.id}>
+                                                            <p className="mb-1 text-base font-medium" style={{ color: 'var(--brand-navy)' }}>
+                                                                {group.label}
+                                                            </p>
+                                                            <p className="mb-3 text-sm" style={{ color: 'var(--brand-text-muted)' }}>
+                                                                {group.selectionType === 'SINGLE'
+                                                                    ? '1つ選択してください'
+                                                                    : '複数選択可（タップで選択・解除）'}
+                                                            </p>
+                                                            {group.variants.length === 0 ? (
+                                                                <p className="text-gray-500 mb-4">種類が登録されていません</p>
+                                                            ) : (
+                                                                <div className="mb-4 grid grid-cols-3 gap-3">
+                                                                    {group.variants.map((v: any) => {
+                                                                        const isSelected = selectedIds.includes(String(v.id))
+                                                                        return (
+                                                                            <button
+                                                                                key={v.id}
+                                                                                type="button"
+                                                                                onClick={() =>
+                                                                                    group.selectionType === 'SINGLE'
+                                                                                        ? toggleSingle(String(v.id))
+                                                                                        : toggleMulti(String(v.id))
+                                                                                }
+                                                                                className={`flex flex-col items-center rounded-lg border-2 p-3 transition-colors ${
+                                                                                    isSelected
+                                                                                        ? 'border-blue-500 bg-blue-100'
+                                                                                        : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
+                                                                                }`}
+                                                                            >
+                                                                                <div className="mb-2 flex h-24 w-full items-center justify-center overflow-hidden rounded">
+                                                                                    {v.imageUrl ? (
+                                                                                        <div
+                                                                                            role="button"
+                                                                                            tabIndex={-1}
+                                                                                            className="h-full w-full cursor-zoom-in"
+                                                                                            onClick={(e) => {
+                                                                                                e.stopPropagation()
+                                                                                                setEnlargedImage(
+                                                                                                    resolveProductImageUrl(v.imageUrl) || ''
+                                                                                                )
+                                                                                            }}
+                                                                                            aria-label="画像を拡大"
+                                                                                        >
+                                                                                            <Image
+                                                                                                src={resolveProductImageUrl(v.imageUrl) || ''}
+                                                                                                alt={v.name}
+                                                                                                width={96}
+                                                                                                height={96}
+                                                                                                className="h-full w-full object-contain"
+                                                                                            />
+                                                                                        </div>
+                                                                                    ) : (
+                                                                                        <ImageOff className="h-10 w-10 text-gray-300" />
+                                                                                    )}
+                                                                                </div>
+                                                                                <p className="mb-1 w-full text-center text-xl font-medium leading-snug">
+                                                                                    {v.name}
+                                                                                </p>
+                                                                                <p className="text-lg text-gray-500">
+                                                                                    一般: ¥{v.priceGeneral.toLocaleString()}
+                                                                                </p>
+                                                                                <p className="text-lg text-gray-500">
+                                                                                    会員: ¥{v.priceMember.toLocaleString()}
+                                                                                </p>
+                                                                                {isSelected && (
+                                                                                    <p className="mt-1 text-sm font-semibold" style={{ color: 'var(--brand-navy)' }}>
+                                                                                        ✓ 選択中
+                                                                                    </p>
+                                                                                )}
+                                                                            </button>
+                                                                        )
+                                                                    })}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )
+                                                })
+                                            )}
+                                        </div>
                                     ) : variants.length === 0 ? (
                                         <p className="text-gray-500">種類がありません</p>
                                     ) : isMultiSelectProduct ? (
@@ -1379,7 +1569,8 @@ export function DocumentItemTable({
                                 !pendingVariant &&
                                 !pendingRowVariant &&
                                 Object.keys(pendingRowVariantsMap).length === 0 &&
-                                pendingMultiVariantIds.length === 0
+                                pendingMultiVariantIds.length === 0 &&
+                                Object.values(pendingGroupSelections).every((ids) => ids.length === 0)
                             }
                             className="cursor-pointer rounded border-0 bg-blue-600 px-4 py-2 text-white disabled:cursor-not-allowed disabled:bg-gray-300"
                         >

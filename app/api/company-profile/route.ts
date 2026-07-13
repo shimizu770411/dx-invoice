@@ -61,6 +61,7 @@ export async function PUT(request: NextRequest) {
             bank4Type: body.bank4Type ?? null,
             bank4Account: body.bank4Account ?? null,
             bank4Holder: body.bank4Holder ?? null,
+            dateFormat: body.dateFormat === 'JAPANESE' ? 'JAPANESE' : 'WESTERN',
         }
 
         // 会社プロフィールを更新

@@ -20,6 +20,7 @@ export async function PUT(
         if (body.priceMember !== undefined) data.priceMember = Number(body.priceMember) || 0
         if (body.isActive !== undefined) data.isActive = Boolean(body.isActive)
         if (body.storeId !== undefined) data.storeId = body.storeId ? BigInt(body.storeId) : null
+        if (body.groupId !== undefined) data.groupId = body.groupId ? BigInt(body.groupId) : null
         if (body.isDefaultSet !== undefined) data.isDefaultSet = Boolean(body.isDefaultSet)
         if (body.setPrice !== undefined) data.setPrice = Number(body.setPrice) || 0
         if (body.sortNo !== undefined) data.sortNo = Number(body.sortNo) || 0

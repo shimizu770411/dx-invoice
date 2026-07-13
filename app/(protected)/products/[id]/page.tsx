@@ -33,8 +33,24 @@ type VariantRow = {
     isDefaultSet: boolean
     isActive: boolean
     storeId: string
+    /** 所属するバリアントグループ（重箱など）のローカルID。未設定なら直付けバリアント */
+    groupLocalId?: string
     dirty?: boolean
     isNew?: boolean
+}
+
+type VariantGroupSelectionType = 'SINGLE' | 'MULTI'
+
+/** バリアントグループ（重箱の「基本セット」「追加オプション」等） */
+type VariantGroup = {
+    localId: string
+    id?: string
+    label: string
+    selectionType: VariantGroupSelectionType
+    isRequired: boolean
+    /** MULTI選択時の出力方法: true=合算して1行 / false=種類別に複数行（SINGLEでは未使用） */
+    mergeDisplay: boolean
+    dirty?: boolean
 }
 
 export default function ProductEditPage() {
@@ -77,6 +93,9 @@ export default function ProductEditPage() {
     const [isMultiSelect, setIsMultiSelect] = useState(false)
     // 複数選択時の出力方法: true=合算1行 / false=種類別複数行
     const [multiSelectMerge, setMultiSelectMerge] = useState(true)
+    // グループ商品（重箱など、基本セット＋追加オプションのグループ構成）
+    const [hasVariantGroups, setHasVariantGroups] = useState(false)
+    const [variantGroups, setVariantGroups] = useState<VariantGroup[]>([])
     type MultiRowVariant = {
         localId: string
         label: string
@@ -124,6 +143,89 @@ export default function ProductEditPage() {
         })
     }
 
+    /** 同一グループ内でのみ隣接要素と入れ替える（グループを跨いだ並び替えは行わない） */
+    const moveGroupVariant = (groupLocalId: string, absoluteIndex: number, dir: -1 | 1) => {
+        setVariants((prev) => {
+            const groupIndices = prev
+                .map((v, i) => ({ v, i }))
+                .filter(({ v }) => v.groupLocalId === groupLocalId)
+                .map(({ i }) => i)
+            const posInGroup = groupIndices.indexOf(absoluteIndex)
+            const targetPos = posInGroup + dir
+            if (posInGroup < 0 || targetPos < 0 || targetPos >= groupIndices.length) return prev
+            const targetAbsoluteIndex = groupIndices[targetPos]
+            const next = prev.slice()
+            const tmp = next[absoluteIndex]
+            next[absoluteIndex] = { ...next[targetAbsoluteIndex], dirty: true }
+            next[targetAbsoluteIndex] = { ...tmp, dirty: true }
+            return next
+        })
+    }
+
+    const handleAddVariantGroup = () => {
+        setVariantGroups((prev) => [
+            ...prev,
+            {
+                localId: genLocalId(),
+                label: '',
+                selectionType: 'SINGLE',
+                isRequired: false,
+                mergeDisplay: true,
+                dirty: true,
+            },
+        ])
+    }
+
+    const setVariantGroup = (localId: string, patch: Partial<VariantGroup>) => {
+        setVariantGroups((prev) =>
+            prev.map((g) => (g.localId === localId ? { ...g, ...patch, dirty: true } : g))
+        )
+    }
+
+    const moveVariantGroup = (index: number, dir: -1 | 1) => {
+        const target = index + dir
+        if (target < 0 || target >= variantGroups.length) return
+        setVariantGroups((prev) => {
+            const next = prev.slice()
+            const [g] = next.splice(index, 1)
+            next.splice(target, 0, g)
+            return next
+        })
+    }
+
+    const handleDeleteVariantGroup = (localId: string) => {
+        const hasVariantsInGroup = variants.some((v) => v.groupLocalId === localId)
+        if (hasVariantsInGroup) {
+            toast({
+                title: 'グループ配下に種類が残っています。先に配下の種類を削除してください',
+                variant: 'destructive',
+                duration: 3000,
+            })
+            return
+        }
+        if (!confirm('このグループを削除します。よろしいですか？')) return
+        setVariantGroups((prev) => prev.filter((g) => g.localId !== localId))
+    }
+
+    const handleAddGroupVariant = (groupLocalId: string) => {
+        setVariants((prev) => [
+            ...prev,
+            {
+                name: '',
+                imageUrl: '',
+                priceGeneral: 0,
+                priceMember: 0,
+                setPrice: 0,
+                isDefaultSet: false,
+                isActive: true,
+                storeId: '',
+                groupLocalId,
+                dirty: true,
+                isNew: true,
+            },
+        ])
+    }
+
     // 全商品（子候補）
     const { data: allProducts = [] } = useQuery({
         queryKey: ['products', 'all'],
@@ -147,6 +249,18 @@ export default function ProductEditPage() {
         setCanAddFreeRow((product as any).canAddFreeRow ?? false)
         setIsMultiSelect((product as any).isMultiSelect ?? false)
         setMultiSelectMerge((product as any).multiSelectMerge ?? true)
+        setHasVariantGroups((product as any).hasVariantGroups ?? false)
+        const productVariantGroups = (product as any).variantGroups || []
+        setVariantGroups(
+            productVariantGroups.map((g: any) => ({
+                localId: String(g.id),
+                id: String(g.id),
+                label: g.label ?? '',
+                selectionType: g.selectionType === 'MULTI' ? 'MULTI' : 'SINGLE',
+                isRequired: Boolean(g.isRequired),
+                mergeDisplay: g.mergeDisplay ?? true,
+            }))
+        )
         setMultiRows(
             ((product as any).rows || []).map((r: any) => ({
                 localId: String(r.id),
@@ -163,8 +277,8 @@ export default function ProductEditPage() {
                 })),
             }))
         )
-        setVariants(
-            product.variants.map((v: ProductVariant) => ({
+        const groupedVariantRows: VariantRow[] = productVariantGroups.flatMap((g: any) =>
+            (g.variants || []).map((v: ProductVariant) => ({
                 id: v.id,
                 name: v.name,
                 imageUrl: v.imageUrl || '',
@@ -174,8 +288,25 @@ export default function ProductEditPage() {
                 isDefaultSet: v.isDefaultSet ?? false,
                 isActive: v.isActive,
                 storeId: v.storeId ? String(v.storeId) : '',
+                groupLocalId: String(g.id),
             }))
         )
+        setVariants([
+            ...product.variants
+                .filter((v: any) => !v.groupId)
+                .map((v: ProductVariant) => ({
+                    id: v.id,
+                    name: v.name,
+                    imageUrl: v.imageUrl || '',
+                    priceGeneral: v.priceGeneral,
+                    priceMember: v.priceMember,
+                    setPrice: v.setPrice ?? 0,
+                    isDefaultSet: v.isDefaultSet ?? false,
+                    isActive: v.isActive,
+                    storeId: v.storeId ? String(v.storeId) : '',
+                })),
+            ...groupedVariantRows,
+        ])
     }, [product])
 
     if (isLoading || !product) {
@@ -206,8 +337,8 @@ export default function ProductEditPage() {
         }
         try {
             setSavingItem(true)
-            // 1) 基本情報
-            await updateProduct(productId, {
+            // 1) 基本情報（グループ商品の場合はグループ構成も併せて同期）
+            const savedProduct = await updateProduct(productId, {
                 name,
                 isActive,
                 isSetParent: kind === 'PARENT',
@@ -220,6 +351,16 @@ export default function ProductEditPage() {
                 canAddFreeRow,
                 isMultiSelect,
                 multiSelectMerge: isMultiSelect ? multiSelectMerge : true,
+                hasVariantGroups,
+                groups: hasVariantGroups
+                    ? variantGroups.map((g) => ({
+                          id: g.id,
+                          label: g.label,
+                          selectionType: g.selectionType,
+                          isRequired: g.isRequired,
+                          mergeDisplay: g.selectionType === 'MULTI' ? g.mergeDisplay : true,
+                      }))
+                    : [],
                 rows: isMultiRow
                     ? multiRows.map((r) => ({
                           label: r.label,
@@ -241,26 +382,49 @@ export default function ProductEditPage() {
             } else {
                 await setProductChildren(productId, [])
             }
+
+            // 新規グループのローカルID→実IDの対応表（送信順=sortNo順でDB側と対応する）
+            const groupIdMap = new Map<string, string>()
+            if (hasVariantGroups) {
+                const savedGroups = ((savedProduct as any).variantGroups || []) as { id: string }[]
+                variantGroups.forEach((g, idx) => {
+                    const saved = savedGroups[idx]
+                    if (saved) groupIdMap.set(g.localId, String(saved.id))
+                })
+            }
+
             // 3) 種類（dirty なものを順次保存）
             // 新規・既存どちらも画面上の位置 i を sortNo として保存する。
             // 過去に新規行のみ sortNo を送らず MAX+1 に委譲していたため、
             // 「新規行を前、既存行を後ろ」と並び替えて保存すると新規/既存で sortNo が
             // 重複し、副キー id の昇順で画面表示と保存順が逆転するバグがあった。
+            // グループ商品の場合は、この sortNo をグループ単位（同じ groupLocalId を持つ行だけ）で数え直す。
             const updatedVariants = [...variants]
+            const sortNoWithinScope = (index: number) => {
+                const v = updatedVariants[index]
+                const scopeIndices = updatedVariants
+                    .map((vv, ii) => ({ vv, ii }))
+                    .filter(({ vv }) => vv.groupLocalId === v.groupLocalId)
+                    .map(({ ii }) => ii)
+                return scopeIndices.indexOf(index)
+            }
             for (let i = 0; i < updatedVariants.length; i++) {
                 const v = updatedVariants[i]
                 if (!v.dirty && !v.isNew) continue
+                const sortNo = hasVariantGroups ? sortNoWithinScope(i) : i
+                const groupId = v.groupLocalId ? groupIdMap.get(v.groupLocalId) ?? null : null
                 if (v.isNew) {
                     const created = await createVariant(productId, {
                         name: v.name,
                         storeId: v.storeId || null,
+                        groupId,
                         imageUrl: v.imageUrl || null,
                         priceGeneral: v.priceGeneral,
                         priceMember: v.priceMember,
                         setPrice: v.isDefaultSet ? 0 : v.setPrice,
                         isDefaultSet: v.isDefaultSet,
                         isActive: v.isActive,
-                        sortNo: i,
+                        sortNo,
                     })
                     updatedVariants[i] = {
                         ...v,
@@ -272,18 +436,24 @@ export default function ProductEditPage() {
                     await updateVariant(productId, v.id, {
                         name: v.name,
                         storeId: v.storeId || null,
+                        groupId,
                         imageUrl: v.imageUrl || null,
                         priceGeneral: v.priceGeneral,
                         priceMember: v.priceMember,
                         setPrice: v.isDefaultSet ? 0 : v.setPrice,
                         isDefaultSet: v.isDefaultSet,
                         isActive: v.isActive,
-                        sortNo: i,
+                        sortNo,
                     })
                     updatedVariants[i] = { ...v, dirty: false }
                 }
             }
             setVariants(updatedVariants)
+            if (hasVariantGroups) {
+                setVariantGroups((prev) =>
+                    prev.map((g) => ({ ...g, id: groupIdMap.get(g.localId) ?? g.id, dirty: false }))
+                )
+            }
             toast({ title: '商品情報を保存しました', variant: 'success', duration: 2000 })
             queryClient.invalidateQueries({ queryKey: ['product', productId] })
             queryClient.invalidateQueries({ queryKey: ['products'] })
@@ -488,6 +658,26 @@ export default function ProductEditPage() {
                 duration: 2500,
             })
         }
+    }
+
+    /** 初期セットは1商品につき1つだけ。ONにする種類以外は自動的にOFFにする */
+    const handleToggleDefaultSet = (index: number, checked: boolean) => {
+        setVariants((prev) =>
+            prev.map((x, j) => {
+                if (j === index) {
+                    return {
+                        ...x,
+                        isDefaultSet: checked,
+                        ...(checked ? { setPrice: 0 } : {}),
+                        dirty: true,
+                    }
+                }
+                if (checked && x.isDefaultSet) {
+                    return { ...x, isDefaultSet: false, dirty: true }
+                }
+                return x
+            })
+        )
     }
 
     const handleDeleteVariant = async (index: number) => {
@@ -881,9 +1071,12 @@ export default function ProductEditPage() {
                             type="checkbox"
                             className="h-5 w-5 cursor-pointer"
                             checked={isMultiRow}
+                            disabled={isMultiSelect || hasVariantGroups}
                             onChange={(e) => setIsMultiRow(e.target.checked)}
                         />
-                        複数行構成商品（会葬礼状、御供養など、1商品で複数明細行＋符号制御）
+                        <span style={{ opacity: isMultiSelect || hasVariantGroups ? 0.4 : 1 }}>
+                            複数行構成商品（会葬礼状、御供養など、1商品で複数明細行＋符号制御）
+                        </span>
                     </label>
                 </div>
 
@@ -913,14 +1106,14 @@ export default function ProductEditPage() {
                             type="checkbox"
                             className="h-5 w-5 cursor-pointer"
                             checked={isMultiSelect}
-                            disabled={isMultiRow}
+                            disabled={isMultiRow || hasVariantGroups}
                             onChange={(e) => setIsMultiSelect(e.target.checked)}
                         />
-                        <span style={{ opacity: isMultiRow ? 0.4 : 1 }}>
+                        <span style={{ opacity: isMultiRow || hasVariantGroups ? 0.4 : 1 }}>
                             複数種類同時選択（写真商品など、複数バリエーションを同時選択可能）
                         </span>
                     </label>
-                    {isMultiSelect && !isMultiRow && (
+                    {isMultiSelect && !isMultiRow && !hasVariantGroups && (
                         <div
                             className="mt-3 ml-7"
                             style={{
@@ -966,6 +1159,25 @@ export default function ProductEditPage() {
                             </div>
                         </div>
                     )}
+                </div>
+
+                {/* グループ商品（重箱など、基本セット＋追加オプションのグループ構成） */}
+                <div className="mb-5">
+                    <label
+                        className="font-mincho cursor-pointer flex items-center gap-2"
+                        style={{ fontSize: '14px', color: 'var(--brand-text)' }}
+                    >
+                        <input
+                            type="checkbox"
+                            className="h-5 w-5 cursor-pointer"
+                            checked={hasVariantGroups}
+                            disabled={isMultiRow || isMultiSelect}
+                            onChange={(e) => setHasVariantGroups(e.target.checked)}
+                        />
+                        <span style={{ opacity: isMultiRow || isMultiSelect ? 0.4 : 1 }}>
+                            グループ商品（重箱など、基本セット＋追加オプションのグループ構成）
+                        </span>
+                    </label>
                 </div>
 
                 {/* 商品種別 */}
@@ -1721,8 +1933,313 @@ export default function ProductEditPage() {
                 </section>
             )}
 
-            {/* 種類（バリエーション）: 複数行構成商品OFF時のみ表示 */}
-            {!isMultiRow && (
+            {/* グループ商品（重箱など）: 基本セット＋追加オプションのグループ単位で種類を管理 */}
+            {!isMultiRow && hasVariantGroups && (
+            <section
+                className="bg-white mb-6"
+                style={{
+                    border: '1px solid var(--brand-border)',
+                    padding: '28px 32px',
+                }}
+            >
+                <div
+                    className="flex items-center justify-between mb-5 pb-3"
+                    style={{ borderBottom: '1px solid var(--brand-border)' }}
+                >
+                    <h2
+                        className="font-mincho"
+                        style={{
+                            fontSize: '18px',
+                            fontWeight: 600,
+                            color: 'var(--brand-navy)',
+                            letterSpacing: '0.2em',
+                        }}
+                    >
+                        グループ構成
+                    </h2>
+                    <button
+                        type="button"
+                        onClick={handleAddVariantGroup}
+                        className="font-mincho transition-colors flex items-center gap-2"
+                        style={{
+                            padding: '8px 20px',
+                            backgroundColor: '#ffffff',
+                            color: 'var(--brand-navy)',
+                            border: '1px solid var(--brand-navy)',
+                            fontSize: '14px',
+                            letterSpacing: '0.2em',
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                        }}
+                    >
+                        <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>
+                            add
+                        </span>
+                        グループを追加
+                    </button>
+                </div>
+
+                {variantGroups.length === 0 ? (
+                    <div
+                        className="py-10 text-center font-mincho"
+                        style={{
+                            color: 'var(--brand-text-muted)',
+                            fontSize: '14px',
+                            letterSpacing: '0.15em',
+                        }}
+                    >
+                        グループが登録されていません（例: 基本セット／追加オプション）
+                    </div>
+                ) : (
+                    <div className="space-y-6">
+                        {variantGroups.map((g, gIdx) => {
+                            const groupVariantEntries = variants
+                                .map((v, i) => ({ v, i }))
+                                .filter(({ v }) => v.groupLocalId === g.localId)
+                            return (
+                                <div
+                                    key={g.localId}
+                                    style={{
+                                        border: '1px solid var(--brand-border)',
+                                        padding: '20px',
+                                        backgroundColor: '#fbfaf7',
+                                    }}
+                                >
+                                    <div className="flex items-start justify-between gap-4 mb-4">
+                                        <div className="grid grid-cols-[1fr_auto] gap-4 flex-1 items-end">
+                                            <div>
+                                                <label className="brand-label">
+                                                    グループ名<span className="brand-label-required">*</span>
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={g.label}
+                                                    onChange={(e) =>
+                                                        setVariantGroup(g.localId, { label: e.target.value })
+                                                    }
+                                                    placeholder="例: 基本セット、追加オプション"
+                                                    style={inputStyle}
+                                                />
+                                            </div>
+                                            <div className="flex gap-4">
+                                                {(
+                                                    [
+                                                        { value: 'SINGLE', label: '単一選択', desc: '1つだけ選ぶ' },
+                                                        { value: 'MULTI', label: '複数選択', desc: '複数個選べる' },
+                                                    ] as { value: VariantGroupSelectionType; label: string; desc: string }[]
+                                                ).map((opt) => (
+                                                    <label
+                                                        key={opt.value}
+                                                        className="font-mincho cursor-pointer flex items-start gap-2"
+                                                        style={{ fontSize: '13px', color: 'var(--brand-text)' }}
+                                                    >
+                                                        <input
+                                                            type="radio"
+                                                            className="mt-0.5 cursor-pointer"
+                                                            checked={g.selectionType === opt.value}
+                                                            onChange={() =>
+                                                                setVariantGroup(g.localId, { selectionType: opt.value })
+                                                            }
+                                                        />
+                                                        <span>
+                                                            {opt.label}
+                                                            <span
+                                                                style={{
+                                                                    fontSize: '11px',
+                                                                    color: 'var(--brand-text-muted)',
+                                                                    marginLeft: '6px',
+                                                                }}
+                                                            >
+                                                                {opt.desc}
+                                                            </span>
+                                                        </span>
+                                                    </label>
+                                                ))}
+                                            </div>
+                                            {g.selectionType === 'MULTI' && (
+                                                <div className="col-span-2">
+                                                    <p
+                                                        className="font-mincho mb-2"
+                                                        style={{ fontSize: '12px', color: 'var(--brand-text-muted)', letterSpacing: '0.05em' }}
+                                                    >
+                                                        見積・請求書での出力方法
+                                                    </p>
+                                                    <div className="flex gap-4">
+                                                        {(
+                                                            [
+                                                                { value: true, label: '合算して1行で出す', desc: '選択した種類の金額を合算し1明細行で表示' },
+                                                                { value: false, label: '種類別に複数行で出す', desc: '選択した種類それぞれを1行ずつ表示' },
+                                                            ] as { value: boolean; label: string; desc: string }[]
+                                                        ).map((opt) => (
+                                                            <label
+                                                                key={String(opt.value)}
+                                                                className="font-mincho cursor-pointer flex items-start gap-2"
+                                                                style={{ fontSize: '13px', color: 'var(--brand-text)' }}
+                                                            >
+                                                                <input
+                                                                    type="radio"
+                                                                    className="mt-0.5 cursor-pointer"
+                                                                    checked={g.mergeDisplay === opt.value}
+                                                                    onChange={() =>
+                                                                        setVariantGroup(g.localId, { mergeDisplay: opt.value })
+                                                                    }
+                                                                />
+                                                                <span>
+                                                                    {opt.label}
+                                                                    <span
+                                                                        style={{
+                                                                            fontSize: '11px',
+                                                                            color: 'var(--brand-text-muted)',
+                                                                            marginLeft: '6px',
+                                                                        }}
+                                                                    >
+                                                                        {opt.desc}
+                                                                    </span>
+                                                                </span>
+                                                            </label>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => moveVariantGroup(gIdx, -1)}
+                                                disabled={gIdx === 0}
+                                                className="flex items-center justify-center transition-colors"
+                                                style={{
+                                                    width: '28px',
+                                                    height: '28px',
+                                                    border: '1px solid var(--brand-navy)',
+                                                    backgroundColor: gIdx === 0 ? '#f0eee8' : '#ffffff',
+                                                    color: gIdx === 0 ? '#c4bfb0' : 'var(--brand-navy)',
+                                                    cursor: gIdx === 0 ? 'not-allowed' : 'pointer',
+                                                }}
+                                                title="上へ"
+                                            >
+                                                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>
+                                                    arrow_upward
+                                                </span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => moveVariantGroup(gIdx, 1)}
+                                                disabled={gIdx === variantGroups.length - 1}
+                                                className="flex items-center justify-center transition-colors"
+                                                style={{
+                                                    width: '28px',
+                                                    height: '28px',
+                                                    border: '1px solid var(--brand-navy)',
+                                                    backgroundColor:
+                                                        gIdx === variantGroups.length - 1 ? '#f0eee8' : '#ffffff',
+                                                    color:
+                                                        gIdx === variantGroups.length - 1
+                                                            ? '#c4bfb0'
+                                                            : 'var(--brand-navy)',
+                                                    cursor: gIdx === variantGroups.length - 1 ? 'not-allowed' : 'pointer',
+                                                }}
+                                                title="下へ"
+                                            >
+                                                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>
+                                                    arrow_downward
+                                                </span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleDeleteVariantGroup(g.localId)}
+                                                className="font-mincho transition-colors"
+                                                style={{
+                                                    padding: '6px 14px',
+                                                    backgroundColor: '#ffffff',
+                                                    color: 'var(--brand-red)',
+                                                    border: '1px solid var(--brand-red)',
+                                                    fontSize: '12px',
+                                                    letterSpacing: '0.15em',
+                                                    cursor: 'pointer',
+                                                }}
+                                            >
+                                                グループ削除
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center justify-between mb-3">
+                                        <h3
+                                            className="font-mincho"
+                                            style={{ fontSize: '14px', color: 'var(--brand-text-muted)', letterSpacing: '0.1em' }}
+                                        >
+                                            種類（{groupVariantEntries.length}件）
+                                        </h3>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleAddGroupVariant(g.localId)}
+                                            className="font-mincho transition-colors flex items-center gap-1"
+                                            style={{
+                                                padding: '6px 14px',
+                                                backgroundColor: '#ffffff',
+                                                color: 'var(--brand-navy)',
+                                                border: '1px solid var(--brand-navy)',
+                                                fontSize: '12px',
+                                                letterSpacing: '0.15em',
+                                                cursor: 'pointer',
+                                            }}
+                                        >
+                                            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>
+                                                add
+                                            </span>
+                                            種類を追加
+                                        </button>
+                                    </div>
+
+                                    {groupVariantEntries.length === 0 ? (
+                                        <div
+                                            className="py-6 text-center font-mincho"
+                                            style={{ color: 'var(--brand-text-muted)', fontSize: '13px', letterSpacing: '0.1em' }}
+                                        >
+                                            種類が登録されていません
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {groupVariantEntries.map(({ v, i }, posInGroup) => (
+                                                <VariantCard
+                                                    key={v.id || `new-${i}`}
+                                                    v={v}
+                                                    index={i}
+                                                    kind={kind}
+                                                    stores={stores}
+                                                    uploadingId={uploadingId}
+                                                    dragEnabled={false}
+                                                    draggingIndex={null}
+                                                    dropTargetIndex={null}
+                                                    onDragStart={() => {}}
+                                                    onDragEnd={() => {}}
+                                                    onDragOver={() => {}}
+                                                    onDragLeave={() => {}}
+                                                    onDrop={() => {}}
+                                                    onSetVariant={setVariant}
+                                                    onToggleDefaultSet={handleToggleDefaultSet}
+                                                    onUploadImage={handleUploadImage}
+                                                    onOpenGallery={setGalleryIndex}
+                                                    onMoveUp={() => moveGroupVariant(g.localId, i, -1)}
+                                                    onMoveDown={() => moveGroupVariant(g.localId, i, 1)}
+                                                    canMoveUp={posInGroup > 0}
+                                                    canMoveDown={posInGroup < groupVariantEntries.length - 1}
+                                                    onDelete={handleDeleteVariant}
+                                                />
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )
+                        })}
+                    </div>
+                )}
+            </section>
+            )}
+
+            {/* 種類（バリエーション）: 複数行構成商品・グループ商品OFF時のみ表示 */}
+            {!isMultiRow && !hasVariantGroups && (
             <section
                 className="bg-white"
                 style={{
@@ -1781,388 +2298,39 @@ export default function ProductEditPage() {
                 ) : (
                     <div className="space-y-4">
                         {variants.map((v, i) => (
-                            <div
+                            <VariantCard
                                 key={v.id || `new-${i}`}
-                                onDragOver={(e) => {
-                                    if (draggingVariantIndex === null) return
-                                    e.preventDefault()
-                                    if (variantDropTarget !== i) setVariantDropTarget(i)
+                                v={v}
+                                index={i}
+                                kind={kind}
+                                stores={stores}
+                                uploadingId={uploadingId}
+                                dragEnabled
+                                draggingIndex={draggingVariantIndex}
+                                dropTargetIndex={variantDropTarget}
+                                onDragStart={setDraggingVariantIndex}
+                                onDragEnd={() => {
+                                    setDraggingVariantIndex(null)
+                                    setVariantDropTarget(null)
                                 }}
-                                onDragLeave={() => {
-                                    if (variantDropTarget === i) setVariantDropTarget(null)
-                                }}
-                                onDrop={(e) => {
-                                    e.preventDefault()
+                                onDragOver={setVariantDropTarget}
+                                onDragLeave={() => setVariantDropTarget(null)}
+                                onDrop={(target) => {
                                     const src = draggingVariantIndex
                                     setDraggingVariantIndex(null)
                                     setVariantDropTarget(null)
-                                    if (src !== null) reorderVariantTo(src, i)
+                                    if (src !== null) reorderVariantTo(src, target)
                                 }}
-                                className="grid grid-cols-[180px_1fr_auto] gap-6 items-start p-5"
-                                style={{
-                                    border:
-                                        variantDropTarget === i
-                                            ? '2px dashed var(--brand-navy)'
-                                            : '1px solid var(--brand-border)',
-                                    backgroundColor: v.isActive ? '#ffffff' : '#f5f3ec',
-                                    opacity: draggingVariantIndex === i ? 0.4 : 1,
-                                    transition: 'border 0.1s',
-                                }}
-                            >
-                                {/* 画像 */}
-                                <div>
-                                    <div
-                                        className="relative flex items-center justify-center mb-2 overflow-hidden"
-                                        style={{
-                                            width: '180px',
-                                            height: '135px',
-                                            backgroundColor: 'var(--brand-ivory)',
-                                            border: '1px solid var(--brand-border)',
-                                        }}
-                                    >
-                                        {v.imageUrl ? (
-                                            // eslint-disable-next-line @next/next/no-img-element
-                                            <img
-                                                src={v.imageUrl}
-                                                alt={v.name}
-                                                style={{
-                                                    width: '100%',
-                                                    height: '100%',
-                                                    objectFit: 'contain',
-                                                    padding: '4px',
-                                                }}
-                                            />
-                                        ) : (
-                                            <span
-                                                className="material-symbols-outlined"
-                                                style={{
-                                                    fontSize: '40px',
-                                                    color: 'var(--brand-gold-soft)',
-                                                    opacity: 0.5,
-                                                }}
-                                            >
-                                                image
-                                            </span>
-                                        )}
-                                        {uploadingId === String(i) && (
-                                            <div
-                                                className="absolute inset-0 flex items-center justify-center"
-                                                style={{
-                                                    backgroundColor: 'rgba(255,255,255,0.85)',
-                                                    fontFamily: 'var(--font-mincho)',
-                                                    fontSize: '13px',
-                                                    color: 'var(--brand-navy)',
-                                                    letterSpacing: '0.15em',
-                                                }}
-                                            >
-                                                アップロード中…
-                                            </div>
-                                        )}
-                                    </div>
-                                    <label
-                                        className="font-mincho flex items-center justify-center gap-1 cursor-pointer transition-colors"
-                                        style={{
-                                            padding: '6px 12px',
-                                            border: '1px solid var(--brand-gold)',
-                                            color: 'var(--brand-gold-soft)',
-                                            backgroundColor: '#ffffff',
-                                            fontSize: '12px',
-                                            letterSpacing: '0.15em',
-                                        }}
-                                    >
-                                        <span
-                                            className="material-symbols-outlined"
-                                            style={{ fontSize: '14px' }}
-                                        >
-                                            upload
-                                        </span>
-                                        画像をアップロード
-                                        <input
-                                            type="file"
-                                            accept="image/*"
-                                            className="hidden"
-                                            onChange={(e) => {
-                                                const f = e.target.files?.[0]
-                                                if (f) handleUploadImage(i, f)
-                                                e.target.value = ''
-                                            }}
-                                        />
-                                    </label>
-                                    <button
-                                        type="button"
-                                        onClick={() => setGalleryIndex(i)}
-                                        className="w-full mt-2 font-mincho flex items-center justify-center gap-1 transition-colors"
-                                        style={{
-                                            padding: '6px 12px',
-                                            border: '1px solid var(--brand-navy)',
-                                            color: 'var(--brand-navy)',
-                                            backgroundColor: '#ffffff',
-                                            fontSize: '12px',
-                                            letterSpacing: '0.15em',
-                                            cursor: 'pointer',
-                                        }}
-                                    >
-                                        <span
-                                            className="material-symbols-outlined"
-                                            style={{ fontSize: '14px' }}
-                                        >
-                                            collections
-                                        </span>
-                                        既存画像から選択
-                                    </button>
-                                    {v.imageUrl && (
-                                        <button
-                                            type="button"
-                                            onClick={() => setVariant(i, { imageUrl: '' })}
-                                            className="w-full mt-2 font-mincho"
-                                            style={{
-                                                padding: '4px 8px',
-                                                fontSize: '11px',
-                                                color: 'var(--brand-text-muted)',
-                                                border: '1px dashed var(--brand-border)',
-                                                backgroundColor: 'transparent',
-                                                letterSpacing: '0.15em',
-                                                cursor: 'pointer',
-                                            }}
-                                        >
-                                            画像をクリア
-                                        </button>
-                                    )}
-                                </div>
-
-                                {/* フォーム */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="brand-label">
-                                            種類名<span className="brand-label-required">*</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={v.name}
-                                            onChange={(e) => setVariant(i, { name: e.target.value })}
-                                            placeholder="例: 基本型、上級型"
-                                            style={inputStyle}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="brand-label">取扱店舗</label>
-                                        <select
-                                            value={v.storeId}
-                                            onChange={(e) => setVariant(i, { storeId: e.target.value })}
-                                            style={{ ...inputStyle, cursor: 'pointer' }}
-                                        >
-                                            <option value="">全店舗共通</option>
-                                            {stores.map((s) => (
-                                                <option key={s.id} value={s.id}>
-                                                    {s.name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="brand-label">一般価格（円）</label>
-                                        <CurrencyTextInput
-                                            value={v.priceGeneral}
-                                            onChange={(val) => setVariant(i, { priceGeneral: val })}
-                                            style={inputStyle}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="brand-label">会員価格（円）</label>
-                                        <CurrencyTextInput
-                                            value={v.priceMember}
-                                            onChange={(val) => setVariant(i, { priceMember: val })}
-                                            style={inputStyle}
-                                        />
-                                    </div>
-                                    {/* 初期セット（子商品のみ表示） */}
-                                    {kind === 'CHILD' && (
-                                        <>
-                                            <div>
-                                                <label
-                                                    className="flex items-center gap-2 font-mincho mt-7"
-                                                    style={{
-                                                        fontSize: '14px',
-                                                        color: 'var(--brand-text)',
-                                                        letterSpacing: '0.1em',
-                                                    }}
-                                                >
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={v.isDefaultSet}
-                                                        onChange={(e) => {
-                                                            const checked = e.target.checked
-                                                            // 1商品につき1つだけ初期セット可
-                                                            // 自分をONにする時は他をOFFに
-                                                            setVariants((prev) =>
-                                                                prev.map((x, j) => {
-                                                                    if (j === i) {
-                                                                        return {
-                                                                            ...x,
-                                                                            isDefaultSet: checked,
-                                                                            // ON時はsetPriceを0クリア
-                                                                            ...(checked ? { setPrice: 0 } : {}),
-                                                                            dirty: true,
-                                                                        }
-                                                                    }
-                                                                    if (checked && x.isDefaultSet) {
-                                                                        return {
-                                                                            ...x,
-                                                                            isDefaultSet: false,
-                                                                            dirty: true,
-                                                                        }
-                                                                    }
-                                                                    return x
-                                                                })
-                                                            )
-                                                        }}
-                                                    />
-                                                    初期セット
-                                                </label>
-                                            </div>
-                                        </>
-                                    )}
-                                    <div className="md:col-span-2">
-                                        <label
-                                            className="flex items-center gap-2 font-mincho"
-                                            style={{
-                                                fontSize: '14px',
-                                                color: 'var(--brand-text)',
-                                                letterSpacing: '0.1em',
-                                            }}
-                                        >
-                                            <input
-                                                type="checkbox"
-                                                checked={v.isActive}
-                                                onChange={(e) =>
-                                                    setVariant(i, { isActive: e.target.checked })
-                                                }
-                                            />
-                                            見積画面で選択可能
-                                        </label>
-                                    </div>
-                                </div>
-
-                                {/* アクション（並び替え／削除） */}
-                                <div className="flex flex-col gap-2 min-w-[120px]">
-                                    {v.dirty && (
-                                        <span
-                                            className="font-mincho text-center"
-                                            style={{
-                                                fontSize: '11px',
-                                                color: 'var(--brand-red)',
-                                                letterSpacing: '0.15em',
-                                                padding: '4px 0',
-                                            }}
-                                        >
-                                            未保存
-                                        </span>
-                                    )}
-                                    {/* 並び替えコントロール */}
-                                    <div
-                                        draggable
-                                        onDragStart={(e) => {
-                                            setDraggingVariantIndex(i)
-                                            e.dataTransfer.effectAllowed = 'move'
-                                            e.dataTransfer.setData('text/plain', String(i))
-                                        }}
-                                        onDragEnd={() => {
-                                            setDraggingVariantIndex(null)
-                                            setVariantDropTarget(null)
-                                        }}
-                                        className="flex items-center justify-center gap-1"
-                                        style={{
-                                            padding: '4px',
-                                            border: '1px solid var(--brand-border)',
-                                            backgroundColor: '#fbfaf7',
-                                            cursor: 'grab',
-                                        }}
-                                        title="ドラッグで並び替え"
-                                    >
-                                        <span
-                                            className="material-symbols-outlined"
-                                            style={{
-                                                fontSize: '18px',
-                                                color: 'var(--brand-text-muted)',
-                                            }}
-                                        >
-                                            drag_indicator
-                                        </span>
-                                        <button
-                                            type="button"
-                                            onClick={(e) => {
-                                                e.stopPropagation()
-                                                moveVariant(i, -1)
-                                            }}
-                                            disabled={i === 0}
-                                            className="flex items-center justify-center transition-colors"
-                                            style={{
-                                                width: '28px',
-                                                height: '28px',
-                                                border: '1px solid var(--brand-navy)',
-                                                backgroundColor: i === 0 ? '#f0eee8' : '#ffffff',
-                                                color: i === 0 ? '#c4bfb0' : 'var(--brand-navy)',
-                                                cursor: i === 0 ? 'not-allowed' : 'pointer',
-                                            }}
-                                            title="上へ"
-                                        >
-                                            <span
-                                                className="material-symbols-outlined"
-                                                style={{ fontSize: '16px' }}
-                                            >
-                                                arrow_upward
-                                            </span>
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={(e) => {
-                                                e.stopPropagation()
-                                                moveVariant(i, 1)
-                                            }}
-                                            disabled={i === variants.length - 1}
-                                            className="flex items-center justify-center transition-colors"
-                                            style={{
-                                                width: '28px',
-                                                height: '28px',
-                                                border: '1px solid var(--brand-navy)',
-                                                backgroundColor:
-                                                    i === variants.length - 1 ? '#f0eee8' : '#ffffff',
-                                                color:
-                                                    i === variants.length - 1
-                                                        ? '#c4bfb0'
-                                                        : 'var(--brand-navy)',
-                                                cursor:
-                                                    i === variants.length - 1 ? 'not-allowed' : 'pointer',
-                                            }}
-                                            title="下へ"
-                                        >
-                                            <span
-                                                className="material-symbols-outlined"
-                                                style={{ fontSize: '16px' }}
-                                            >
-                                                arrow_downward
-                                            </span>
-                                        </button>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => handleDeleteVariant(i)}
-                                        className="font-mincho transition-colors"
-                                        style={{
-                                            padding: '8px 16px',
-                                            backgroundColor: '#ffffff',
-                                            color: 'var(--brand-red)',
-                                            border: '1px solid var(--brand-red)',
-                                            fontSize: '13px',
-                                            letterSpacing: '0.2em',
-                                            fontWeight: 500,
-                                            cursor: 'pointer',
-                                        }}
-                                    >
-                                        削　除
-                                    </button>
-                                </div>
-                            </div>
+                                onSetVariant={setVariant}
+                                onToggleDefaultSet={handleToggleDefaultSet}
+                                onUploadImage={handleUploadImage}
+                                onOpenGallery={setGalleryIndex}
+                                onMoveUp={() => moveVariant(i, -1)}
+                                onMoveDown={() => moveVariant(i, 1)}
+                                canMoveUp={i > 0}
+                                canMoveDown={i < variants.length - 1}
+                                onDelete={handleDeleteVariant}
+                            />
                         ))}
                     </div>
                 )}
@@ -2286,6 +2454,396 @@ export default function ProductEditPage() {
                 })()}
                 currentProductId={productId}
             />
+        </div>
+    )
+}
+
+type VariantCardProps = {
+    v: VariantRow
+    index: number
+    kind: ProductKind
+    stores: { id: string; name: string }[]
+    uploadingId: string | null
+    dragEnabled: boolean
+    draggingIndex: number | null
+    dropTargetIndex: number | null
+    onDragStart: (index: number) => void
+    onDragEnd: () => void
+    onDragOver: (index: number) => void
+    onDragLeave: (index: number) => void
+    onDrop: (index: number) => void
+    onSetVariant: (index: number, patch: Partial<VariantRow>) => void
+    onToggleDefaultSet: (index: number, checked: boolean) => void
+    onUploadImage: (index: number, file: File) => void
+    onOpenGallery: (index: number) => void
+    onMoveUp: () => void
+    onMoveDown: () => void
+    canMoveUp: boolean
+    canMoveDown: boolean
+    onDelete: (index: number) => void
+}
+
+/** 種類（バリエーション）1件分の編集カード。通常のフラット表示とグループ表示の両方から使う */
+function VariantCard({
+    v,
+    index: i,
+    kind,
+    stores,
+    uploadingId,
+    dragEnabled,
+    draggingIndex,
+    dropTargetIndex,
+    onDragStart,
+    onDragEnd,
+    onDragOver,
+    onDragLeave,
+    onDrop,
+    onSetVariant,
+    onToggleDefaultSet,
+    onUploadImage,
+    onOpenGallery,
+    onMoveUp,
+    onMoveDown,
+    canMoveUp,
+    canMoveDown,
+    onDelete,
+}: VariantCardProps) {
+    return (
+        <div
+            onDragOver={(e) => {
+                if (!dragEnabled || draggingIndex === null) return
+                e.preventDefault()
+                if (dropTargetIndex !== i) onDragOver(i)
+            }}
+            onDragLeave={() => {
+                if (dragEnabled && dropTargetIndex === i) onDragLeave(i)
+            }}
+            onDrop={(e) => {
+                if (!dragEnabled) return
+                e.preventDefault()
+                onDrop(i)
+            }}
+            className="grid grid-cols-[180px_1fr_auto] gap-6 items-start p-5"
+            style={{
+                border:
+                    dragEnabled && dropTargetIndex === i
+                        ? '2px dashed var(--brand-navy)'
+                        : '1px solid var(--brand-border)',
+                backgroundColor: v.isActive ? '#ffffff' : '#f5f3ec',
+                opacity: dragEnabled && draggingIndex === i ? 0.4 : 1,
+                transition: 'border 0.1s',
+            }}
+        >
+            {/* 画像 */}
+            <div>
+                <div
+                    className="relative flex items-center justify-center mb-2 overflow-hidden"
+                    style={{
+                        width: '180px',
+                        height: '135px',
+                        backgroundColor: 'var(--brand-ivory)',
+                        border: '1px solid var(--brand-border)',
+                    }}
+                >
+                    {v.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                            src={v.imageUrl}
+                            alt={v.name}
+                            style={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'contain',
+                                padding: '4px',
+                            }}
+                        />
+                    ) : (
+                        <span
+                            className="material-symbols-outlined"
+                            style={{
+                                fontSize: '40px',
+                                color: 'var(--brand-gold-soft)',
+                                opacity: 0.5,
+                            }}
+                        >
+                            image
+                        </span>
+                    )}
+                    {uploadingId === String(i) && (
+                        <div
+                            className="absolute inset-0 flex items-center justify-center"
+                            style={{
+                                backgroundColor: 'rgba(255,255,255,0.85)',
+                                fontFamily: 'var(--font-mincho)',
+                                fontSize: '13px',
+                                color: 'var(--brand-navy)',
+                                letterSpacing: '0.15em',
+                            }}
+                        >
+                            アップロード中…
+                        </div>
+                    )}
+                </div>
+                <label
+                    className="font-mincho flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                    style={{
+                        padding: '6px 12px',
+                        border: '1px solid var(--brand-gold)',
+                        color: 'var(--brand-gold-soft)',
+                        backgroundColor: '#ffffff',
+                        fontSize: '12px',
+                        letterSpacing: '0.15em',
+                    }}
+                >
+                    <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>
+                        upload
+                    </span>
+                    画像をアップロード
+                    <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                            const f = e.target.files?.[0]
+                            if (f) onUploadImage(i, f)
+                            e.target.value = ''
+                        }}
+                    />
+                </label>
+                <button
+                    type="button"
+                    onClick={() => onOpenGallery(i)}
+                    className="w-full mt-2 font-mincho flex items-center justify-center gap-1 transition-colors"
+                    style={{
+                        padding: '6px 12px',
+                        border: '1px solid var(--brand-navy)',
+                        color: 'var(--brand-navy)',
+                        backgroundColor: '#ffffff',
+                        fontSize: '12px',
+                        letterSpacing: '0.15em',
+                        cursor: 'pointer',
+                    }}
+                >
+                    <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>
+                        collections
+                    </span>
+                    既存画像から選択
+                </button>
+                {v.imageUrl && (
+                    <button
+                        type="button"
+                        onClick={() => onSetVariant(i, { imageUrl: '' })}
+                        className="w-full mt-2 font-mincho"
+                        style={{
+                            padding: '4px 8px',
+                            fontSize: '11px',
+                            color: 'var(--brand-text-muted)',
+                            border: '1px dashed var(--brand-border)',
+                            backgroundColor: 'transparent',
+                            letterSpacing: '0.15em',
+                            cursor: 'pointer',
+                        }}
+                    >
+                        画像をクリア
+                    </button>
+                )}
+            </div>
+
+            {/* フォーム */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label className="brand-label">
+                        種類名<span className="brand-label-required">*</span>
+                    </label>
+                    <input
+                        type="text"
+                        value={v.name}
+                        onChange={(e) => onSetVariant(i, { name: e.target.value })}
+                        placeholder="例: 基本型、上級型"
+                        style={inputStyle}
+                    />
+                </div>
+                <div>
+                    <label className="brand-label">取扱店舗</label>
+                    <select
+                        value={v.storeId}
+                        onChange={(e) => onSetVariant(i, { storeId: e.target.value })}
+                        style={{ ...inputStyle, cursor: 'pointer' }}
+                    >
+                        <option value="">全店舗共通</option>
+                        {stores.map((s) => (
+                            <option key={s.id} value={s.id}>
+                                {s.name}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+                <div>
+                    <label className="brand-label">一般価格（円）</label>
+                    <CurrencyTextInput
+                        value={v.priceGeneral}
+                        onChange={(val) => onSetVariant(i, { priceGeneral: val })}
+                        style={inputStyle}
+                    />
+                </div>
+                <div>
+                    <label className="brand-label">会員価格（円）</label>
+                    <CurrencyTextInput
+                        value={v.priceMember}
+                        onChange={(val) => onSetVariant(i, { priceMember: val })}
+                        style={inputStyle}
+                    />
+                </div>
+                {/* 初期セット（子商品のみ表示） */}
+                {kind === 'CHILD' && (
+                    <div>
+                        <label
+                            className="flex items-center gap-2 font-mincho mt-7"
+                            style={{
+                                fontSize: '14px',
+                                color: 'var(--brand-text)',
+                                letterSpacing: '0.1em',
+                            }}
+                        >
+                            <input
+                                type="checkbox"
+                                checked={v.isDefaultSet}
+                                onChange={(e) => onToggleDefaultSet(i, e.target.checked)}
+                            />
+                            初期セット
+                        </label>
+                    </div>
+                )}
+                <div className="md:col-span-2">
+                    <label
+                        className="flex items-center gap-2 font-mincho"
+                        style={{
+                            fontSize: '14px',
+                            color: 'var(--brand-text)',
+                            letterSpacing: '0.1em',
+                        }}
+                    >
+                        <input
+                            type="checkbox"
+                            checked={v.isActive}
+                            onChange={(e) => onSetVariant(i, { isActive: e.target.checked })}
+                        />
+                        見積画面で選択可能
+                    </label>
+                </div>
+            </div>
+
+            {/* アクション（並び替え／削除） */}
+            <div className="flex flex-col gap-2 min-w-[120px]">
+                {v.dirty && (
+                    <span
+                        className="font-mincho text-center"
+                        style={{
+                            fontSize: '11px',
+                            color: 'var(--brand-red)',
+                            letterSpacing: '0.15em',
+                            padding: '4px 0',
+                        }}
+                    >
+                        未保存
+                    </span>
+                )}
+                {/* 並び替えコントロール */}
+                <div
+                    draggable={dragEnabled}
+                    onDragStart={(e) => {
+                        if (!dragEnabled) return
+                        onDragStart(i)
+                        e.dataTransfer.effectAllowed = 'move'
+                        e.dataTransfer.setData('text/plain', String(i))
+                    }}
+                    onDragEnd={() => {
+                        if (!dragEnabled) return
+                        onDragEnd()
+                    }}
+                    className="flex items-center justify-center gap-1"
+                    style={{
+                        padding: '4px',
+                        border: '1px solid var(--brand-border)',
+                        backgroundColor: '#fbfaf7',
+                        cursor: dragEnabled ? 'grab' : 'default',
+                    }}
+                    title={dragEnabled ? 'ドラッグで並び替え' : undefined}
+                >
+                    {dragEnabled && (
+                        <span
+                            className="material-symbols-outlined"
+                            style={{
+                                fontSize: '18px',
+                                color: 'var(--brand-text-muted)',
+                            }}
+                        >
+                            drag_indicator
+                        </span>
+                    )}
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            onMoveUp()
+                        }}
+                        disabled={!canMoveUp}
+                        className="flex items-center justify-center transition-colors"
+                        style={{
+                            width: '28px',
+                            height: '28px',
+                            border: '1px solid var(--brand-navy)',
+                            backgroundColor: canMoveUp ? '#ffffff' : '#f0eee8',
+                            color: canMoveUp ? 'var(--brand-navy)' : '#c4bfb0',
+                            cursor: canMoveUp ? 'pointer' : 'not-allowed',
+                        }}
+                        title="上へ"
+                    >
+                        <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>
+                            arrow_upward
+                        </span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            onMoveDown()
+                        }}
+                        disabled={!canMoveDown}
+                        className="flex items-center justify-center transition-colors"
+                        style={{
+                            width: '28px',
+                            height: '28px',
+                            border: '1px solid var(--brand-navy)',
+                            backgroundColor: canMoveDown ? '#ffffff' : '#f0eee8',
+                            color: canMoveDown ? 'var(--brand-navy)' : '#c4bfb0',
+                            cursor: canMoveDown ? 'pointer' : 'not-allowed',
+                        }}
+                        title="下へ"
+                    >
+                        <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>
+                            arrow_downward
+                        </span>
+                    </button>
+                </div>
+                <button
+                    type="button"
+                    onClick={() => onDelete(i)}
+                    className="font-mincho transition-colors"
+                    style={{
+                        padding: '8px 16px',
+                        backgroundColor: '#ffffff',
+                        color: 'var(--brand-red)',
+                        border: '1px solid var(--brand-red)',
+                        fontSize: '13px',
+                        letterSpacing: '0.2em',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                    }}
+                >
+                    削　除
+                </button>
+            </div>
         </div>
     )
 }

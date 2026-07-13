@@ -1,10 +1,13 @@
 'use client'
 
+import { useDateFormat } from '@/hooks/useDateFormat'
+
 type Props = {
     customer: any
 }
 
 export function FlowerCustomerInfo({ customer }: Props) {
+    const formatDate = useDateFormat()
     return (
         <div
             className="mb-8"
@@ -41,9 +44,7 @@ export function FlowerCustomerInfo({ customer }: Props) {
 
                 <dt style={{ color: 'var(--brand-text-muted)', letterSpacing: '0.15em' }}>受付日</dt>
                 <dd>
-                    {customer.receptionAt
-                        ? new Date(customer.receptionAt).toLocaleDateString('ja-JP')
-                        : '-'}
+                    {customer.receptionAt ? formatDate(customer.receptionAt) : '-'}
                 </dd>
 
                 <dt style={{ color: 'var(--brand-text-muted)', letterSpacing: '0.15em' }}>喪主名</dt>

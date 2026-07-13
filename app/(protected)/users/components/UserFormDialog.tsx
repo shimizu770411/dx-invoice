@@ -44,6 +44,9 @@ export function UserFormDialog({ open, user, onClose, onSubmit }: UserFormDialog
                     password: '',
                     email: user.email ?? '',
                     birthDate: user.birthDate ? user.birthDate.split('T')[0] : '',
+                    role: user.role ?? 'STAFF',
+                    isAdmin: user.isAdmin ?? false,
+                    requirePasswordChange: user.requirePasswordChange ?? false,
                 })
             } else {
                 reset(DEFAULT_FORM_VALUES)

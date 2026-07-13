@@ -10,7 +10,7 @@ import { toast } from '@/hooks/use-toast'
 import { handleLoadError, handleSaveError } from '@/lib/errorHandler'
 import { calculateDocumentFormTotals } from '@/lib/documentTotals'
 import { useDocumentItems } from '@/hooks/useDocumentItems'
-import { expandEachModeItems, buildDocumentFreeItems, MATURITY_SERVICE_NAME } from '@/lib/documentUtils'
+import { expandEachModeItems, expandVariantGroupItems, buildDocumentFreeItems, MATURITY_SERVICE_NAME } from '@/lib/documentUtils'
 import { useDocumentProductSearch } from '@/hooks/useDocumentProductSearch'
 import { EstimateFormData, DEFAULT_FORM_VALUES } from '../schemas/EstimateFormSchema'
 
@@ -42,6 +42,17 @@ function buildNewEstimateItems(filteredProducts: ProductItem[]): EstimateItem[] 
                 (product as any).defaultDescription ?? ''
             )
             ordered.push(...expanded.map((it) => ({ ...it, qty: 0, amount: 0 })))
+        } else if ((product as any).hasVariantGroups) {
+            ordered.push({
+                productItemId: product.id,
+                description: (product as any).defaultDescription ?? '',
+                unitPriceGeneral: 0,
+                unitPriceMember: 0,
+                qty: 0,
+                amount: 0,
+                sortNo: ordered.length,
+                productItem: { ...product },
+            } as EstimateItem)
         } else {
             const firstVariant = product.variants[0] ?? null
             ordered.push({
@@ -109,6 +120,46 @@ function buildEstimateItemsForProduct(
     const allExisting = existingItems.filter(
         (item) => item.productItemId === product.id && !(item as any).productRowId
     )
+    if (product.hasVariantGroups) {
+        const groupExisting = allExisting.filter((item) => (item as any).productVariantGroupId)
+        if (groupExisting.length > 0) {
+            const groupSelectionsMap: Record<string, string[]> = {}
+            for (const gi of groupExisting) {
+                const gid = String((gi as any).productVariantGroupId)
+                if (!groupSelectionsMap[gid]) groupSelectionsMap[gid] = []
+                // 合算行（multiSelectVariantIds）は複数IDをまとめて展開、通常行はproductVariantIdを1件追加
+                if ((gi as any).multiSelectVariantIds) {
+                    try {
+                        const ids: string[] = JSON.parse((gi as any).multiSelectVariantIds)
+                        groupSelectionsMap[gid].push(...ids)
+                    } catch { /* ignore */ }
+                } else if (gi.productVariantId) {
+                    groupSelectionsMap[gid].push(String(gi.productVariantId))
+                }
+            }
+            return [{
+                productItemId: product.id,
+                description: product.defaultDescription ?? '',
+                unitPriceGeneral: groupExisting.reduce((s, gi) => s + gi.unitPriceGeneral * (gi.qty || 1), 0),
+                unitPriceMember: groupExisting.reduce((s, gi) => s + gi.unitPriceMember * (gi.qty || 1), 0),
+                qty: 1,
+                amount: 0,
+                sortNo: startSortNo,
+                productItem: { ...product },
+                groupSelections: JSON.stringify(groupSelectionsMap),
+            } as EstimateItem]
+        }
+        return [{
+            productItemId: product.id,
+            description: product.defaultDescription ?? '',
+            unitPriceGeneral: 0,
+            unitPriceMember: 0,
+            qty: 0,
+            amount: 0,
+            sortNo: startSortNo,
+            productItem: { ...product },
+        } as EstimateItem]
+    }
     if (allExisting.length > 0) {
         if (product.isMultiSelect && product.multiSelectMerge === false && allExisting.length > 1) {
             const variantIds = allExisting.map((it: any) => String(it.productVariantId)).filter(Boolean)
@@ -223,7 +274,8 @@ export function useEstimateCreate(customerId: string, reset: UseFormReset<Estima
                 })
                 return
             }
-            const finalItems = expandEachModeItems(activeItems, isMember)
+            const groupExpandedItems = expandVariantGroupItems(activeItems, isMember)
+            const finalItems = expandEachModeItems(groupExpandedItems, isMember)
             const mergedFreeItems = freeItems
                 .map((item, i) => {
                     const productItemName = formValues.freeItems[i]?.productItemName ?? item.productItemName ?? ''
@@ -342,7 +394,8 @@ export function useEstimateEdit(estimateId: string, reset: UseFormReset<Estimate
                 })
                 return
             }
-            const finalItems = expandEachModeItems(activeItems, isMember)
+            const groupExpandedItems = expandVariantGroupItems(activeItems, isMember)
+            const finalItems = expandEachModeItems(groupExpandedItems, isMember)
             const mergedFreeItems = freeItems
                 .map((item, i) => {
                     const productItemName = formValues.freeItems[i]?.productItemName ?? item.productItemName ?? ''

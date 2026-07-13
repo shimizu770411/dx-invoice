@@ -28,6 +28,7 @@ export const companyFormSchema = z.object({
     bank4Type: z.string().optional(),
     bank4Account: z.string().optional(),
     bank4Holder: z.string().optional(),
+    dateFormat: z.enum(['WESTERN', 'JAPANESE']),
 })
 
 export type CompanyFormData = z.infer<typeof companyFormSchema>
@@ -60,4 +61,5 @@ export const DEFAULT_FORM_VALUES: CompanyFormData = {
     bank4Type: '',
     bank4Account: '',
     bank4Holder: '',
+    dateFormat: 'WESTERN',
 }

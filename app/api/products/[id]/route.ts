@@ -24,6 +24,15 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
                     },
                     orderBy: [{ sortNo: 'asc' }, { id: 'asc' }],
                 },
+                variantGroups: {
+                    include: {
+                        variants: {
+                            include: { store: true },
+                            orderBy: [{ sortNo: 'asc' }, { id: 'asc' }],
+                        },
+                    },
+                    orderBy: [{ sortNo: 'asc' }, { id: 'asc' }],
+                },
                 setParentLinks: {
                     include: { child: { select: { id: true, name: true, sortNo: true } } },
                     orderBy: { sortNo: 'asc' },
@@ -74,6 +83,7 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
         if (body.canAddFreeRow !== undefined) updateData.canAddFreeRow = Boolean(body.canAddFreeRow)
         if (body.isMultiSelect !== undefined) updateData.isMultiSelect = Boolean(body.isMultiSelect)
         if (body.multiSelectMerge !== undefined) updateData.multiSelectMerge = Boolean(body.multiSelectMerge)
+        if (body.hasVariantGroups !== undefined) updateData.hasVariantGroups = Boolean(body.hasVariantGroups)
         if (body.defaultDescription !== undefined)
             updateData.defaultDescription = body.defaultDescription || null
 
@@ -122,11 +132,72 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
             }
         }
 
+        // バリアントグループ（重箱等の「基本セット＋追加オプション」構成）: body.groups があれば同期
+        if (Array.isArray(body.groups)) {
+            const existingGroups = await prisma.productVariantGroup.findMany({
+                where: { productItemId: BigInt(params.id) },
+                select: { id: true },
+            })
+            const sentIds = new Set(
+                body.groups.filter((g: any) => g.id).map((g: any) => String(g.id))
+            )
+            const removedGroups = existingGroups.filter((g) => !sentIds.has(String(g.id)))
+
+            for (const g of removedGroups) {
+                const variantCount = await prisma.productVariant.count({
+                    where: { groupId: g.id, isActive: true },
+                })
+                if (variantCount > 0) {
+                    return NextResponse.json(
+                        {
+                            error: 'BadRequest',
+                            message:
+                                'グループ配下に有効な種類（バリアント）が残っているため削除できません。先に配下の種類を削除してください。',
+                        },
+                        { status: 400 }
+                    )
+                }
+                await prisma.productVariantGroup.delete({ where: { id: g.id } })
+            }
+
+            for (const [gIdx, g] of body.groups.entries()) {
+                const selectionType = g.selectionType === 'MULTI' ? 'MULTI' : 'SINGLE'
+                const mergeDisplay = g.mergeDisplay !== false
+                if (g.id) {
+                    await prisma.productVariantGroup.update({
+                        where: { id: BigInt(g.id) },
+                        data: {
+                            label: typeof g.label === 'string' ? g.label : '',
+                            selectionType,
+                            isRequired: Boolean(g.isRequired),
+                            mergeDisplay,
+                            sortNo: gIdx,
+                        },
+                    })
+                } else {
+                    await prisma.productVariantGroup.create({
+                        data: {
+                            productItemId: BigInt(params.id),
+                            label: typeof g.label === 'string' ? g.label : '',
+                            selectionType,
+                            isRequired: Boolean(g.isRequired),
+                            mergeDisplay,
+                            sortNo: gIdx,
+                        },
+                    })
+                }
+            }
+        }
+
         const updated = await prisma.productItem.findUnique({
             where: { id: BigInt(params.id) },
             include: {
                 variants: true,
                 rows: {
+                    include: { variants: { orderBy: { sortNo: 'asc' } } },
+                    orderBy: { sortNo: 'asc' },
+                },
+                variantGroups: {
                     include: { variants: { orderBy: { sortNo: 'asc' } } },
                     orderBy: { sortNo: 'asc' },
                 },

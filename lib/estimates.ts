@@ -29,6 +29,10 @@ export interface EstimateItem {
     isMaturityService?: boolean
     adhocSetScope?: 'NONE' | 'MEMBER_ONLY' | 'GENERAL_ONLY' | 'BOTH'
     multiSelectVariantIds?: string | null
+    /** 保存後の行がどのバリアントグループ（重箱の基本セット／追加オプション等）由来かを示す */
+    productVariantGroupId?: string | null
+    /** グループ商品の選択状態（保存前の一時データ）。JSON文字列: { [groupId]: variantId[] } */
+    groupSelections?: string | null
     sortNo: number
     productItem?: any
     productVariant?: any

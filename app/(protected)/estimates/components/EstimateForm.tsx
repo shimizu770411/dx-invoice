@@ -149,6 +149,35 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
         )
     }
 
+    /** グループ商品（重箱など）: 1グループ分の選択結果を更新し、全グループの合計金額を再集計する */
+    const handleGroupVariantChange = (index: number, groupId: string, selectedIds: string[]) => {
+        setItems((prev) =>
+            prev.map((item, i) => {
+                if (i !== index) return item
+                const pi = (item as any).productItem
+                const currentSelections: Record<string, string[]> = (item as any).groupSelections
+                    ? JSON.parse((item as any).groupSelections)
+                    : {}
+                const nextSelections = { ...currentSelections, [groupId]: selectedIds }
+                const allSelectedVariants: any[] = []
+                for (const group of pi?.variantGroups || []) {
+                    const ids = nextSelections[String(group.id)] || []
+                    allSelectedVariants.push(
+                        ...(group.variants || []).filter((v: any) => ids.includes(String(v.id)))
+                    )
+                }
+                const hasAnySelection = Object.values(nextSelections).some((ids) => ids.length > 0)
+                return {
+                    ...item,
+                    groupSelections: JSON.stringify(nextSelections),
+                    unitPriceGeneral: allSelectedVariants.reduce((s, v) => s + v.priceGeneral, 0),
+                    unitPriceMember: allSelectedVariants.reduce((s, v) => s + v.priceMember, 0),
+                    qty: hasAnySelection ? 1 : 0,
+                } as any
+            })
+        )
+    }
+
     useEffect(() => {
         const isMember = watchedIsMember === 'true'
         setItems((prev) =>
@@ -160,6 +189,21 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                         const variants = ((item as any).productItem?.variants || [])
                             .filter((v: any) => ids.includes(String(v.id)))
                         const totalMember = variants.reduce((s: number, v: any) => s + v.priceMember, 0)
+                        return { ...item, unitPriceMember: totalMember }
+                    } catch { return item }
+                }
+                // グループ商品（重箱など）: 全グループの選択中バリアントの会員価格を再集計
+                if ((item as any).groupSelections) {
+                    try {
+                        const selections: Record<string, string[]> = JSON.parse((item as any).groupSelections)
+                        const groups = (item as any).productItem?.variantGroups || []
+                        let totalMember = 0
+                        for (const group of groups) {
+                            const ids = selections[String(group.id)] || []
+                            totalMember += (group.variants || [])
+                                .filter((v: any) => ids.includes(String(v.id)))
+                                .reduce((s: number, v: any) => s + v.priceMember, 0)
+                        }
                         return { ...item, unitPriceMember: totalMember }
                     } catch { return item }
                 }
@@ -356,6 +400,7 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                                         freeFields={freeItemFields}
                                         onVariantChange={handleVariantChange}
                                         onMultiSelectChange={handleMultiSelectChange}
+                                        onGroupVariantChange={handleGroupVariantChange}
                                         setValue={setValue}
                                         readOnly={mode === 'edit' && isConfirmed}
                                         currentStoreId={customer?.storeId ? String(customer.storeId) : null}
@@ -369,6 +414,7 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                                         totals={totals}
                                         onVariantChange={handleVariantChange}
                                         onMultiSelectChange={handleMultiSelectChange}
+                                        onGroupVariantChange={handleGroupVariantChange}
                                         setValue={setValue}
                                         freeItems={freeItems}
                                         freeFields={freeItemFields}

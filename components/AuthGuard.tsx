@@ -26,11 +26,17 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
         setIsChecking(true)
         ;(async () => {
             try {
-                // apiClientを使用して認証状態を確認（Authorizationヘッダが自動設定される）
                 console.log('[AuthGuard] Checking authentication for pathname:', pathname)
                 const user = await getMe()
                 console.log('[AuthGuard] Authentication successful, user:', user)
                 if (!mounted) return
+
+                // パスワード変更強制フラグが立っている場合は変更ページへ
+                if (user.requirePasswordChange && pathname !== '/change-password') {
+                    router.replace('/change-password')
+                    return
+                }
+
                 setChecked(true)
                 setIsChecking(false)
             } catch (e: any) {

@@ -24,6 +24,9 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
                 tel: true,
                 email: true,
                 birthDate: true,
+                role: true,
+                isAdmin: true,
+                requirePasswordChange: true,
                 createdAt: true,
                 updatedAt: true,
             },
@@ -89,8 +92,12 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
         if (data.birthDate !== undefined) {
             updateData.birthDate = data.birthDate ? new Date(data.birthDate) : null
         }
+        if (data.role !== undefined && ['STAFF', 'CLERK', 'APPROVER'].includes(data.role)) {
+            updateData.role = data.role
+        }
+        if (data.isAdmin !== undefined) updateData.isAdmin = data.isAdmin === true
+        if (data.requirePasswordChange !== undefined) updateData.requirePasswordChange = data.requirePasswordChange === true
         if (data.password) {
-            // パスワードが提供された場合、ハッシュ化
             updateData.password = await bcrypt.hash(data.password, 10)
         }
 
@@ -104,6 +111,9 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
                 tel: true,
                 email: true,
                 birthDate: true,
+                role: true,
+                isAdmin: true,
+                requirePasswordChange: true,
                 createdAt: true,
                 updatedAt: true,
             },

@@ -9,6 +9,7 @@ import { ResetButton } from '@/components/button/ResetButton'
 import { SearchButton } from '@/components/button/SearchButton'
 import { toast } from '@/hooks/use-toast'
 import { PdfCompanyProfile } from '@/app/(protected)/pdf/components/PdfCompanyProfile'
+import { useDateFormat } from '@/hooks/useDateFormat'
 
 export default function FlowerPdfPage() {
     const router = useRouter()
@@ -19,6 +20,7 @@ export default function FlowerPdfPage() {
     const [company, setCompany] = useState<CompanyProfile | null>(null)
     const [pdfUrl, setPdfUrl] = useState<string | null>(null)
     const [generating, setGenerating] = useState(false)
+    const formatDate = useDateFormat()
 
     useEffect(() => {
         loadData()
@@ -159,10 +161,7 @@ export default function FlowerPdfPage() {
                                     ))}
                                 </h1>
                                 <div className="text-right tracking-[0.4em]">
-                                    {(() => {
-                                        const d = new Date()
-                                        return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
-                                    })()}
+                                    {formatDate(new Date().toISOString())}
                                 </div>
 
                                 <div className="mb-2 mt-4 flex items-center justify-between gap-2">
@@ -305,10 +304,7 @@ export default function FlowerPdfPage() {
                                                 <tr className="border border-black">
                                                     <td className="p-2 text-right tracking-[0.25em]">
                                                         {target.isPaid && target.paidAt
-                                                            ? (() => {
-                                                                  const d = new Date(target.paidAt)
-                                                                  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
-                                                              })()
+                                                            ? formatDate(target.paidAt)
                                                             : '-'}
                                                     </td>
                                                 </tr>

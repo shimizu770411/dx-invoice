@@ -28,6 +28,7 @@ type Props = {
     totals: Totals
     onVariantChange?: (index: number, variant: ProductVariant) => void
     onMultiSelectChange?: (index: number, variantIds: string[], options?: { adhocSetScope?: 'NONE' | 'MEMBER_ONLY' | 'BOTH'; isService?: boolean; isMaturityService?: boolean }) => void
+    onGroupVariantChange?: (index: number, groupId: string, variantIds: string[]) => void
     setValue?: UseFormSetValue<EstimateFormData>
     freeItems?: EstimateFreeItem[]
     freeFields?: FieldArrayWithId<EstimateFormData, 'freeItems', 'id'>[]
@@ -36,6 +37,7 @@ type Props = {
 
 type Step =
     | { kind: 'product'; productIndex: number }
+    | { kind: 'productGroup'; productIndexes: number[] }
     | { kind: 'free'; freeIndex: number }
 
 export function EstimateItemWizard({
@@ -46,6 +48,7 @@ export function EstimateItemWizard({
     totals,
     onVariantChange,
     onMultiSelectChange,
+    onGroupVariantChange,
     setValue,
     freeItems = [],
     freeFields = [],
@@ -92,19 +95,61 @@ export function EstimateItemWizard({
     const visibleIndexes = items.map((_, i) => i).filter((i) => isVisible(items[i]))
 
     // ステップ配列: 商品ステップ → フリー項目ステップ（5件）の順
-    const productSteps: Step[] = visibleIndexes.map((i) => ({ kind: 'product', productIndex: i }))
+    // isMultiRow商品は同一productItemIdが連続する行をグループ化して1ステップに束ねる
+    const productSteps: Step[] = (() => {
+        const steps: Step[] = []
+        let i = 0
+        while (i < visibleIndexes.length) {
+            const idx = visibleIndexes[i]
+            const it = items[idx] as any
+            if (it?.productItem?.isMultiRow) {
+                const pid = String(it.productItemId)
+                const groupIndexes: number[] = [idx]
+                i++
+                while (i < visibleIndexes.length) {
+                    const nextIdx = visibleIndexes[i]
+                    const nextIt = items[nextIdx] as any
+                    if (nextIt?.productItem?.isMultiRow && String(nextIt.productItemId) === pid) {
+                        groupIndexes.push(nextIdx)
+                        i++
+                    } else {
+                        break
+                    }
+                }
+                steps.push({ kind: 'productGroup', productIndexes: groupIndexes })
+            } else {
+                steps.push({ kind: 'product', productIndex: idx })
+                i++
+            }
+        }
+        return steps
+    })()
     const freeSteps: Step[] = freeFields.map((_, i) => ({ kind: 'free', freeIndex: i }))
     const allSteps: Step[] = [...productSteps, ...freeSteps]
     const total = allSteps.length
 
     const selectedCount = useMemo(() => {
-        const productCount = (watchedItems || []).reduce((c, f) => c + (f?.qty > 0 ? 1 : 0), 0)
+        // productGroupは全行中いずれかqty>0なら1カウント
+        const seenGroupPids = new Set<string>()
+        const productCount = visibleIndexes.reduce((c, idx) => {
+            const it = items[idx] as any
+            if (it?.productItem?.isMultiRow) {
+                const pid = String(it.productItemId)
+                if (seenGroupPids.has(pid)) return c
+                seenGroupPids.add(pid)
+                const anySelected = visibleIndexes
+                    .filter((j) => (items[j] as any)?.productItem?.isMultiRow && String((items[j] as any).productItemId) === pid)
+                    .some((j) => (watchedItems?.[j]?.qty ?? 0) > 0)
+                return c + (anySelected ? 1 : 0)
+            }
+            return c + ((watchedItems?.[idx]?.qty ?? 0) > 0 ? 1 : 0)
+        }, 0)
         const freeCount = (watchedFreeItems || []).reduce(
             (c, f) => c + (f?.qty > 0 && (f?.productItemName ?? '').trim() !== '' ? 1 : 0),
             0
         )
         return productCount + freeCount
-    }, [watchedItems, watchedFreeItems])
+    }, [watchedItems, watchedFreeItems, visibleIndexes, items])
 
     const changeMarkerRef = useRef(0)
 
@@ -132,6 +177,11 @@ export function EstimateItemWizard({
     const variants = item?.productItem?.variants || []
     const currentQty = step.kind === 'product' ? watchedItems?.[index]?.qty ?? 0 : 0
     const selectedVariantId = item?.productVariantId
+
+    // 複数行構成商品グループステップ用の値
+    const groupIndexes = step.kind === 'productGroup' ? step.productIndexes : []
+    const groupFirstItem = groupIndexes.length > 0 ? (items[groupIndexes[0]] as any) : null
+    const groupIsSelected = groupIndexes.some((i) => (watchedItems?.[i]?.qty ?? 0) > 0)
 
     // フリー項目ステップ用の値
     const freeIndex = step.kind === 'free' ? step.freeIndex : -1
@@ -166,6 +216,10 @@ export function EstimateItemWizard({
     const handleSkip = () => {
         if (step.kind === 'product') {
             setValue?.(`items.${index}.qty` as `items.${number}.qty`, 0, { shouldDirty: true })
+        } else if (step.kind === 'productGroup') {
+            step.productIndexes.forEach((i) => {
+                setValue?.(`items.${i}.qty` as `items.${number}.qty`, 0, { shouldDirty: true })
+            })
         } else {
             setValue?.(`freeItems.${freeIndex}.qty` as `freeItems.${number}.qty`, 0, {
                 shouldDirty: true,
@@ -284,7 +338,9 @@ export function EstimateItemWizard({
                                 ? '満期サービス'
                                 : step.kind === 'free'
                                   ? `フリー項目 ${freeIndex + 1}`
-                                  : item?.productItem?.name ?? '-'}
+                                  : step.kind === 'productGroup'
+                                    ? (groupFirstItem?.productItem?.name ?? '-')
+                                    : item?.productItem?.name ?? '-'}
                         </h2>
                     </div>
                     <div className="flex items-center gap-2">
@@ -315,6 +371,26 @@ export function EstimateItemWizard({
                                     </div>
                                 )
                             }
+                            if ((item as any)?.productItem?.hasVariantGroups) {
+                                const selections: Record<string, string[]> = (() => {
+                                    try { return (item as any)?.groupSelections ? JSON.parse((item as any).groupSelections) : {} } catch { return {} }
+                                })()
+                                const names: string[] = []
+                                for (const group of (item as any)?.productItem?.variantGroups || []) {
+                                    const ids: string[] = selections[String(group.id)] || []
+                                    names.push(
+                                        ...(group.variants || [])
+                                            .filter((v: any) => ids.includes(String(v.id)))
+                                            .map((v: any) => v.name)
+                                    )
+                                }
+                                if (names.length === 0) return null
+                                return (
+                                    <div className="font-mincho" style={{ padding: '6px 14px', border: '1px solid var(--brand-navy)', color: 'var(--brand-navy)', fontSize: '13px', letterSpacing: '0.15em' }}>
+                                        選択中: {names.join('、')}
+                                    </div>
+                                )
+                            }
                             if (!item?.productVariant) return null
                             return (
                                 <div className="font-mincho" style={{ padding: '6px 14px', border: '1px solid var(--brand-navy)', color: 'var(--brand-navy)', fontSize: '13px', letterSpacing: '0.15em' }}>
@@ -326,7 +402,96 @@ export function EstimateItemWizard({
                 </div>
 
                 {/* バリエーションカード（商品ステップのみ） */}
-                {step.kind === 'product' && (variants.length === 0 ? (
+                {step.kind === 'product' && ((item as any)?.productItem?.hasVariantGroups ? (
+                    <div className="mb-5 flex flex-col gap-6">
+                        {((item as any)?.productItem?.variantGroups || []).length === 0 ? (
+                            <p className="font-mincho" style={{ fontSize: '14px', color: 'var(--brand-text-muted)' }}>
+                                グループが登録されていません
+                            </p>
+                        ) : (
+                            ((item as any).productItem.variantGroups as any[]).map((group) => {
+                                const groupSelections: Record<string, string[]> = (() => {
+                                    try { return (item as any)?.groupSelections ? JSON.parse((item as any).groupSelections) : {} } catch { return {} }
+                                })()
+                                const selectedIds = groupSelections[String(group.id)] || []
+                                const handleToggle = (variantId: string) => {
+                                    const next = group.selectionType === 'SINGLE'
+                                        ? [variantId]
+                                        : selectedIds.includes(variantId)
+                                            ? selectedIds.filter((id) => id !== variantId)
+                                            : [...selectedIds, variantId]
+                                    onGroupVariantChange?.(index, String(group.id), next)
+                                    changeMarkerRef.current += 1
+                                    setValue?.('_changeMarker' as any, String(changeMarkerRef.current), { shouldDirty: true })
+                                }
+                                return (
+                                    <div key={group.id}>
+                                        <p className="font-mincho mb-1" style={{ fontSize: '15px', fontWeight: 600, color: 'var(--brand-navy)', letterSpacing: '0.1em' }}>
+                                            {group.label}
+                                        </p>
+                                        <p className="font-mincho mb-2" style={{ fontSize: '12px', color: 'var(--brand-text-muted)', letterSpacing: '0.1em' }}>
+                                            {group.selectionType === 'SINGLE' ? '1つ選択してください' : '複数選択可（タップで選択・解除）'}
+                                        </p>
+                                        {(group.variants || []).length === 0 ? (
+                                            <p className="text-sm" style={{ color: 'var(--brand-text-muted)' }}>種類が登録されていません</p>
+                                        ) : (
+                                            <div className="grid grid-cols-3 gap-4">
+                                                {(group.variants as ProductVariant[]).map((v) => {
+                                                    const isSelected = selectedIds.includes(String(v.id))
+                                                    const img = resolveProductImageUrl(v.imageUrl)
+                                                    return (
+                                                        <button
+                                                            key={v.id}
+                                                            type="button"
+                                                            onClick={() => handleToggle(String(v.id))}
+                                                            className="transition-all overflow-hidden"
+                                                            style={{
+                                                                border: isSelected ? '2px solid var(--brand-navy)' : '1px solid var(--brand-border)',
+                                                                backgroundColor: isSelected ? '#f5f6fc' : '#ffffff',
+                                                                padding: '0',
+                                                                textAlign: 'left',
+                                                                boxShadow: isSelected ? '0 4px 12px rgba(1, 8, 62, 0.15)' : '0 1px 3px rgba(1, 8, 62, 0.05)',
+                                                                cursor: 'pointer',
+                                                            }}
+                                                        >
+                                                            <div
+                                                                className="flex items-center justify-center overflow-hidden relative"
+                                                                style={{ width: '100%', aspectRatio: '4 / 3', backgroundColor: 'var(--brand-ivory)', borderBottom: '1px solid var(--brand-border)' }}
+                                                            >
+                                                                {img ? (
+                                                                    <Image src={img} alt={v.name} fill sizes="300px" className="object-contain" style={{ padding: '4px' }} />
+                                                                ) : (
+                                                                    <ImageOff className="h-12 w-12" style={{ color: 'var(--brand-gold-soft)', opacity: 0.4 }} />
+                                                                )}
+                                                                {isSelected && (
+                                                                    <div className="absolute top-2 right-2 flex items-center justify-center"
+                                                                        style={{ width: '32px', height: '32px', backgroundColor: 'var(--brand-navy)', color: '#ffffff', borderRadius: '50%', fontSize: '18px' }}>
+                                                                        ✓
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <div className="px-3 py-2">
+                                                                <p className="font-mincho mb-1" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--brand-text)', letterSpacing: '0.08em', lineHeight: 1.4 }}>
+                                                                    {v.name}
+                                                                </p>
+                                                                <p className="font-garamond" style={{ fontSize: '17px', fontWeight: 600, color: 'var(--brand-navy)', fontVariantNumeric: 'tabular-nums' }}>
+                                                                    ¥{(isMember ? v.priceMember : v.priceGeneral).toLocaleString()}
+                                                                </p>
+                                                                <p className="font-mincho" style={{ fontSize: '10px', color: 'var(--brand-gold-soft)', letterSpacing: '0.1em' }}>
+                                                                    {isMember ? '会員価格' : '一般価格'}
+                                                                </p>
+                                                            </div>
+                                                        </button>
+                                                    )
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                )
+                            })
+                        )}
+                    </div>
+                ) : variants.length === 0 ? (
                     <div
                         className="py-10 text-center font-mincho mb-5"
                         style={{
@@ -450,6 +615,96 @@ export function EstimateItemWizard({
                                 maxRows={2}
                             />
                         </div>
+                    </div>
+                )}
+
+                {/* 複数行構成商品グループ（productGroupステップ） */}
+                {step.kind === 'productGroup' && (
+                    <div
+                        className="mb-5"
+                        style={{
+                            padding: '20px 24px',
+                            backgroundColor: 'var(--brand-ivory-light)',
+                            border: '1px solid var(--brand-border)',
+                        }}
+                    >
+                        {!groupIsSelected ? (
+                            <div className="text-center py-6">
+                                <p
+                                    className="font-mincho mb-4"
+                                    style={{ fontSize: '14px', color: 'var(--brand-text-muted)', letterSpacing: '0.1em' }}
+                                >
+                                    複数明細行の商品です。選択すると全行が有効になります。
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        groupIndexes.forEach((i) => {
+                                            setValue?.(`items.${i}.qty` as `items.${number}.qty`, 1, { shouldDirty: true })
+                                        })
+                                    }}
+                                    className="font-mincho text-white transition-colors"
+                                    style={{
+                                        padding: '12px 40px',
+                                        backgroundColor: 'var(--brand-navy)',
+                                        border: 'none',
+                                        fontSize: '15px',
+                                        letterSpacing: '0.2em',
+                                        cursor: 'pointer',
+                                    }}
+                                >
+                                    選択する
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col gap-4">
+                                {groupIndexes.map((idx, rowNum) => {
+                                    const rowItem = items[idx] as any
+                                    const variantName = rowItem?.productVariant?.name ?? `行 ${rowNum + 1}`
+                                    const unitPrice = isMember
+                                        ? (rowItem?.productVariant?.priceMember ?? 0)
+                                        : (rowItem?.productVariant?.priceGeneral ?? 0)
+                                    const rowQty = watchedItems?.[idx]?.qty ?? 1
+                                    const rowAmount = unitPrice * rowQty
+                                    return (
+                                        <div key={idx} style={{ borderLeft: '3px solid var(--brand-gold)', paddingLeft: '16px' }}>
+                                            <div className="flex items-baseline justify-between mb-2">
+                                                <span
+                                                    className="font-mincho"
+                                                    style={{ fontSize: '14px', fontWeight: 600, color: 'var(--brand-navy)', letterSpacing: '0.1em' }}
+                                                >
+                                                    {variantName}
+                                                </span>
+                                                {rowAmount > 0 && (
+                                                    <span
+                                                        className="font-garamond"
+                                                        style={{ fontSize: '16px', color: 'var(--brand-navy)', fontVariantNumeric: 'tabular-nums' }}
+                                                    >
+                                                        ¥{rowAmount.toLocaleString()}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="grid grid-cols-[120px_1fr] gap-4">
+                                                <FormInput
+                                                    name={`items.${idx}.qty`}
+                                                    control={control}
+                                                    label="数量"
+                                                    type="number"
+                                                />
+                                                <FormTextarea
+                                                    name={`items.${idx}.description`}
+                                                    control={control}
+                                                    label="摘要"
+                                                    rows={2}
+                                                    noResize
+                                                    maxRows={2}
+                                                />
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -611,7 +866,7 @@ export function EstimateItemWizard({
                     </button>
 
                     <div className="flex gap-2">
-                        {(step.kind === 'product' ? currentQty === 0 : freeQty === 0) ? (
+                        {(step.kind === 'product' ? currentQty === 0 : step.kind === 'productGroup' ? !groupIsSelected : freeQty === 0) ? (
                             <button
                                 type="button"
                                 onClick={handleSkip}
@@ -638,6 +893,10 @@ export function EstimateItemWizard({
                                             0,
                                             { shouldDirty: true }
                                         )
+                                    } else if (step.kind === 'productGroup') {
+                                        step.productIndexes.forEach((i) => {
+                                            setValue?.(`items.${i}.qty` as `items.${number}.qty`, 0, { shouldDirty: true })
+                                        })
                                     } else {
                                         setValue?.(
                                             `freeItems.${freeIndex}.qty` as `freeItems.${number}.qty`,
@@ -759,7 +1018,13 @@ export function EstimateItemWizard({
                             label = it?.productItem?.name ?? '-'
                             qty = watchedItems?.[s.productIndex]?.qty ?? 0
                             isSelected = qty > 0
-                            key = `p-${it?.productItemId ?? s.productIndex}`
+                            key = `p-${s.productIndex}`
+                        } else if (s.kind === 'productGroup') {
+                            const firstIt = items[s.productIndexes[0]] as any
+                            label = firstIt?.productItem?.name ?? '-'
+                            qty = watchedItems?.[s.productIndexes[0]]?.qty ?? 0
+                            isSelected = s.productIndexes.some((i) => (watchedItems?.[i]?.qty ?? 0) > 0)
+                            key = `pg-${s.productIndexes[0]}`
                         } else {
                             const fName =
                                 (watchedFreeItems?.[s.freeIndex]?.productItemName ?? '').trim()

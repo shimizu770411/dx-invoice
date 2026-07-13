@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useDateFormat } from '@/hooks/useDateFormat'
 
 type Props = {
     customer: any
@@ -8,20 +9,7 @@ type Props = {
 
 export function DocumentCustomerSummary({ customer }: Props) {
     const [open, setOpen] = useState(false)
-
-    const formatReception = (v?: string) => {
-        if (!v) return ''
-        try {
-            return new Intl.DateTimeFormat('ja-JP-u-ca-japanese', {
-                era: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-            }).format(new Date(v))
-        } catch {
-            return ''
-        }
-    }
+    const formatDate = useDateFormat()
 
     const labelStyle: React.CSSProperties = {
         fontFamily: 'var(--font-garamond)',
@@ -113,7 +101,7 @@ export function DocumentCustomerSummary({ customer }: Props) {
                 >
                     <div>
                         <span style={labelStyle}>RECEPTION</span>
-                        <span style={valueStyle}>{formatReception(customer.receptionAt)}</span>
+                        <span style={valueStyle}>{formatDate(customer.receptionAt)}</span>
                     </div>
                     <div>
                         <span style={labelStyle}>CHIEF MOURNER</span>

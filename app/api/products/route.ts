@@ -34,6 +34,17 @@ export async function GET(request: NextRequest) {
                     },
                     orderBy: [{ sortNo: 'asc' }, { id: 'asc' }],
                 },
+                variantGroups: {
+                    where: includeInactive ? {} : { isActive: true },
+                    include: {
+                        variants: {
+                            where: includeInactive ? {} : { isActive: true },
+                            include: { store: true },
+                            orderBy: [{ sortNo: 'asc' }, { id: 'asc' }],
+                        },
+                    },
+                    orderBy: [{ sortNo: 'asc' }, { id: 'asc' }],
+                },
                 setParentLinks: {
                     include: { child: { select: { id: true, name: true, sortNo: true } } },
                     orderBy: { sortNo: 'asc' },
@@ -80,7 +91,19 @@ export async function POST(request: NextRequest) {
                 isMaturityServiceable: Boolean(body.isMaturityServiceable),
                 isMultiRow: Boolean(body.isMultiRow),
                 canAddFreeRow: Boolean(body.canAddFreeRow),
+                hasVariantGroups: Boolean(body.hasVariantGroups),
                 defaultDescription: body.defaultDescription || null,
+                variantGroups: Array.isArray(body.groups)
+                    ? {
+                          create: body.groups.map((g: any, gIdx: number) => ({
+                              label: typeof g.label === 'string' ? g.label : '',
+                              selectionType: g.selectionType === 'MULTI' ? 'MULTI' : 'SINGLE',
+                              isRequired: Boolean(g.isRequired),
+                              mergeDisplay: g.mergeDisplay !== false,
+                              sortNo: gIdx,
+                          })),
+                      }
+                    : undefined,
                 rows: Array.isArray(body.rows)
                     ? {
                           create: body.rows.map((row: any, rowIdx: number) => ({
@@ -113,7 +136,7 @@ export async function POST(request: NextRequest) {
                       }
                     : undefined,
             },
-            include: { variants: true, rows: { include: { variants: true } } },
+            include: { variants: true, rows: { include: { variants: true } }, variantGroups: { include: { variants: true } } },
         })
 
         return NextResponse.json(serializeBigInt(created), { status: 201 })

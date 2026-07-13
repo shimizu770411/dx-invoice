@@ -1,4 +1,10 @@
 import apiClient from './api';
+import type { UserRole } from './users';
+
+export interface InvoiceConfirmedBy {
+    id: string
+    name: string
+}
 
 export interface InvoiceFreeItem {
     id?: string
@@ -29,6 +35,10 @@ export interface InvoiceItem {
   isMaturityService?: boolean;
   adhocSetScope?: 'NONE' | 'MEMBER_ONLY' | 'GENERAL_ONLY' | 'BOTH';
   multiSelectVariantIds?: string | null;
+  /** 保存後の行がどのバリアントグループ（重箱の基本セット／追加オプション等）由来かを示す */
+  productVariantGroupId?: string | null;
+  /** グループ商品の選択状態（保存前の一時データ）。JSON文字列: { [groupId]: variantId[] } */
+  groupSelections?: string | null;
   sortNo: number;
   productItem?: any;
   productVariant?: any;
@@ -49,6 +59,12 @@ export interface Invoice {
     items: InvoiceItem[]
     freeItems?: InvoiceFreeItem[]
     customer?: any
+    staffConfirmedAt?: string | null
+    staffConfirmedBy?: InvoiceConfirmedBy | null
+    clerkConfirmedAt?: string | null
+    clerkConfirmedBy?: InvoiceConfirmedBy | null
+    approverConfirmedAt?: string | null
+    approverConfirmedBy?: InvoiceConfirmedBy | null
 }
 
 export async function getInvoices(customerId?: string): Promise<Invoice[]> {
@@ -80,5 +96,15 @@ export async function createInvoiceFromEstimate(
 
 export async function updateInvoice(id: string, data: any): Promise<Invoice> {
   const response = await apiClient.put(`/invoices/${id}`, data);
+  return response.data;
+}
+
+export type InvoiceConfirmationFields = Pick<
+    Invoice,
+    'staffConfirmedAt' | 'staffConfirmedBy' | 'clerkConfirmedAt' | 'clerkConfirmedBy' | 'approverConfirmedAt' | 'approverConfirmedBy'
+>
+
+export async function confirmInvoice(id: string, role: UserRole): Promise<InvoiceConfirmationFields> {
+  const response = await apiClient.post(`/invoices/${id}/confirm`, { role });
   return response.data;
 }

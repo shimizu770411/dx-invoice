@@ -29,6 +29,7 @@ export interface CompanyProfile {
     bank4Type?: string
     bank4Account?: string
     bank4Holder?: string
+    dateFormat?: string
 }
 
 export interface UpdateCompanyProfileData {
@@ -59,6 +60,7 @@ export interface UpdateCompanyProfileData {
     bank4Type?: string
     bank4Account?: string
     bank4Holder?: string
+    dateFormat?: string
 }
 
 export async function getCompanyProfile(): Promise<CompanyProfile> {

@@ -1,11 +1,22 @@
 import apiClient from './api';
 
+export type UserRole = 'STAFF' | 'CLERK' | 'APPROVER'
+
+export const USER_ROLE_LABELS: Record<UserRole, string> = {
+  STAFF: '担当者',
+  CLERK: '事務員',
+  APPROVER: '決裁者',
+}
+
 export interface User {
   id: string;
   name: string;
   tel: string;
   email?: string;
   birthDate?: string;
+  role: UserRole;
+  isAdmin: boolean;
+  requirePasswordChange: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -16,6 +27,9 @@ export interface CreateUserData {
   password: string;
   email?: string;
   birthDate?: string;
+  role?: UserRole;
+  isAdmin?: boolean;
+  requirePasswordChange?: boolean;
 }
 
 export interface UpdateUserData {
@@ -24,6 +38,9 @@ export interface UpdateUserData {
   password?: string;
   email?: string;
   birthDate?: string;
+  role?: UserRole;
+  isAdmin?: boolean;
+  requirePasswordChange?: boolean;
 }
 
 export async function getUsers(name?: string): Promise<User[]> {

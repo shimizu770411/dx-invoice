@@ -13,6 +13,7 @@ import { createInvoiceFromEstimate } from '@/lib/invoices'
 import { toast } from '@/hooks/use-toast'
 import { handleOperationError } from '@/lib/errorHandler'
 import { CaseSearchForm } from './components/CaseSearchForm'
+import { useDateFormat } from '@/hooks/useDateFormat'
 
 interface FormParams extends SearchCustomersParams {
     receptionFromInput?: string
@@ -43,6 +44,7 @@ export default function CasesPage() {
     const { data: customers = [], isLoading: customersLoading } = useCustomersQuery(searchParams)
     const createPaymentMutation = useCreatePaymentMutation()
     const cancelPaymentMutation = useCancelPaymentMutation()
+    const formatDate = useDateFormat()
 
     const loading = customersLoading
 
@@ -74,22 +76,6 @@ export default function CasesPage() {
         }
     }
 
-    const formatDate = (dateString: string | null) => {
-        if (!dateString) return ''
-        try {
-            const date = new Date(dateString)
-            if (isNaN(date.getTime())) return ''
-            // 和暦（例: 令和7年3月31日）
-            return new Intl.DateTimeFormat('ja-JP-u-ca-japanese', {
-                era: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-            }).format(date)
-        } catch {
-            return ''
-        }
-    }
 
     const handlePaymentClick = (customer: CustomerListItem) => {
         if (!customer.invoiceId) return

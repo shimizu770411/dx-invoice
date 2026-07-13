@@ -7,7 +7,7 @@ import { toast } from '@/hooks/use-toast'
 import { handleSaveError } from '@/lib/errorHandler'
 import { companyFormSchema, CompanyFormData, DEFAULT_FORM_VALUES } from './schemas/CompanyFormSchema'
 import { useCompanyProfileQuery, useUpdateCompanyProfileMutation } from './hooks/useCompanyForm'
-import { BasicInfoSection, BankInfoSection } from './components/CompanyFormSections'
+import { BasicInfoSection, BankInfoSection, SystemSettingsSection } from './components/CompanyFormSections'
 
 export default function CompanyPage() {
     const { data: profile, isLoading } = useCompanyProfileQuery()
@@ -54,6 +54,7 @@ export default function CompanyPage() {
                 bank4Type: profile.bank4Type ?? '',
                 bank4Account: profile.bank4Account ?? '',
                 bank4Holder: profile.bank4Holder ?? '',
+                dateFormat: (profile.dateFormat === 'JAPANESE' ? 'JAPANESE' : 'WESTERN') as 'WESTERN' | 'JAPANESE',
             })
         }
     }, [profile, reset])
@@ -123,6 +124,7 @@ export default function CompanyPage() {
                 <form onSubmit={handleSubmit(onSubmit)} noValidate>
                     <BasicInfoSection />
                     <BankInfoSection />
+                    <SystemSettingsSection />
 
                     {/* 保存ボタン（画面下部固定） */}
                     <div

@@ -11,6 +11,9 @@ export interface User {
     name: string
     tel: string
     email?: string
+    role?: string
+    isAdmin?: boolean
+    requirePasswordChange?: boolean
 }
 
 export interface LoginResponse {

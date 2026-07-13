@@ -8,6 +8,7 @@ export default function LoginPage() {
     const router = useRouter()
     const [tel, setTel] = useState('')
     const [password, setPassword] = useState('')
+    const [showPassword, setShowPassword] = useState(false)
     const [error, setError] = useState('')
     const [loading, setLoading] = useState(false)
 
@@ -18,8 +19,8 @@ export default function LoginPage() {
 
         try {
             await login({ tel, password })
-            await getMe()
-            router.push('/cases')
+            const me = await getMe()
+            router.push(me.requirePasswordChange ? '/change-password' : '/cases')
         } catch (err: any) {
             setError(
                 err.response?.data?.message || 'ログインに失敗しました。ログインIDとパスワードをご確認ください。'
@@ -155,31 +156,66 @@ export default function LoginPage() {
                             >
                                 パスワード
                             </label>
-                            <input
-                                id="password"
-                                type="password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                required
-                                autoComplete="current-password"
-                                className="w-full transition-colors focus:outline-none"
-                                style={{
-                                    padding: '14px 16px',
-                                    fontSize: '18px',
-                                    border: '1px solid #d4cfc0',
-                                    backgroundColor: '#fafaf7',
-                                    fontFamily: '"Noto Serif JP", serif',
-                                    letterSpacing: '0.1em',
-                                }}
-                                onFocus={(e) => {
-                                    e.currentTarget.style.borderColor = '#020e70'
-                                    e.currentTarget.style.backgroundColor = '#ffffff'
-                                }}
-                                onBlur={(e) => {
-                                    e.currentTarget.style.borderColor = '#d4cfc0'
-                                    e.currentTarget.style.backgroundColor = '#fafaf7'
-                                }}
-                            />
+                            <div style={{ position: 'relative' }}>
+                                <input
+                                    id="password"
+                                    type={showPassword ? 'text' : 'password'}
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    required
+                                    autoComplete="current-password"
+                                    className="w-full transition-colors focus:outline-none"
+                                    style={{
+                                        padding: '14px 48px 14px 16px',
+                                        fontSize: '18px',
+                                        border: '1px solid #d4cfc0',
+                                        backgroundColor: '#fafaf7',
+                                        fontFamily: '"Noto Serif JP", serif',
+                                        letterSpacing: '0.1em',
+                                    }}
+                                    onFocus={(e) => {
+                                        e.currentTarget.style.borderColor = '#020e70'
+                                        e.currentTarget.style.backgroundColor = '#ffffff'
+                                    }}
+                                    onBlur={(e) => {
+                                        e.currentTarget.style.borderColor = '#d4cfc0'
+                                        e.currentTarget.style.backgroundColor = '#fafaf7'
+                                    }}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword((v) => !v)}
+                                    style={{
+                                        position: 'absolute',
+                                        right: '14px',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        background: 'none',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        color: '#8a7e5c',
+                                        padding: '4px',
+                                        lineHeight: 1,
+                                    }}
+                                    tabIndex={-1}
+                                    aria-label={showPassword ? 'パスワードを隠す' : 'パスワードを表示'}
+                                >
+                                    {showPassword ? (
+                                        /* 目を閉じるアイコン */
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                                            <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                                            <line x1="1" y1="1" x2="23" y2="23" />
+                                        </svg>
+                                    ) : (
+                                        /* 目を開くアイコン */
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                            <circle cx="12" cy="12" r="3" />
+                                        </svg>
+                                    )}
+                                </button>
+                            </div>
                         </div>
 
                         {error && (

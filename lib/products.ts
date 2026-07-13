@@ -5,6 +5,7 @@ export interface ProductVariant {
     productItemId: string
     storeId?: string | null
     store?: { id: string; name: string } | null
+    groupId?: string | null
     name: string
     imageUrl?: string | null
     priceGeneral: number
@@ -13,6 +14,23 @@ export interface ProductVariant {
     isDefaultSet?: boolean
     isActive: boolean
     sortNo?: number
+}
+
+/** バリアントグループの選択方式（重箱等の「基本セット＋追加オプション」パターン） */
+export type ProductVariantGroupSelectionType = 'SINGLE' | 'MULTI'
+
+/** 1商品内のバリアントグループ（重箱の「基本セット」「追加オプション」等） */
+export interface ProductVariantGroup {
+    id: string
+    productItemId?: string
+    label: string
+    selectionType: ProductVariantGroupSelectionType
+    isRequired?: boolean
+    /** MULTI選択時の出力方法: true=合算して1行 / false=種類別に複数行（SINGLEでは未使用） */
+    mergeDisplay?: boolean
+    sortNo?: number
+    isActive?: boolean
+    variants: ProductVariant[]
 }
 
 /**
@@ -71,10 +89,22 @@ export interface ProductItem {
     canAddFreeRow?: boolean
     isMultiSelect?: boolean
     multiSelectMerge?: boolean
+    hasVariantGroups?: boolean
     isActive: boolean
     variants: ProductVariant[]
     rows?: ProductRow[]
+    variantGroups?: ProductVariantGroup[]
     children?: { id: string; name: string; sortNo?: number }[]
+}
+
+/** バリアントグループの登録・更新入力（idがあれば更新、なければ新規作成） */
+export interface ProductVariantGroupInput {
+    id?: string
+    label: string
+    selectionType: ProductVariantGroupSelectionType
+    isRequired?: boolean
+    mergeDisplay?: boolean
+    sortNo?: number
 }
 
 export interface ProductItemInput {
@@ -91,6 +121,8 @@ export interface ProductItemInput {
     canAddFreeRow?: boolean
     isMultiSelect?: boolean
     multiSelectMerge?: boolean
+    hasVariantGroups?: boolean
+    groups?: ProductVariantGroupInput[]
 }
 
 export interface ProductSetInput {
@@ -104,6 +136,7 @@ export async function setProductChildren(parentId: string, childIds: string[]): 
 export interface ProductVariantInput {
     name: string
     storeId?: string | null
+    groupId?: string | null
     imageUrl?: string | null
     priceGeneral: number
     priceMember: number

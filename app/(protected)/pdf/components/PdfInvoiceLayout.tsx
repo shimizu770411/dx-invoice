@@ -11,6 +11,7 @@ export type PdfProductItem = {
     canAddFreeRow?: boolean
     isMultiSelect?: boolean
     multiSelectMerge?: boolean
+    hasVariantGroups?: boolean
     variants?: { id: string; name: string }[]
 }
 
@@ -140,6 +141,7 @@ type DisplayRow = {
     isFixedRow?: boolean // 満期サービス・解約手数料など固定行（単価表示スキップ）
     hideDescription?: boolean // 複数行構成商品の2行目以降は摘要を非表示
     isSecondaryRow?: boolean // 複数行構成商品の2行目以降（品名空・上罫線なし）
+    multiRowGroupSize?: number // 複数行構成商品の先頭行のみ設定（rowSpan に使用）
     displayDescription?: string // MERGEDモード複数選択時: 種類名を「、」で連結した表示用文字列
     deductionLabel?: string
     deductionItem?: PdfDocumentItem | null
@@ -190,6 +192,9 @@ function buildDisplayRows(
             // MERGED モード（isMultiSelect=true, multiSelectMerge=true/null）は1行で種類名を「、」連結表示する。
             const isEachMode = product.isMultiSelect && product.multiSelectMerge === false
             const isMergedMode = product.isMultiSelect && product.multiSelectMerge !== false
+            // グループ商品（重箱など、hasVariantGroups）: 品名・摘要セルは1行目に rowSpan 結合されるため、
+            // 各行の摘要（選択した種類名）を改行区切りで1行目のセルにまとめて表示する。
+            const isVariantGroupMode = !!product.hasVariantGroups
             itemsForProduct.forEach((estimateItem, idx) => {
                 const isFirstRow = idx === 0
                 let displayDescription: string | undefined
@@ -201,6 +206,11 @@ function buildDisplayRows(
                             .map((v) => v.name)
                         if (names.length > 0) displayDescription = names.join('、')
                     } catch { /* ignore */ }
+                } else if (isVariantGroupMode && isFirstRow && itemsForProduct.length > 1) {
+                    displayDescription = itemsForProduct
+                        .map((it) => it.description || '')
+                        .filter(Boolean)
+                        .join('\n')
                 }
                 rows.push({
                     label: isFirstRow ? product.name : '',
@@ -209,6 +219,7 @@ function buildDisplayRows(
                     hideDescription: isEachMode ? false : !isFirstRow,
                     isSecondaryRow: !isFirstRow,
                     displayDescription,
+                    multiRowGroupSize: isFirstRow && itemsForProduct.length > 1 ? itemsForProduct.length : undefined,
                 })
             })
         }
@@ -533,14 +544,13 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                     return (
                                     <Fragment key={index}>
                                         <tr key={`main-${index}`}>
+                                            {!row.isSecondaryRow && (
                                             <td
-                                                className={`border border-l-0 border-black px-2 ${mergeCls}`}
+                                                className="border border-l-0 border-black px-2 align-top"
+                                                rowSpan={row.multiRowGroupSize}
                                             >
                                                 {(() => {
-                                                    const chars = row.isSecondaryRow
-                                                        ? []
-                                                        : (row.label || '-').split('')
-
+                                                    const chars = (row.label || '-').split('')
                                                     return (
                                                         <>
                                                             <div
@@ -563,11 +573,14 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                                     )
                                                 })()}
                                             </td>
+                                            )}
+                                            {!row.isSecondaryRow && (
                                             <td
-                                                className={`border border-l-0 border-black px-0.5 text-left ${mergeCls}`}
+                                                className="border border-l-0 border-black px-0.5 text-left align-top"
+                                                rowSpan={row.multiRowGroupSize}
                                             >
                                                 <div className="whitespace-pre-wrap break-words">
-                                                    {row.hideDescription ? '' : (row.displayDescription ?? row.estimateItem?.description ?? '')}
+                                                    {row.displayDescription ?? row.estimateItem?.description ?? ''}
                                                 </div>
                                                 <div>
                                                     {/* 数量が1より大きい場合のみ表示。親付きフリー行（満期サービス以外）は qty=1 でも常に数量を表示。 */}
@@ -581,6 +594,7 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                                         : ''}
                                                 </div>
                                             </td>
+                                            )}
                                             <td
                                                 className={`border border-black px-1 text-right ${mergeCls}`}
                                             >

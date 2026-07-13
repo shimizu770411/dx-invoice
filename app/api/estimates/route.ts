@@ -176,6 +176,9 @@ export async function POST(request: NextRequest) {
                         productRowVariantId: item.productRowVariantId
                             ? BigInt(item.productRowVariantId)
                             : null,
+                        productVariantGroupId: item.productVariantGroupId
+                            ? BigInt(item.productVariantGroupId)
+                            : null,
                         calcType:
                             item.calcType === 'FIXED' || item.calcType === 'UNIT_PRICE_X_QTY'
                                 ? item.calcType
@@ -198,7 +201,12 @@ export async function POST(request: NextRequest) {
                 customer: true,
                 items: {
                     include: {
-                        productItem: { include: { rows: { include: { variants: true } } } },
+                        productItem: {
+                            include: {
+                                rows: { include: { variants: true } },
+                                variantGroups: { include: { variants: true } },
+                            },
+                        },
                         productVariant: true,
                     },
                 },

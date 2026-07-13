@@ -37,6 +37,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
 
         const isDefaultSet = Boolean(body.isDefaultSet)
         const productItemId = BigInt(params.id)
+        const groupId = body.groupId ? BigInt(body.groupId) : null
 
         const created = await prisma.$transaction(async (tx) => {
             // 初期セット ON の場合、同商品の他種類の isDefaultSet を OFF に
@@ -46,11 +47,11 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
                     data: { isDefaultSet: false },
                 })
             }
-            // sortNo 未指定時は末尾に追加（既存の最大 sortNo + 1）
+            // sortNo 未指定時は末尾に追加（グループ商品はグループ単位、それ以外は商品単位で最大 sortNo + 1）
             let sortNo = Number(body.sortNo)
             if (!Number.isFinite(sortNo)) {
                 const max = await tx.productVariant.aggregate({
-                    where: { productItemId },
+                    where: groupId ? { groupId } : { productItemId },
                     _max: { sortNo: true },
                 })
                 sortNo = (max._max.sortNo ?? -1) + 1
@@ -59,6 +60,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
                 data: {
                     productItemId,
                     storeId: body.storeId ? BigInt(body.storeId) : null,
+                    groupId,
                     name: body.name,
                     imageUrl: body.imageUrl || null,
                     priceGeneral: Number(body.priceGeneral) || 0,

@@ -56,10 +56,16 @@ model User {
   email      String?  @db.VarChar(255)
   tel        String   @unique @db.VarChar(30)
   password   String   @db.VarChar(255)
+  role                  String   @default("STAFF") @db.VarChar(20)
+  isAdmin               Boolean  @default(false) @map("is_admin")
+  requirePasswordChange Boolean  @default(false) @map("require_password_change")
   createdAt  DateTime @default(now()) @db.Timestamptz(6) @map("created_at")
   updatedAt  DateTime @updatedAt @db.Timestamptz(6) @map("updated_at")
 
   createdPayments Payment[] @relation("CreatedBy")
+  staffConfirmedInvoices    Invoice[] @relation("InvoiceStaffConfirmedBy")
+  clerkConfirmedInvoices    Invoice[] @relation("InvoiceClerkConfirmedBy")
+  approverConfirmedInvoices Invoice[] @relation("InvoiceApproverConfirmedBy")
 
   @@map("users")
 }
@@ -183,6 +189,11 @@ enum RowCalcType {
   UNIT_PRICE_X_QTY // 単価 × 数量
 }
 
+enum ProductVariantGroupSelectionType {
+  SINGLE // 基本セット: 1つだけ選択
+  MULTI  // 追加オプション: 0個以上を複数選択
+}
+
 model ProductItem {
   id                 BigInt   @id @default(autoincrement())
   name               String   @db.VarChar(120)
@@ -197,12 +208,14 @@ model ProductItem {
   canAddFreeRow         Boolean   @default(false) @map("can_add_free_row")
   isMultiSelect         Boolean   @default(false) @map("is_multi_select")
   multiSelectMerge      Boolean   @default(true)  @map("multi_select_merge")
+  hasVariantGroups      Boolean   @default(false) @map("has_variant_groups")
   isActive              Boolean   @default(true) @map("is_active")
   createdAt     DateTime @default(now()) @db.Timestamptz(6) @map("created_at")
   updatedAt     DateTime @updatedAt @db.Timestamptz(6) @map("updated_at")
 
   variants  ProductVariant[]
   rows      ProductRow[]
+  variantGroups ProductVariantGroup[]
   estimateItems EstimateItem[]
   invoiceItems  InvoiceItem[]
   setParentLinks ProductSet[] @relation("SetParent")
@@ -214,6 +227,26 @@ model ProductItem {
   @@index([isSetParent])
   @@index([isSetChild])
   @@map("product_items")
+}
+
+model ProductVariantGroup {
+  id            BigInt   @id @default(autoincrement())
+  productItemId BigInt   @map("product_item_id")
+  label         String   @db.VarChar(100)
+  selectionType ProductVariantGroupSelectionType @default(SINGLE) @map("selection_type")
+  isRequired    Boolean  @default(false) @map("is_required")
+  // MULTI選択時の出力方法: true=合算して1行 / false=種類別に複数行（SINGLEでは未使用）
+  mergeDisplay  Boolean  @default(true) @map("merge_display")
+  sortNo        Int      @default(0) @map("sort_no")
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @db.Timestamptz(6) @map("created_at")
+  updatedAt     DateTime @updatedAt @db.Timestamptz(6) @map("updated_at")
+
+  productItem   ProductItem      @relation(fields: [productItemId], references: [id], onDelete: Cascade)
+  variants      ProductVariant[]
+
+  @@index([productItemId, sortNo])
+  @@map("product_variant_groups")
 }
 
 model ProductRow {
@@ -273,6 +306,7 @@ model ProductVariant {
   id            BigInt   @id @default(autoincrement())
   productItemId BigInt   @map("product_item_id")
   storeId       BigInt?  @map("store_id")
+  groupId       BigInt?  @map("group_id")
   name          String   @db.VarChar(120)
   imageUrl      String?  @db.VarChar(500) @map("image_url")
   priceGeneral  Int      @map("price_general")
@@ -286,12 +320,14 @@ model ProductVariant {
 
   productItem  ProductItem @relation(fields: [productItemId], references: [id])
   store        Store?      @relation(fields: [storeId], references: [id])
+  group        ProductVariantGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
   estimateItems EstimateItem[]
   invoiceItems  InvoiceItem[]
 
   @@index([storeId])
   @@index([productItemId, isDefaultSet])
   @@index([productItemId, sortNo])
+  @@index([groupId, sortNo])
   @@map("product_variants")
 }
 
@@ -350,6 +386,7 @@ model EstimateItem {
   productVariantId     BigInt?       @map("product_variant_id")
   productRowId         BigInt?       @map("product_row_id")
   productRowVariantId  BigInt?       @map("product_row_variant_id")
+  productVariantGroupId BigInt?      @map("product_variant_group_id")
   calcType             RowCalcType?  @map("calc_type")
   sign                 Int           @default(1)
   description          String?       @db.VarChar(255)
@@ -415,6 +452,12 @@ model Invoice {
   returnStaff         String?             @db.VarChar(100) @map("return_staff")
   remarks             String?             @db.Text
   issuedAt            DateTime?           @db.Timestamptz(6) @map("issued_at")
+  staffConfirmedAt      DateTime?         @db.Timestamptz(6) @map("staff_confirmed_at")
+  staffConfirmedById    BigInt?           @map("staff_confirmed_by_id")
+  clerkConfirmedAt      DateTime?         @db.Timestamptz(6) @map("clerk_confirmed_at")
+  clerkConfirmedById    BigInt?           @map("clerk_confirmed_by_id")
+  approverConfirmedAt   DateTime?         @db.Timestamptz(6) @map("approver_confirmed_at")
+  approverConfirmedById BigInt?           @map("approver_confirmed_by_id")
   createdAt           DateTime            @default(now()) @db.Timestamptz(6) @map("created_at")
   updatedAt           DateTime            @updatedAt @db.Timestamptz(6) @map("updated_at")
 
@@ -422,6 +465,9 @@ model Invoice {
   fromEstimate        Estimate?           @relation(fields: [fromEstimateId], references: [id])
   items               InvoiceItem[]
   payments            Payment[]
+  staffConfirmedBy    User?               @relation("InvoiceStaffConfirmedBy", fields: [staffConfirmedById], references: [id])
+  clerkConfirmedBy    User?               @relation("InvoiceClerkConfirmedBy", fields: [clerkConfirmedById], references: [id])
+  approverConfirmedBy User?               @relation("InvoiceApproverConfirmedBy", fields: [approverConfirmedById], references: [id])
 
   @@map("invoices")
 }
@@ -433,6 +479,7 @@ model InvoiceItem {
   productVariantId     BigInt?       @map("product_variant_id")
   productRowId         BigInt?       @map("product_row_id")
   productRowVariantId  BigInt?       @map("product_row_variant_id")
+  productVariantGroupId BigInt?      @map("product_variant_group_id")
   calcType             RowCalcType?  @map("calc_type")
   sign                 Int           @default(1)
   description          String?       @db.VarChar(255)
@@ -582,6 +629,7 @@ model CompanyProfile {
   bank4Type     String?  @db.VarChar(20) @map("bank4_type")
   bank4Account  String?  @db.VarChar(50) @map("bank4_account")
   bank4Holder   String?  @db.VarChar(100) @map("bank4_holder")
+  dateFormat    String   @default("WESTERN") @db.VarChar(20) @map("date_format")
   createdAt     DateTime @default(now()) @db.Timestamptz(6) @map("created_at")
   updatedAt     DateTime @updatedAt @db.Timestamptz(6) @map("updated_at")
 

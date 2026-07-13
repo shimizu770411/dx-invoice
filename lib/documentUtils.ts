@@ -72,6 +72,72 @@ export function expandEachModeItems<T extends { qty: number; multiSelectVariantI
     }).map((item, i) => ({ ...item, sortNo: i }))
 }
 
+// グループ商品（重箱等、基本セット＋追加オプションのグループ構成）の代表行を、
+// グループごとの選択結果（groupSelections: JSON文字列 { [groupId]: variantId[] }）に基づいて
+// 実際の明細行（グループ選択1つにつき1行）へ展開し、sortNo を振り直して返す
+export function expandVariantGroupItems<T extends { qty: number; groupSelections?: string | null; [key: string]: any }>(
+    activeItems: T[],
+    isMember: boolean
+): T[] {
+    return activeItems.flatMap((item) => {
+        const pi = item.productItem
+        if (!pi?.hasVariantGroups) return [item]
+        if (!item.groupSelections) return [item]
+        try {
+            const selections: Record<string, string[]> = JSON.parse(item.groupSelections)
+            const groups = pi.variantGroups || []
+            const rows: T[] = []
+            for (const group of groups) {
+                const selectedIds = selections[String(group.id)] || []
+                if (selectedIds.length === 0) continue
+                // MULTI選択グループで合算表示（mergeDisplay、デフォルトtrue）かつ2件以上選択時は1行に合算する
+                const isMergedGroup = group.selectionType === 'MULTI' && group.mergeDisplay !== false
+                if (isMergedGroup && selectedIds.length > 1) {
+                    const selectedVariants = (group.variants || []).filter((vv: any) =>
+                        selectedIds.includes(String(vv.id))
+                    )
+                    if (selectedVariants.length === 0) continue
+                    const totalGeneral = selectedVariants.reduce((s: number, v: any) => s + v.priceGeneral, 0)
+                    const totalMember = selectedVariants.reduce((s: number, v: any) => s + v.priceMember, 0)
+                    rows.push({
+                        ...item,
+                        productVariantId: String(selectedVariants[0].id),
+                        productVariant: selectedVariants[0],
+                        productVariantGroupId: String(group.id),
+                        multiSelectVariantIds: JSON.stringify(selectedIds),
+                        unitPriceGeneral: totalGeneral,
+                        unitPriceMember: totalMember,
+                        qty: 1,
+                        amount: (isMember ? totalMember : totalGeneral) * 1,
+                        description: selectedVariants.map((v: any) => v.name).join('、'),
+                        groupSelections: null,
+                    })
+                    continue
+                }
+                for (const variantId of selectedIds) {
+                    const v = (group.variants || []).find((vv: any) => String(vv.id) === variantId)
+                    if (!v) continue
+                    rows.push({
+                        ...item,
+                        productVariantId: String(v.id),
+                        productVariant: v,
+                        productVariantGroupId: String(group.id),
+                        unitPriceGeneral: v.priceGeneral,
+                        unitPriceMember: v.priceMember,
+                        qty: 1,
+                        amount: (isMember ? v.priceMember : v.priceGeneral) * 1,
+                        description: v.name,
+                        groupSelections: null,
+                    })
+                }
+            }
+            return rows.length > 0 ? rows : []
+        } catch {
+            return [item]
+        }
+    }).map((item, i) => ({ ...item, sortNo: i }))
+}
+
 // フリー行を親付き/親なしに分離し、パディング・自動生成を行って結合して返す
 // fixedRowNames: 末尾に固定配置する行名（見積: [満期サービス]、請求書: [満期サービス, 解約手数料]）
 // ignoreQtyFilter: true のとき qty に関わらず canAddFreeRow=true の全商品に親リンク行を生成する（新規作成時に使用）
