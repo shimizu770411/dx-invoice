@@ -96,8 +96,17 @@ function InvoiceFormContent({
                     } as any
                 }
                 if (!variant) return item
+                const product = (item as any).productItem
+                let description = item.description
+                if (product?.overwriteDescriptionOnVariantChange) {
+                    const defaultVariantId = product.variants?.[0]?.id
+                    const isDefaultVariant = defaultVariantId != null && String(defaultVariantId) === String(variant.id)
+                    description = isDefaultVariant ? (product.defaultDescription ?? '') : product.name
+                    setValue(`items.${index}.description`, description)
+                }
                 return {
                     ...item,
+                    description,
                     productVariantId: variant.id,
                     productVariant: variant,
                     unitPriceGeneral: variant.priceGeneral,

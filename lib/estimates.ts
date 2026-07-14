@@ -53,6 +53,7 @@ export interface Estimate {
     grandTotal: number
     items: EstimateItem[]
     customer?: any
+    hasInvoice?: boolean
 }
 
 export async function getEstimates(customerId?: string): Promise<Estimate[]> {

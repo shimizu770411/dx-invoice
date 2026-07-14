@@ -209,6 +209,7 @@ model ProductItem {
   isMultiSelect         Boolean   @default(false) @map("is_multi_select")
   multiSelectMerge      Boolean   @default(true)  @map("multi_select_merge")
   hasVariantGroups      Boolean   @default(false) @map("has_variant_groups")
+  overwriteDescriptionOnVariantChange Boolean @default(false) @map("overwrite_description_on_variant_change")
   isActive              Boolean   @default(true) @map("is_active")
   createdAt     DateTime @default(now()) @db.Timestamptz(6) @map("created_at")
   updatedAt     DateTime @updatedAt @db.Timestamptz(6) @map("updated_at")

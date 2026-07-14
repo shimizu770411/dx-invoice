@@ -32,7 +32,7 @@ export function EstimateBasicInfo({ control, isNew, disabled }: Props) {
                     control={control}
                     label="見積区分"
                     options={STATUS_OPTIONS}
-                    disabled={disabled}
+                    disabled
                 />
             </div>
         </div>

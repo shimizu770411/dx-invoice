@@ -32,7 +32,7 @@ export type EstimateFormData = z.infer<typeof estimateFormSchema>
 export const DEFAULT_FORM_VALUES: EstimateFormData = {
     docNo: '',
     status: 'DRAFT',
-    isMember: 'false',
+    isMember: 'true',
     cremationProcessType: '',
     altarPlaceType: '',
     altarPlaceOther: '',

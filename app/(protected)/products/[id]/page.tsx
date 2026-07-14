@@ -83,6 +83,8 @@ export default function ProductEditPage() {
     >('NONE')
     const [isMaturityServiceable, setIsMaturityServiceable] = useState(false)
     const [defaultDescription, setDefaultDescription] = useState('')
+    // 初期商品以外の種類を選択した場合、摘要を商品名で上書きするか
+    const [overwriteDescriptionOnVariantChange, setOverwriteDescriptionOnVariantChange] = useState(false)
     const [childIds, setChildIds] = useState<string[]>([])
     const [variants, setVariants] = useState<VariantRow[]>([])
     // 複数行構成商品
@@ -244,6 +246,7 @@ export default function ProductEditPage() {
         setSetableScope((product.setableScope as any) ?? 'NONE')
         setIsMaturityServiceable(product.isMaturityServiceable ?? false)
         setDefaultDescription(product.defaultDescription ?? '')
+        setOverwriteDescriptionOnVariantChange((product as any).overwriteDescriptionOnVariantChange ?? false)
         setChildIds((product.children || []).map((c: any) => String(c.id)))
         setIsMultiRow((product as any).isMultiRow ?? false)
         setCanAddFreeRow((product as any).canAddFreeRow ?? false)
@@ -347,6 +350,7 @@ export default function ProductEditPage() {
                 setableScope,
                 isMaturityServiceable,
                 defaultDescription: defaultDescription.trim() || null,
+                overwriteDescriptionOnVariantChange,
                 isMultiRow,
                 canAddFreeRow,
                 isMultiSelect,
@@ -834,9 +838,9 @@ export default function ProductEditPage() {
                     </label>
                 </div>
 
-                {/* 摘要のデフォルト値 */}
+                {/* 摘要の初期値 */}
                 <div className="mb-5">
-                    <label className="brand-label">摘要のデフォルト値</label>
+                    <label className="brand-label">摘要の初期値</label>
                     <textarea
                         value={defaultDescription}
                         onChange={(e) => setDefaultDescription(e.target.value)}
@@ -863,6 +867,17 @@ export default function ProductEditPage() {
                     >
                         見積/請求の明細に新しくこの商品を追加したとき、摘要欄の初期値として入る文字列。空欄なら未入力で開始。
                     </p>
+                    <label
+                        className="flex items-center gap-2 font-mincho"
+                        style={{ marginTop: '10px', fontSize: '14px', color: 'var(--brand-text)', letterSpacing: '0.1em' }}
+                    >
+                        <input
+                            type="checkbox"
+                            checked={overwriteDescriptionOnVariantChange}
+                            onChange={(e) => setOverwriteDescriptionOnVariantChange(e.target.checked)}
+                        />
+                        初期商品以外を選択した場合は、摘要に商品名を反映する
+                    </label>
                 </div>
 
                 {/* セット可否（初期セット品の 0 円扱いの適用範囲） */}

@@ -41,6 +41,9 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
                     },
                     orderBy: { sortNo: 'asc' },
                 },
+                invoices: {
+                    select: { id: true },
+                },
             },
         })
 
@@ -79,6 +82,8 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
                     })),
                 },
                 membershipPaidAmount,
+                hasInvoice: estimate.invoices.length > 0,
+                invoices: undefined,
                 freeItems: allFreeItems,
                 items: estimate.items.map((item: any) => ({
                     ...item,

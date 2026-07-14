@@ -90,6 +90,7 @@ export interface ProductItem {
     isMultiSelect?: boolean
     multiSelectMerge?: boolean
     hasVariantGroups?: boolean
+    overwriteDescriptionOnVariantChange?: boolean
     isActive: boolean
     variants: ProductVariant[]
     rows?: ProductRow[]
@@ -122,6 +123,7 @@ export interface ProductItemInput {
     isMultiSelect?: boolean
     multiSelectMerge?: boolean
     hasVariantGroups?: boolean
+    overwriteDescriptionOnVariantChange?: boolean
     groups?: ProductVariantGroupInput[]
 }
 

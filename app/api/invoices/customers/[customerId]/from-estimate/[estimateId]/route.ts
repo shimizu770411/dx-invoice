@@ -69,6 +69,7 @@ export async function POST(
                 customerId: estimate.customerId,
                 docNo: autoDocNo,
                 status: 'DRAFT',
+                isMember: estimate.isMember,
                 subtotal: totals.subtotal,
                 tax: totals.tax,
                 total: totals.total,

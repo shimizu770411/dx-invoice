@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useQueryClient } from '@tanstack/react-query'
 import { useForm, FormProvider, useFieldArray, useWatch, UseFormReturn } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { estimateFormSchema, EstimateFormData, DEFAULT_FORM_VALUES } from '../schemas/EstimateFormSchema'
@@ -21,6 +22,7 @@ interface Estimate {
     estimateType: 'PRE_CONSULTATION' | 'FORMAL'
     status: string
     docNo?: string | null
+    hasInvoice?: boolean
 }
 
 interface ContentProps {
@@ -47,6 +49,7 @@ function LoadingState() {
 
 function EstimateFormContent({ mode, customer, estimate, items, setItems, freeItems, onSubmit, methods }: ContentProps) {
     const router = useRouter()
+    const queryClient = useQueryClient()
     const {
         control,
         handleSubmit,
@@ -104,8 +107,17 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                     } as any
                 }
                 if (!variant) return item
+                const product = (item as any).productItem
+                let description = item.description
+                if (product?.overwriteDescriptionOnVariantChange) {
+                    const defaultVariantId = product.variants?.[0]?.id
+                    const isDefaultVariant = defaultVariantId != null && String(defaultVariantId) === String(variant.id)
+                    description = isDefaultVariant ? (product.defaultDescription ?? '') : product.name
+                    setValue(`items.${index}.description`, description)
+                }
                 return {
                     ...item,
+                    description,
                     productVariantId: variant.id,
                     productVariant: variant,
                     unitPriceGeneral: variant.priceGeneral,
@@ -261,6 +273,7 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
         setIsConfirming(true)
         try {
             const result = await confirmEstimate(estimate.id)
+            queryClient.invalidateQueries({ queryKey: ['customers'] })
             toast({ title: '本見積を作成しました', variant: 'success', duration: 2000 })
             router.push(`/estimates/${result.id}`)
         } catch (e: any) {
@@ -523,10 +536,11 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                                     {estimate.estimateType === 'FORMAL' && (
                                         <button
                                             type="submit"
-                                            disabled={isSubmitting}
-                                            className={`rounded border-0 px-6 py-3 text-white ${isSubmitting ? 'cursor-not-allowed bg-gray-300' : 'cursor-pointer bg-green-600'}`}
+                                            disabled={isSubmitting || estimate.hasInvoice}
+                                            title={estimate.hasInvoice ? '請求書作成済みのため更新できません' : undefined}
+                                            className={`rounded border-0 px-6 py-3 text-white ${isSubmitting || estimate.hasInvoice ? 'cursor-not-allowed bg-gray-300' : 'cursor-pointer bg-green-600'}`}
                                         >
-                                            {isSubmitting ? '保存中...' : '更新（本見積）'}
+                                            {isSubmitting ? '保存中...' : estimate.hasInvoice ? '更新不可（請求書作成済み）' : '更新（本見積）'}
                                         </button>
                                     )}
                                     <div className="flex items-center gap-3 text-sm">

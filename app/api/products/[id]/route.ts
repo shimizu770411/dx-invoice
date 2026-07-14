@@ -84,6 +84,8 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
         if (body.isMultiSelect !== undefined) updateData.isMultiSelect = Boolean(body.isMultiSelect)
         if (body.multiSelectMerge !== undefined) updateData.multiSelectMerge = Boolean(body.multiSelectMerge)
         if (body.hasVariantGroups !== undefined) updateData.hasVariantGroups = Boolean(body.hasVariantGroups)
+        if (body.overwriteDescriptionOnVariantChange !== undefined)
+            updateData.overwriteDescriptionOnVariantChange = Boolean(body.overwriteDescriptionOnVariantChange)
         if (body.defaultDescription !== undefined)
             updateData.defaultDescription = body.defaultDescription || null
 
