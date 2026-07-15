@@ -59,6 +59,7 @@ export interface Invoice {
     items: InvoiceItem[]
     freeItems?: InvoiceFreeItem[]
     customer?: any
+    isPaid?: boolean
     staffConfirmedAt?: string | null
     staffConfirmedBy?: InvoiceConfirmedBy | null
     clerkConfirmedAt?: string | null

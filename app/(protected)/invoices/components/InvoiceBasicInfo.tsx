@@ -7,13 +7,14 @@ import { FormSelect } from '@/components/form/FormSelect'
 
 type Props = {
     control: Control<InvoiceFormData>
+    disabled?: boolean
 }
 
-export function InvoiceBasicInfo({ control }: Props) {
+export function InvoiceBasicInfo({ control, disabled }: Props) {
     return (
         <div className="mb-8">
             <div className="grid grid-cols-2 gap-4">
-                <FormInput name="docNo" control={control} label="請求番号" placeholder="例: INV-0001" />
+                <FormInput name="docNo" control={control} label="請求番号" placeholder="例: INV-0001" disabled={disabled} />
                 <FormSelect
                     name="isMember"
                     control={control}
@@ -22,6 +23,7 @@ export function InvoiceBasicInfo({ control }: Props) {
                         { value: 'false', label: '一般' },
                         { value: 'true', label: '会員' },
                     ]}
+                    disabled={disabled}
                 />
             </div>
         </div>

@@ -210,6 +210,7 @@ model ProductItem {
   multiSelectMerge      Boolean   @default(true)  @map("multi_select_merge")
   hasVariantGroups      Boolean   @default(false) @map("has_variant_groups")
   overwriteDescriptionOnVariantChange Boolean @default(false) @map("overwrite_description_on_variant_change")
+  showProductVariantName Boolean @default(false) @map("show_product_variant_name")
   isActive              Boolean   @default(true) @map("is_active")
   createdAt     DateTime @default(now()) @db.Timestamptz(6) @map("created_at")
   updatedAt     DateTime @updatedAt @db.Timestamptz(6) @map("updated_at")
@@ -264,6 +265,8 @@ model ProductRow {
 
   productItem     ProductItem  @relation(fields: [productItemId], references: [id], onDelete: Cascade)
   variants        ProductRowVariant[]
+  estimateItems   EstimateItem[]
+  invoiceItems    InvoiceItem[]
 
   @@index([productItemId, sortNo])
   @@map("product_rows")
@@ -282,6 +285,8 @@ model ProductRowVariant {
   updatedAt       DateTime     @updatedAt @db.Timestamptz(6) @map("updated_at")
 
   productRow      ProductRow   @relation(fields: [productRowId], references: [id], onDelete: Cascade)
+  estimateItems   EstimateItem[]
+  invoiceItems    InvoiceItem[]
 
   @@index([productRowId, sortNo])
   @@map("product_row_variants")
@@ -406,6 +411,8 @@ model EstimateItem {
   estimate          Estimate      @relation(fields: [estimateId], references: [id], onDelete: Cascade)
   productItem       ProductItem?  @relation(fields: [productItemId], references: [id])
   productVariant    ProductVariant? @relation(fields: [productVariantId], references: [id])
+  productRow        ProductRow?   @relation(fields: [productRowId], references: [id])
+  productRowVariant ProductRowVariant? @relation(fields: [productRowVariantId], references: [id])
   freeItems         EstimateItemFree[]
 
   @@map("estimate_items")
@@ -499,6 +506,8 @@ model InvoiceItem {
   invoice           Invoice          @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   productItem       ProductItem?     @relation(fields: [productItemId], references: [id])
   productVariant     ProductVariant? @relation(fields: [productVariantId], references: [id])
+  productRow        ProductRow?      @relation(fields: [productRowId], references: [id])
+  productRowVariant ProductRowVariant? @relation(fields: [productRowVariantId], references: [id])
   freeItems          InvoiceItemFree[]
 
   @@map("invoice_items")

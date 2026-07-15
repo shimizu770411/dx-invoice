@@ -17,6 +17,7 @@ type Props = {
     handleRemoveFreeItem?: (index: number) => void
     onVariantChange?: (index: number, variant: ProductVariant) => void
     setValue?: UseFormSetValue<InvoiceFormData>
+    readOnly?: boolean
     currentStoreId?: string | null
     onMultiSelectChange?: (index: number, variantIds: string[], options?: { adhocSetScope?: 'NONE' | 'MEMBER_ONLY' | 'BOTH'; isService?: boolean; isMaturityService?: boolean }) => void
     onGroupVariantChange?: (index: number, groupId: string, variantIds: string[]) => void

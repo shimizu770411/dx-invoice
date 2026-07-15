@@ -86,6 +86,8 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
         if (body.hasVariantGroups !== undefined) updateData.hasVariantGroups = Boolean(body.hasVariantGroups)
         if (body.overwriteDescriptionOnVariantChange !== undefined)
             updateData.overwriteDescriptionOnVariantChange = Boolean(body.overwriteDescriptionOnVariantChange)
+        if (body.showProductVariantName !== undefined)
+            updateData.showProductVariantName = Boolean(body.showProductVariantName)
         if (body.defaultDescription !== undefined)
             updateData.defaultDescription = body.defaultDescription || null
 

@@ -67,11 +67,11 @@ export function WakeTab() {
                 </div>
             </div>
 
-            {/* 出棺場所 */}
+            {/* 火葬場名 */}
             <FormInput<CaseFormData>
                 name="departurePlace"
                 control={control}
-                label="出棺場所"
+                label="火葬場名"
                 error={errors.departurePlace}
             />
         </div>

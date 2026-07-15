@@ -19,6 +19,7 @@ import type { InvoiceConfirmationFields } from '@/lib/invoices'
 interface Invoice extends InvoiceConfirmationFields {
     id: string
     docNo?: string | null
+    isPaid?: boolean
 }
 
 interface ContentProps {
@@ -61,6 +62,9 @@ function InvoiceFormContent({
     const [activeTab, setActiveTab] = useState<'items' | 'other'>('items')
     const [showSelectedOptions, setShowSelectedOptions] = useState(false)
 
+    // 入金済みの請求書は編集不可にする
+    const isLocked = !!invoice?.isPaid
+
     const watchedItems = useWatch({ control, name: 'items' })
     const watchedFreeItems = useWatch({ control, name: 'freeItems' })
     const watchedIsMember = useWatch({ control, name: 'isMember' })
@@ -99,9 +103,7 @@ function InvoiceFormContent({
                 const product = (item as any).productItem
                 let description = item.description
                 if (product?.overwriteDescriptionOnVariantChange) {
-                    const defaultVariantId = product.variants?.[0]?.id
-                    const isDefaultVariant = defaultVariantId != null && String(defaultVariantId) === String(variant.id)
-                    description = isDefaultVariant ? (product.defaultDescription ?? '') : product.name
+                    description = variant.name
                     setValue(`items.${index}.description`, description)
                 }
                 return {
@@ -308,6 +310,12 @@ function InvoiceFormContent({
 
                 <InvoiceCustomerSummary customer={customer} />
 
+                {isLocked && (
+                    <div className="mb-4 rounded border border-amber-400 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                        入金済みのため、この請求書は閲覧のみです。
+                    </div>
+                )}
+
                 {/* タブ */}
                 <div className="flex" style={{ borderBottom: '2px solid var(--brand-border)', backgroundColor: '#fbfaf7' }}>
                     <button type="button" onClick={() => setActiveTab('items')} style={tabStyle(activeTab === 'items')}>明　細</button>
@@ -316,9 +324,10 @@ function InvoiceFormContent({
 
                 {/* タブコンテンツ */}
                 <div style={{ backgroundColor: '#ffffff', border: '1px solid var(--brand-border)', borderTop: 'none', padding: '28px 32px' }}>
+                    <fieldset disabled={isLocked} className="contents">
                     {activeTab === 'items' && (
                         <>
-                            <InvoiceBasicInfo control={control} />
+                            <InvoiceBasicInfo control={control} disabled={isLocked} />
 
                             {(errors.items?.root?.message ?? (errors.items as any)?.message) && (
                                 <p
@@ -340,11 +349,13 @@ function InvoiceFormContent({
                                 onMultiSelectChange={handleMultiSelectChange}
                                 onGroupVariantChange={handleGroupVariantChange}
                                 setValue={setValue}
+                                readOnly={isLocked}
                                 currentStoreId={customer?.storeId ? String(customer.storeId) : null}
                             />
                         </>
                     )}
-                    {activeTab === 'other' && <InvoiceOtherFields control={control} />}
+                    {activeTab === 'other' && <InvoiceOtherFields control={control} disabled={isLocked} />}
+                    </fieldset>
                 </div>
 
                 {/* 操作ボタン & 合計（画面下部固定） */}
@@ -393,20 +404,21 @@ function InvoiceFormContent({
                         <div className="flex items-center gap-3">
                             <button
                                 type="submit"
-                                disabled={isSubmitting}
+                                disabled={isSubmitting || isLocked}
+                                title={isLocked ? '入金済みのため更新できません' : undefined}
                                 className="font-mincho transition-colors text-white"
                                 style={{
                                     padding: '12px 44px',
-                                    backgroundColor: isSubmitting ? '#7a7a7a' : 'var(--brand-navy)',
+                                    backgroundColor: isSubmitting || isLocked ? '#7a7a7a' : 'var(--brand-navy)',
                                     border: 'none',
                                     fontSize: '14px',
                                     letterSpacing: '0.4em',
                                     fontWeight: 500,
-                                    cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                                    cursor: isSubmitting || isLocked ? 'not-allowed' : 'pointer',
                                     boxShadow: '0 2px 4px rgba(1, 8, 62, 0.15)',
                                 }}
                             >
-                                {isSubmitting ? '保存中…' : '更　新'}
+                                {isSubmitting ? '保存中…' : isLocked ? '更新不可（入金済み）' : '更　新'}
                             </button>
                             <div className="flex items-center gap-3 text-sm">
                                 <label className="flex items-center gap-1 cursor-pointer">

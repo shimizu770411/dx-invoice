@@ -77,6 +77,8 @@ type DocumentItem = {
         isMultiSelect?: boolean
         multiSelectMerge?: boolean
         hasVariantGroups?: boolean
+        showProductVariantName?: boolean
+        overwriteDescriptionOnVariantChange?: boolean
         variantGroups?: DocumentVariantGroup[]
         rows?: DocumentRow[]
         children?: { id: string; name: string }[]
@@ -591,9 +593,11 @@ export function DocumentItemTable({
                                                             })
 
                                                             // qty を一括更新（フォームを dirty 化）
+                                                            // 返品行（sign=-1）は数量のデフォルトを常に 0 にする
                                                             for (const gi of groupIndexes) {
                                                                 const gItem = items[gi]
-                                                                const defaultQty = gItem?.productRow?.defaultQty ?? 1
+                                                                const isReturnRow = (gItem?.sign ?? 1) === -1
+                                                                const defaultQty = isReturnRow ? 0 : (gItem?.productRow?.defaultQty ?? 1)
                                                                 setValue?.(
                                                                     `items.${gi}.qty` as `items.${number}.qty`,
                                                                     checked ? defaultQty : 0,
@@ -606,6 +610,34 @@ export function DocumentItemTable({
                                                                     checked ? 1 : 0,
                                                                     { shouldDirty: true }
                                                                 )
+                                                                const childItem = items[ci]
+                                                                const childVariantName = childItem?.productVariant?.name
+                                                                if (checked && childItem?.productItem?.overwriteDescriptionOnVariantChange && childVariantName) {
+                                                                    setValue?.(
+                                                                        `items.${ci}.description` as `items.${number}.description`,
+                                                                        childVariantName,
+                                                                        { shouldDirty: true }
+                                                                    )
+                                                                }
+                                                            }
+
+                                                            // canAddFreeRow=ON の商品: チェックを外したら紐づくフリー行の数量を0にリセット（合計計算に残らないようにする）
+                                                            if (!checked) {
+                                                                for (const gi of [...groupIndexes, ...childIndexes]) {
+                                                                    const gItem = items[gi]
+                                                                    if (!gItem?.productItem?.canAddFreeRow) continue
+                                                                    const pid = String(gItem.productItemId ?? '')
+                                                                    const fiIndex = (watchedFreeItems ?? []).findIndex(
+                                                                        (fi: any) => fi?.parentProductItemId && String(fi.parentProductItemId) === pid
+                                                                    )
+                                                                    if (fiIndex >= 0) {
+                                                                        setValue?.(
+                                                                            `freeItems.${fiIndex}.qty` as `freeItems.${number}.qty`,
+                                                                            0,
+                                                                            { shouldDirty: true }
+                                                                        )
+                                                                    }
+                                                                }
                                                             }
                                                         }}
                                                         className="h-5 w-5 cursor-pointer"
@@ -665,6 +697,15 @@ export function DocumentItemTable({
                                                         </span>
                                                     )}
                                                 </div>
+                                                {item?.productItem?.showProductVariantName &&
+                                                    (item?.productVariant?.name ?? item?.productRowVariant?.label) && (
+                                                    <div
+                                                        className="text-xs"
+                                                        style={{ color: 'var(--brand-text-muted)' }}
+                                                    >
+                                                        （{item.productVariant?.name ?? item.productRowVariant?.label}）
+                                                    </div>
+                                                )}
                                             </td>
                                         )}
                                         {(!isGroupableItem || isGroupStart) && (

@@ -93,6 +93,7 @@ export async function POST(request: NextRequest) {
                 canAddFreeRow: Boolean(body.canAddFreeRow),
                 hasVariantGroups: Boolean(body.hasVariantGroups),
                 overwriteDescriptionOnVariantChange: Boolean(body.overwriteDescriptionOnVariantChange),
+                showProductVariantName: Boolean(body.showProductVariantName),
                 defaultDescription: body.defaultDescription || null,
                 variantGroups: Array.isArray(body.groups)
                     ? {

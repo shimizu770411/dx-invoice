@@ -48,7 +48,7 @@ function buildDisplayRows(
             rows.push({
                 label: product.name,
                 estimateItem: null,
-                showProductVariantName: product.name.includes('霊柩車'),
+                showProductVariantName: !!product.showProductVariantName,
             })
         } else {
             // 複数行構成商品（同じ productItemId の複数行）は、1行目のみ品名と摘要を表示
@@ -57,14 +57,14 @@ function buildDisplayRows(
                 rows.push({
                     label: isFirstRow ? product.name : '',
                     estimateItem,
-                    showProductVariantName: isFirstRow && product.name.includes('霊柩車'),
+                    showProductVariantName: isFirstRow && !!product.showProductVariantName,
                     hideDescription: !isFirstRow,
                     isSecondaryRow: !isFirstRow,
                 })
             })
         }
-        // canAddFreeRow=ON の商品はフリー行を直下に追加表示（入力が空でも表示）
-        if (product.canAddFreeRow) {
+        // canAddFreeRow=ON の商品はフリー行を直下に追加表示（親商品が選択されている場合のみ）
+        if (product.canAddFreeRow && itemsForProduct.length > 0) {
             const linkedFi = linkedFreeByProductId.get(String(product.id))
             rows.push({
                 label: linkedFi?.productItemName || '　',
@@ -283,9 +283,14 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
                                                                 ))}
                                                             </div>
                                                             <div className="text-center">
-                                                                {row.estimateItem && row.showProductVariantName
-                                                                    ? `(${row.estimateItem?.productVariant?.name})`
-                                                                    : ''}
+                                                                {(() => {
+                                                                    const variantLabel =
+                                                                        row.estimateItem?.productVariant?.name ??
+                                                                        row.estimateItem?.productRowVariant?.label
+                                                                    return row.estimateItem && row.showProductVariantName && variantLabel
+                                                                        ? `(${variantLabel})`
+                                                                        : ''
+                                                                })()}
                                                             </div>
                                                         </>
                                                     )

@@ -35,6 +35,8 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
                             },
                         },
                         productVariant: true,
+                        productRow: true,
+                        productRowVariant: true,
                         freeItems: {
                             orderBy: { sortNo: 'asc' },
                         },

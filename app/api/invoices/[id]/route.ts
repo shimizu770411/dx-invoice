@@ -35,6 +35,8 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
                             },
                         },
                         productVariant: true,
+                        productRow: true,
+                        productRowVariant: true,
                         freeItems: {
                             orderBy: { sortNo: 'asc' },
                         },
@@ -44,12 +46,19 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
                 staffConfirmedBy: { select: { id: true, name: true } },
                 clerkConfirmedBy: { select: { id: true, name: true } },
                 approverConfirmedBy: { select: { id: true, name: true } },
+                payments: {
+                    where: { targetType: 'INVOICE' },
+                    orderBy: { createdAt: 'desc' },
+                    take: 1,
+                },
             },
         })
 
         if (!invoice) {
             return NextResponse.json({ error: '請求書が見つかりません' }, { status: 404 })
         }
+
+        const isPaid = invoice.payments[0]?.status === 'PAID'
 
         // 会費入金額を計算
         const membershipPaidAmount = invoice.customer.memberships.reduce(
@@ -82,6 +91,8 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
                     })),
                 },
                 membershipPaidAmount,
+                isPaid,
+                payments: undefined,
                 freeItems: allFreeItems,
                 items: invoice.items.map((item: any) => ({
                     ...item,

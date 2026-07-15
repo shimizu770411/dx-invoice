@@ -85,6 +85,8 @@ export default function ProductEditPage() {
     const [defaultDescription, setDefaultDescription] = useState('')
     // 初期商品以外の種類を選択した場合、摘要を商品名で上書きするか
     const [overwriteDescriptionOnVariantChange, setOverwriteDescriptionOnVariantChange] = useState(false)
+    // 見積/請求書/PDFの品名欄の下に、選択した種類名を括弧書きで表示するか
+    const [showProductVariantName, setShowProductVariantName] = useState(false)
     const [childIds, setChildIds] = useState<string[]>([])
     const [variants, setVariants] = useState<VariantRow[]>([])
     // 複数行構成商品
@@ -247,6 +249,7 @@ export default function ProductEditPage() {
         setIsMaturityServiceable(product.isMaturityServiceable ?? false)
         setDefaultDescription(product.defaultDescription ?? '')
         setOverwriteDescriptionOnVariantChange((product as any).overwriteDescriptionOnVariantChange ?? false)
+        setShowProductVariantName((product as any).showProductVariantName ?? false)
         setChildIds((product.children || []).map((c: any) => String(c.id)))
         setIsMultiRow((product as any).isMultiRow ?? false)
         setCanAddFreeRow((product as any).canAddFreeRow ?? false)
@@ -351,6 +354,7 @@ export default function ProductEditPage() {
                 isMaturityServiceable,
                 defaultDescription: defaultDescription.trim() || null,
                 overwriteDescriptionOnVariantChange,
+                showProductVariantName,
                 isMultiRow,
                 canAddFreeRow,
                 isMultiSelect,
@@ -876,7 +880,18 @@ export default function ProductEditPage() {
                             checked={overwriteDescriptionOnVariantChange}
                             onChange={(e) => setOverwriteDescriptionOnVariantChange(e.target.checked)}
                         />
-                        初期商品以外を選択した場合は、摘要に商品名を反映する
+                        種類を選択した場合は、摘要に商品名を反映する
+                    </label>
+                    <label
+                        className="flex items-center gap-2 font-mincho"
+                        style={{ marginTop: '10px', fontSize: '14px', color: 'var(--brand-text)', letterSpacing: '0.1em' }}
+                    >
+                        <input
+                            type="checkbox"
+                            checked={showProductVariantName}
+                            onChange={(e) => setShowProductVariantName(e.target.checked)}
+                        />
+                        見積/請求書/PDFの品名の下に、選択した種類名を括弧書きで表示する
                     </label>
                 </div>
 

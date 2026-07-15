@@ -13,6 +13,7 @@ export type PdfProductItem = {
     isMultiSelect?: boolean
     multiSelectMerge?: boolean
     hasVariantGroups?: boolean
+    showProductVariantName?: boolean
     variants?: { id: string; name: string }[]
 }
 
@@ -28,6 +29,7 @@ export type PdfDocumentItem = {
         isMaturityServiceable?: boolean
     } | null
     productVariant?: { name?: string; imageUrl?: string | null; isDefaultSet?: boolean; setPrice?: number } | null
+    productRowVariant?: { label?: string } | null
     description?: string | null
     multiSelectVariantIds?: string | null
     qty: number
@@ -219,7 +221,7 @@ function buildDisplayRows(
                 rows.push({
                     label: isFirstRow ? product.name : '',
                     estimateItem,
-                    showProductVariantName: isFirstRow && product.name.includes('霊柩車'),
+                    showProductVariantName: isFirstRow && !!product.showProductVariantName,
                     hideDescription: isEachMode ? false : !isFirstRow,
                     isSecondaryRow: !isFirstRow,
                     displayDescription,
@@ -227,8 +229,8 @@ function buildDisplayRows(
                 })
             })
         }
-        // canAddFreeRow=ON の商品はフリー行を直下に追加表示（入力が空でも表示）
-        if (product.canAddFreeRow) {
+        // canAddFreeRow=ON の商品はフリー行を直下に追加表示（親商品が選択されている場合のみ）
+        if (product.canAddFreeRow && itemsForProduct.length > 0) {
             const linkedFi = linkedFreeByProductId.get(String(product.id))
             rows.push({
                 label: linkedFi?.productItemName || '　',
@@ -574,11 +576,14 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                                                 ))}
                                                             </div>
                                                             <div className="text-center">
-                                                                {row.estimateItem &&
-                                                                row.showProductVariantName &&
-                                                                row.estimateItem?.productVariant?.name
-                                                                    ? `(${row.estimateItem.productVariant.name})`
-                                                                    : ''}
+                                                                {(() => {
+                                                                    const variantLabel =
+                                                                        row.estimateItem?.productVariant?.name ??
+                                                                        row.estimateItem?.productRowVariant?.label
+                                                                    return row.estimateItem && row.showProductVariantName && variantLabel
+                                                                        ? `(${variantLabel})`
+                                                                        : ''
+                                                                })()}
                                                             </div>
                                                         </>
                                                     )
@@ -594,10 +599,12 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                                     {row.displayDescription ?? row.estimateItem?.description ?? ''}
                                                 </div>
                                                 <div>
-                                                    {/* 数量が1より大きい場合のみ表示。親付きフリー行（満期サービス以外）は qty=1 でも常に数量を表示。 */}
-                                                    {row.estimateItem &&
-                                                    (row.estimateItem.qty > 1 ||
-                                                        (row.isFreeItem && row.isFixedRow && !row.isMaturity))
+                                                    {/* 複数行構成商品(単価×数量型)は「数量 × 単価」を表示。それ以外は数量が1より大きい場合のみ表示。親付きフリー行（満期サービス以外）は qty=1 でも常に数量を表示。 */}
+                                                    {row.estimateItem && isMultiRowItem(row.estimateItem) && row.estimateItem.calcType === 'UNIT_PRICE_X_QTY'
+                                                        ? `${row.estimateItem.qty.toLocaleString()} × ¥${fmtAmount(isMember ? row.estimateItem.unitPriceMember : row.estimateItem.unitPriceGeneral)}`
+                                                        : row.estimateItem &&
+                                                          (row.estimateItem.qty > 1 ||
+                                                              (row.isFreeItem && row.isFixedRow && !row.isMaturity))
                                                         ? `数量: ${row.estimateItem.qty.toLocaleString()}`
                                                         : ''}
                                                     {row.isFreeItem && !row.isFixedRow && row.estimateItem

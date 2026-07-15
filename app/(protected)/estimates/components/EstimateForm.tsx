@@ -76,6 +76,10 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
         }
     }, [mode, estimate?.estimateType, estimate?.status])
 
+    // 事前相談見積（本見積作成済み）、または請求書作成済みの本見積は編集不可にする
+    const isLocked =
+        mode === 'edit' && (isConfirmed || (estimate?.estimateType === 'FORMAL' && !!estimate?.hasInvoice))
+
     const handleVariantChange = (
         index: number,
         variant: ProductVariant | null,
@@ -110,9 +114,7 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                 const product = (item as any).productItem
                 let description = item.description
                 if (product?.overwriteDescriptionOnVariantChange) {
-                    const defaultVariantId = product.variants?.[0]?.id
-                    const isDefaultVariant = defaultVariantId != null && String(defaultVariantId) === String(variant.id)
-                    description = isDefaultVariant ? (product.defaultDescription ?? '') : product.name
+                    description = variant.name
                     setValue(`items.${index}.description`, description)
                 }
                 return {
@@ -301,7 +303,7 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
         ? '見積書 作成'
         : estimate?.estimateType === 'FORMAL' ? '本見積 編集' : '事前相談見積 編集'
 
-    const showTotals = itemsViewMode === 'list' || (mode === 'edit' && isConfirmed)
+    const showTotals = itemsViewMode === 'list' || isLocked
 
     return (
         <FormProvider {...methods}>
@@ -342,6 +344,12 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                     </div>
                 )}
 
+                {mode === 'edit' && !isConfirmed && estimate?.estimateType === 'FORMAL' && estimate?.hasInvoice && (
+                    <div className="mb-4 rounded border border-amber-400 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                        請求書が作成済みのため、この本見積は閲覧のみです。
+                    </div>
+                )}
+
                 <EstimateCustomerSummary customer={customer} />
 
                 {/* タブ */}
@@ -352,13 +360,13 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
 
                 {/* タブコンテンツ */}
                 <div style={{ backgroundColor: '#ffffff', border: '1px solid var(--brand-border)', borderTop: 'none', padding: '28px 32px' }}>
-                    <fieldset disabled={mode === 'edit' && isConfirmed} className="contents">
+                    <fieldset disabled={isLocked} className="contents">
                         {activeTab === 'items' && (
                             <>
                                 <EstimateBasicInfo
                                     control={control}
                                     isNew={mode === 'create'}
-                                    disabled={mode === 'edit' && isConfirmed}
+                                    disabled={isLocked}
                                 />
                                 {(errors.items?.root?.message ?? (errors.items as any)?.message) && (
                                     <p
@@ -369,7 +377,7 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                                     </p>
                                 )}
 
-                                {!(mode === 'edit' && isConfirmed) && (
+                                {!isLocked && (
                                     <div className="mb-5 flex items-center gap-1">
                                         <span className="font-garamond mr-3" style={{ fontSize: '11px', color: 'var(--brand-gold-soft)', letterSpacing: '0.3em' }}>
                                             MODE
@@ -403,7 +411,7 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                                     </div>
                                 )}
 
-                                {itemsViewMode === 'list' || (mode === 'edit' && isConfirmed) ? (
+                                {itemsViewMode === 'list' || isLocked ? (
                                     <EstimateItemTable
                                         items={items}
                                         fields={itemFields}
@@ -415,7 +423,7 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                                         onMultiSelectChange={handleMultiSelectChange}
                                         onGroupVariantChange={handleGroupVariantChange}
                                         setValue={setValue}
-                                        readOnly={mode === 'edit' && isConfirmed}
+                                        readOnly={isLocked}
                                         currentStoreId={customer?.storeId ? String(customer.storeId) : null}
                                     />
                                 ) : (
@@ -437,7 +445,7 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                             </>
                         )}
                         {activeTab === 'other' && (
-                            <EstimateOtherFields control={control} disabled={mode === 'edit' && isConfirmed} />
+                            <EstimateOtherFields control={control} disabled={isLocked} />
                         )}
                     </fieldset>
                 </div>
