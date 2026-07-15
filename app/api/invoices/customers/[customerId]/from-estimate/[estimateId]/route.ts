@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-middleware'
 import { serializeBigInt } from '@/lib/prisma-utils'
 import { calculateDocumentTotals } from '@/lib/documentTotals'
-import { buildDocNoPrefix, buildDocNo } from '@/lib/documentUtils'
+import { buildDocNoPrefix, buildDocNo, pickLatestValidDocNo } from '@/lib/documentUtils'
 
 export async function POST(
     request: NextRequest,
@@ -58,11 +58,12 @@ export async function POST(
 
         // docNo の自動採番: customers.reception_atの年月(yyyymm) + 同プレフィックスの最大連番+1(3桁)
         const prefix = buildDocNoPrefix(estimate.customer.receptionAt)
-        const latestDoc = await prisma.invoice.findFirst({
+        const candidateDocs = await prisma.invoice.findMany({
             where: { docNo: { startsWith: prefix } },
-            orderBy: { docNo: 'desc' },
+            select: { docNo: true },
         })
-        const autoDocNo = buildDocNo(prefix, latestDoc?.docNo)
+        const latestDocNo = pickLatestValidDocNo(candidateDocs.map((d) => d.docNo))
+        const autoDocNo = buildDocNo(prefix, latestDocNo)
 
         const invoice = await prisma.invoice.create({
             data: {

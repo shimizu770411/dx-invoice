@@ -1,11 +1,19 @@
 import { z } from 'zod'
 import { documentItemFieldSchema, documentFreeItemFieldSchema } from '@/lib/documentSchema'
+import { isValidDocNo } from '@/lib/documentUtils'
 
 export const estimateItemFieldSchema = documentItemFieldSchema
 export const estimateFreeItemFieldSchema = documentFreeItemFieldSchema
 
+// 見積番号: 空欄(自動採番) または yyyymm+3桁連番の9桁数字のみ許可
+const docNoSchema = z
+    .string()
+    .refine((val) => val === '' || isValidDocNo(val), {
+        message: '見積番号は空欄、または9桁の数字（例: 202607001）で入力してください',
+    })
+
 export const estimateFormSchema = z.object({
-    docNo: z.string(),
+    docNo: docNoSchema,
     status: z.string(),
     isMember: z.string(),
     cremationProcessType: z.string(),

@@ -17,6 +17,7 @@ interface FormInputProps<T extends FieldValues> {
     max?: number | string
     minYear?: number
     maxYear?: number
+    maxLength?: number
 }
 
 export function FormInput<T extends FieldValues>({
@@ -34,6 +35,7 @@ export function FormInput<T extends FieldValues>({
     max,
     minYear,
     maxYear,
+    maxLength,
 }: FormInputProps<T>) {
     const errorMessage = error && 'message' in error ? (error.message as string) : undefined
 
@@ -70,6 +72,7 @@ export function FormInput<T extends FieldValues>({
                     max={max}
                     minYear={minYear}
                     maxYear={maxYear}
+                    maxLength={maxLength}
                 />
             )}
         />

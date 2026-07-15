@@ -697,7 +697,8 @@ export function DocumentItemTable({
                                                         </span>
                                                     )}
                                                 </div>
-                                                {item?.productItem?.showProductVariantName &&
+                                                {groupAnyChecked &&
+                                                    item?.productItem?.showProductVariantName &&
                                                     (item?.productVariant?.name ?? item?.productRowVariant?.label) && (
                                                     <div
                                                         className="text-xs"

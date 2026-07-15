@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-middleware'
 import { serializeBigInt } from '@/lib/prisma-utils'
 import { calculateDocumentTotals } from '@/lib/documentTotals'
+import { isValidDocNo } from '@/lib/documentUtils'
 
 export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
     const params = await props.params
@@ -127,6 +128,23 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
 
         const { id } = params
         const data = await request.json()
+
+        if (data.docNo && !isValidDocNo(data.docNo)) {
+            return NextResponse.json(
+                { error: '見積番号は空欄、または9桁の数字（例: 202607001）で入力してください' },
+                { status: 400 }
+            )
+        }
+
+        if (data.docNo) {
+            const duplicate = await prisma.estimate.findUnique({ where: { docNo: data.docNo } })
+            if (duplicate && duplicate.id.toString() !== id) {
+                return NextResponse.json(
+                    { error: `見積番号「${data.docNo}」は既に他の見積で使用されています` },
+                    { status: 400 }
+                )
+            }
+        }
 
         // 見積を取得
         const estimate = await prisma.estimate.findUnique({

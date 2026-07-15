@@ -16,6 +16,7 @@ interface InputUIProps {
     max?: number | string
     minYear?: number
     maxYear?: number
+    maxLength?: number
 }
 
 export function InputUI({
@@ -34,6 +35,7 @@ export function InputUI({
     max,
     minYear,
     maxYear,
+    maxLength,
 }: InputUIProps) {
     const isDateType = type === 'date' || type === 'datetime-local'
     const minValue =
@@ -70,6 +72,7 @@ export function InputUI({
                     type={type}
                     min={minValue}
                     max={maxValue}
+                    maxLength={maxLength}
                     placeholder={placeholder}
                     disabled={disabled}
                     className={`w-full rounded border px-3 py-2 text-xl focus:outline-none ${error ? 'border-red-500' : 'border-gray-300'} ${disabled ? 'cursor-not-allowed bg-gray-100 opacity-60' : ''}`}

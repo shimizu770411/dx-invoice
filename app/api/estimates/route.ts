@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-middleware'
 import { serializeBigInt } from '@/lib/prisma-utils'
 import { calculateDocumentTotals } from '@/lib/documentTotals'
-import { buildDocNoPrefix, buildDocNo } from '@/lib/documentUtils'
+import { buildDocNoPrefix, buildDocNo, isValidDocNo, pickLatestValidDocNo } from '@/lib/documentUtils'
 
 export async function GET(request: NextRequest) {
     try {
@@ -104,6 +104,23 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'customerId は必須です' }, { status: 400 })
         }
 
+        if (data.docNo && !isValidDocNo(data.docNo)) {
+            return NextResponse.json(
+                { error: '見積番号は空欄、または9桁の数字（例: 202607001）で入力してください' },
+                { status: 400 }
+            )
+        }
+
+        if (data.docNo) {
+            const duplicate = await prisma.estimate.findUnique({ where: { docNo: data.docNo } })
+            if (duplicate) {
+                return NextResponse.json(
+                    { error: `見積番号「${data.docNo}」は既に他の見積で使用されています` },
+                    { status: 400 }
+                )
+            }
+        }
+
         // 顧客を取得
         const customer = await prisma.customer.findUnique({
             where: { id: BigInt(customerId) },
@@ -138,11 +155,12 @@ export async function POST(request: NextRequest) {
 
         // docNo の自動採番: customers.reception_atの年月(yyyymm) + 同プレフィックスの最大連番+1(3桁)
         const prefix = buildDocNoPrefix(customer.receptionAt)
-        const latestDoc = await prisma.estimate.findFirst({
+        const candidateDocs = await prisma.estimate.findMany({
             where: { docNo: { startsWith: prefix } },
-            orderBy: { docNo: 'desc' },
+            select: { docNo: true },
         })
-        const docNo = buildDocNo(prefix, latestDoc?.docNo, data.docNo)
+        const latestDocNo = pickLatestValidDocNo(candidateDocs.map((d) => d.docNo))
+        const docNo = buildDocNo(prefix, latestDocNo, data.docNo)
 
         // 見積を作成
         const estimate = await prisma.estimate.create({

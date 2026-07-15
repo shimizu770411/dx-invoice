@@ -195,3 +195,18 @@ export function buildDocNo(prefix: string, latestDocNo: string | null | undefine
     const nextSeq = latestDocNo ? parseInt(latestDocNo.slice(6)) + 1 : 1
     return `${prefix}${String(nextSeq).padStart(3, '0')}`
 }
+
+// docNo の形式チェック: yyyymm(6桁) + 連番(3桁) の9桁数字のみを正とする
+export const DOC_NO_LENGTH = 9
+const DOC_NO_PATTERN = new RegExp(`^\\d{${DOC_NO_LENGTH}}$`)
+export function isValidDocNo(docNo: string): boolean {
+    return DOC_NO_PATTERN.test(docNo)
+}
+
+// 同一プレフィックスの docNo 群から、正しい形式のもののみを対象に最新（数値最大）の値を選ぶ。
+// 文字列ソートでは桁数の異なる不正値（例: 手入力の "20260714"）が誤って最新扱いされるため、数値比較する。
+export function pickLatestValidDocNo(docNos: (string | null | undefined)[]): string | null {
+    const valid = docNos.filter((d): d is string => !!d && isValidDocNo(d))
+    if (valid.length === 0) return null
+    return valid.reduce((max, cur) => (Number(cur) > Number(max) ? cur : max))
+}

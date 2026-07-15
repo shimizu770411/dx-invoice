@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-middleware'
 import { serializeBigInt } from '@/lib/prisma-utils'
 import { calculateDocumentTotals } from '@/lib/documentTotals'
-import { buildDocNoPrefix, buildDocNo } from '@/lib/documentUtils'
+import { buildDocNoPrefix, buildDocNo, isValidDocNo, pickLatestValidDocNo } from '@/lib/documentUtils'
 
 export async function POST(request: NextRequest, props: { params: Promise<{ customerId: string }> }) {
     const params = await props.params
@@ -16,6 +16,23 @@ export async function POST(request: NextRequest, props: { params: Promise<{ cust
 
         const { customerId } = params
         const data = await request.json()
+
+        if (data.docNo && !isValidDocNo(data.docNo)) {
+            return NextResponse.json(
+                { error: '請求番号は空欄、または9桁の数字（例: 202607001）で入力してください' },
+                { status: 400 }
+            )
+        }
+
+        if (data.docNo) {
+            const duplicate = await prisma.invoice.findUnique({ where: { docNo: data.docNo } })
+            if (duplicate) {
+                return NextResponse.json(
+                    { error: `請求番号「${data.docNo}」は既に他の請求書で使用されています` },
+                    { status: 400 }
+                )
+            }
+        }
 
         // 顧客を取得
         const customer = await prisma.customer.findUnique({
@@ -51,11 +68,12 @@ export async function POST(request: NextRequest, props: { params: Promise<{ cust
 
         // docNo の自動採番: customers.reception_atの年月(yyyymm) + 同プレフィックスの最大連番+1(3桁)
         const prefix = buildDocNoPrefix(customer.receptionAt)
-        const latestDoc = await prisma.invoice.findFirst({
+        const candidateDocs = await prisma.invoice.findMany({
             where: { docNo: { startsWith: prefix } },
-            orderBy: { docNo: 'desc' },
+            select: { docNo: true },
         })
-        const docNo = buildDocNo(prefix, latestDoc?.docNo, data.docNo)
+        const latestDocNo = pickLatestValidDocNo(candidateDocs.map((d) => d.docNo))
+        const docNo = buildDocNo(prefix, latestDocNo, data.docNo)
 
         const invoice = await prisma.invoice.create({
             data: {
