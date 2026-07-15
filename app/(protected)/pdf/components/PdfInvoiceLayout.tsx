@@ -3,6 +3,7 @@ import { PdfCompanyAd } from './PdfCompanyAd'
 import { PdfMembershipTable } from './PdfMembershipTable'
 import { resolveProductImageUrl } from '@/lib/utils'
 import { scopeApplies } from '@/lib/productScope'
+import { computeMultiRowAmount } from '@/lib/expandMultiRow'
 
 export type PdfProductItem = {
     id: string
@@ -36,6 +37,9 @@ export type PdfDocumentItem = {
     isService?: boolean
     isMaturityService?: boolean
     adhocSetScope?: 'NONE' | 'MEMBER_ONLY' | 'GENERAL_ONLY' | 'BOTH'
+    productRowId?: string | null
+    calcType?: 'FIXED' | 'UNIT_PRICE_X_QTY' | null
+    sign?: number | null
     sortNo: number
 }
 
@@ -352,9 +356,15 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
         isServiceIncludedFor(item, isMember) ||
         (isMaturityServiceIncludedFor(item) && isMember)
 
+    // 複数行構成商品（親子セットの加算/返品ペア等）は sign（符号）を考慮して計算する
+    const isMultiRowItem = (item: PdfDocumentItem): boolean => !!(item.productRowId && item.calcType)
+    const multiRowAmount = (item: PdfDocumentItem, unitPrice: number): number =>
+        computeMultiRowAmount({ calcType: item.calcType, sign: item.sign ?? 1, unitPrice, qty: item.qty })
+
     // 会員価格（セット扱い / サービス扱いの行は除外）
     const itemsMemberSubtotal = items.reduce((sum, item) => {
         if (isExcludedFor(item, true)) return sum
+        if (isMultiRowItem(item)) return sum + multiRowAmount(item, item.unitPriceMember)
         return sum + (item.unitPriceMember * item.qty || 0)
     }, 0)
     const memberSubtotal = itemsMemberSubtotal + freeSubtotal
@@ -363,6 +373,7 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
     // 一般価格（一般モード時に該当する行のみ除外）
     const itemsGeneralSubtotal = items.reduce((sum, item) => {
         if (isExcludedFor(item, false)) return sum
+        if (isMultiRowItem(item)) return sum + multiRowAmount(item, item.unitPriceGeneral)
         return sum + (item.unitPriceGeneral * item.qty || 0)
     }, 0)
     const generalSubtotal = itemsGeneralSubtotal + freeSubtotal
@@ -609,7 +620,9 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                                         </span>
                                                     ) : (
                                                         fmtAmount(
-                                                            row.estimateItem.unitPriceGeneral * row.estimateItem.qty
+                                                            isMultiRowItem(row.estimateItem)
+                                                                ? multiRowAmount(row.estimateItem, row.estimateItem.unitPriceGeneral)
+                                                                : row.estimateItem.unitPriceGeneral * row.estimateItem.qty
                                                         )
                                                     )
                                                 ) : (
@@ -634,8 +647,9 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                                         </span>
                                                     ) : (
                                                         fmtAmount(
-                                                            row.estimateItem.unitPriceMember *
-                                                                row.estimateItem.qty
+                                                            isMultiRowItem(row.estimateItem)
+                                                                ? multiRowAmount(row.estimateItem, row.estimateItem.unitPriceMember)
+                                                                : row.estimateItem.unitPriceMember * row.estimateItem.qty
                                                         )
                                                     )
                                                 ) : (
