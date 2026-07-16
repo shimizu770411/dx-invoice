@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { logout } from '@/lib/auth'
 
+const IS_LOCAL = process.env.NEXT_PUBLIC_IS_LOCAL === 'true'
+
 export default function Navigation() {
     const pathname = usePathname()
 
@@ -28,10 +30,10 @@ export default function Navigation() {
         <nav
             className="relative flex items-center justify-between px-8"
             style={{
-                backgroundColor: 'var(--brand-navy-dark)',
+                backgroundColor: IS_LOCAL ? '#1B4332' : 'var(--brand-navy-dark)',
                 color: '#ffffff',
                 height: '68px',
-                borderBottom: '3px solid var(--brand-gold)',
+                borderBottom: IS_LOCAL ? '3px solid #52b788' : '3px solid var(--brand-gold)',
                 boxShadow: '0 2px 12px rgba(1, 8, 62, 0.2)',
             }}
         >
@@ -66,6 +68,23 @@ export default function Navigation() {
                     >
                         FUNERAL SYSTEM
                     </span>
+                    {IS_LOCAL && (
+                        <span
+                            className="font-garamond"
+                            style={{
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                color: '#1B4332',
+                                backgroundColor: '#95d5b2',
+                                letterSpacing: '0.2em',
+                                lineHeight: 1,
+                                padding: '4px 10px',
+                                borderRadius: '3px',
+                            }}
+                        >
+                            開発環境
+                        </span>
+                    )}
                 </Link>
 
                 <div className="flex items-stretch">

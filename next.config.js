@@ -25,6 +25,8 @@ const nextConfig = {
     // 環境変数
     env: {
         NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || (process.env.VERCEL ? '/api' : 'http://localhost:3000'),
+        // ヘッダー色の切り替え用: Vercel本番以外（ローカル docker 等）を判定
+        NEXT_PUBLIC_IS_LOCAL: process.env.VERCEL_ENV === 'production' ? 'false' : 'true',
     },
 
     // Turbopack設定（Next.js 16でTurbopackがデフォルトのため）
