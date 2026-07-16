@@ -4,6 +4,8 @@ import { requireAuth } from '@/lib/auth-middleware'
 import { serializeBigInt } from '@/lib/prisma-utils'
 import { calculateDocumentTotals } from '@/lib/documentTotals'
 import { isValidDocNo } from '@/lib/documentUtils'
+import { recordOperationLog } from '@/lib/operationLog'
+import { OperationAction, OperationEntityType } from '@phoenix-jpn/db'
 
 export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
     const params = await props.params
@@ -276,6 +278,14 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
         const updated = await prisma.invoice.findUnique({
             where: { id: BigInt(id) },
             include: { customer: true, items: true },
+        })
+
+        await recordOperationLog({
+            userId: authResult.payload.sub,
+            action: OperationAction.UPDATE,
+            entityType: OperationEntityType.INVOICE,
+            entityId: updated!.id,
+            docNo: updated!.docNo,
         })
 
         // レスポンスを返す

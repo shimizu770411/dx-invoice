@@ -4,6 +4,8 @@ import { requireAuth } from '@/lib/auth-middleware'
 import { serializeBigInt } from '@/lib/prisma-utils'
 import { calculateDocumentTotals } from '@/lib/documentTotals'
 import { buildDocNoPrefix, buildDocNo, isValidDocNo, pickLatestValidDocNo } from '@/lib/documentUtils'
+import { recordOperationLog } from '@/lib/operationLog'
+import { OperationAction, OperationEntityType } from '@phoenix-jpn/db'
 
 export async function GET(request: NextRequest) {
     try {
@@ -265,6 +267,14 @@ export async function POST(request: NextRequest) {
                 })),
             })
         }
+
+        await recordOperationLog({
+            userId: authResult.payload.sub,
+            action: OperationAction.CREATE,
+            entityType: OperationEntityType.ESTIMATE,
+            entityId: estimate.id,
+            docNo: estimate.docNo,
+        })
 
         return NextResponse.json(
             serializeBigInt({

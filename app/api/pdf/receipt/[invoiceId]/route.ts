@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth-middleware'
 import { getBrowser } from '@/lib/puppeteer'
+import { prisma } from '@/lib/prisma'
+import { recordReceiptIssue } from '@/lib/operationLog'
 
 /** Vercel Serverless 最大実行時間（秒） */
 export const maxDuration = 60
@@ -65,6 +67,16 @@ export async function GET(request: NextRequest, props: { params: Promise<{ invoi
             printBackground: true,
         })
         await page.close()
+
+        const invoice = await prisma.invoice.findUnique({
+            where: { id: BigInt(invoiceId) },
+            select: { docNo: true },
+        })
+        await recordReceiptIssue({
+            userId: authResult.payload.sub,
+            invoiceId: BigInt(invoiceId),
+            docNo: invoice?.docNo,
+        })
 
         const isDownload = request.nextUrl.searchParams.has('download')
         const dateStr = new Date().toISOString().split('T')[0]

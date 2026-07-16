@@ -49,6 +49,19 @@ enum PaymentStatus {
   CANCELLED
 }
 
+enum OperationAction {
+  CREATE
+  UPDATE
+  ISSUE_PDF
+  REISSUE_PDF
+}
+
+enum OperationEntityType {
+  ESTIMATE
+  INVOICE
+  RECEIPT
+}
+
 model User {
   id         BigInt   @id @default(autoincrement())
   name       String   @db.VarChar(100)
@@ -66,6 +79,7 @@ model User {
   staffConfirmedInvoices    Invoice[] @relation("InvoiceStaffConfirmedBy")
   clerkConfirmedInvoices    Invoice[] @relation("InvoiceClerkConfirmedBy")
   approverConfirmedInvoices Invoice[] @relation("InvoiceApproverConfirmedBy")
+  operationLogs             OperationLog[]
 
   @@map("users")
 }
@@ -644,4 +658,20 @@ model CompanyProfile {
   updatedAt     DateTime @updatedAt @db.Timestamptz(6) @map("updated_at")
 
   @@map("company_profiles")
+}
+
+model OperationLog {
+  id         BigInt              @id @default(autoincrement())
+  userId     BigInt?             @map("user_id")
+  action     OperationAction
+  entityType OperationEntityType @map("entity_type")
+  entityId   BigInt?             @map("entity_id")
+  docNo      String?             @db.VarChar(30) @map("doc_no")
+  occurredAt DateTime            @default(now()) @db.Timestamptz(6) @map("occurred_at")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([userId, occurredAt])
+  @@index([entityType, action, occurredAt])
+  @@map("operation_logs")
 }

@@ -4,6 +4,8 @@ import { requireAuth } from '@/lib/auth-middleware'
 import { serializeBigInt } from '@/lib/prisma-utils'
 import { calculateDocumentTotals } from '@/lib/documentTotals'
 import { buildDocNoPrefix, buildDocNo, isValidDocNo, pickLatestValidDocNo } from '@/lib/documentUtils'
+import { recordOperationLog } from '@/lib/operationLog'
+import { OperationAction, OperationEntityType } from '@phoenix-jpn/db'
 
 export async function POST(request: NextRequest, props: { params: Promise<{ customerId: string }> }) {
     const params = await props.params
@@ -163,6 +165,14 @@ export async function POST(request: NextRequest, props: { params: Promise<{ cust
                 })),
             })
         }
+
+        await recordOperationLog({
+            userId: authResult.payload.sub,
+            action: OperationAction.CREATE,
+            entityType: OperationEntityType.INVOICE,
+            entityId: invoice.id,
+            docNo: invoice.docNo,
+        })
 
         // レスポンスを返す
         return NextResponse.json(
