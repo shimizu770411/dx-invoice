@@ -39,7 +39,7 @@ export function CaseFormTabs({ activeTab, onTabChange }: CaseFormTabsProps) {
         { key: 'funeralInfo', label: '葬儀情報' },
         { key: 'membership1', label: '互助会員１' },
         { key: 'membership2', label: '互助会員２' },
-        { key: 'membership3', label: '互助会員３' },
+        { key: 'membership3', label: 'その他' },
     ]
 
     const renderTab = (tab: { key: TabKey; label: string }) => {
