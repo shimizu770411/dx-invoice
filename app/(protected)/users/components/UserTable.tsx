@@ -66,6 +66,7 @@ export function UserTable({ users, onEdit, currentUserId, currentUserIsAdmin }: 
                             <tr
                                 key={user.id}
                                 className="transition-colors"
+                                style={{ opacity: user.isActive === false ? 0.55 : 1 }}
                                 onMouseEnter={(e) => {
                                     e.currentTarget.style.backgroundColor = 'var(--brand-ivory)'
                                 }}
@@ -132,6 +133,23 @@ export function UserTable({ users, onEdit, currentUserId, currentUserIsAdmin }: 
                                                 }}
                                             >
                                                 管理者
+                                            </span>
+                                        )}
+                                        {user.isActive === false && (
+                                            <span
+                                                className="font-mincho"
+                                                style={{
+                                                    display: 'inline-block',
+                                                    padding: '3px 10px',
+                                                    fontSize: '12px',
+                                                    letterSpacing: '0.1em',
+                                                    backgroundColor: '#f0eee8',
+                                                    color: 'var(--brand-text-muted)',
+                                                    border: '1px solid var(--brand-border)',
+                                                    fontWeight: 600,
+                                                }}
+                                            >
+                                                非表示
                                             </span>
                                         )}
                                         {user.requirePasswordChange && (

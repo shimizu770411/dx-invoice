@@ -2,19 +2,22 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { logout } from '@/lib/auth'
+import { useQuery } from '@tanstack/react-query'
+import { logout, getMe } from '@/lib/auth'
 
 const IS_LOCAL = process.env.NEXT_PUBLIC_IS_LOCAL === 'true'
 
 export default function Navigation() {
     const pathname = usePathname()
+    const { data: currentUser } = useQuery({ queryKey: ['me'], queryFn: getMe })
 
     const navItems = [
         { href: '/cases', label: '案件一覧' },
-        { href: '/products', label: '商品管理' },
-        { href: '/stores', label: '店舗管理' },
+        ...(currentUser?.isAdmin ? [{ href: '/products', label: '商品管理' }] : []),
+        ...(currentUser?.isAdmin ? [{ href: '/stores', label: '店舗管理' }] : []),
         { href: '/users', label: '社員管理' },
-        { href: '/company', label: '自社情報' },
+        ...(currentUser?.isAdmin ? [{ href: '/company', label: '自社情報' }] : []),
+        ...(currentUser?.isAdmin ? [{ href: '/reports/operations', label: '操作ログレポート' }] : []),
     ]
 
     const isActive = (href: string) => {
@@ -23,6 +26,8 @@ export default function Navigation() {
         if (href === '/stores') return pathname === '/stores' || pathname?.startsWith('/stores/')
         if (href === '/users') return pathname === '/users' || pathname?.startsWith('/users/')
         if (href === '/company') return pathname === '/company' || pathname?.startsWith('/company/')
+        if (href === '/reports/operations')
+            return pathname === '/reports/operations' || pathname?.startsWith('/reports/operations/')
         return pathname === href
     }
 

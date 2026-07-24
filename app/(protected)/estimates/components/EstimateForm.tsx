@@ -445,7 +445,7 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                             </>
                         )}
                         {activeTab === 'other' && (
-                            <EstimateOtherFields control={control} disabled={isLocked} />
+                            <EstimateOtherFields control={control} disabled={isLocked} customer={customer} />
                         )}
                     </fieldset>
                 </div>

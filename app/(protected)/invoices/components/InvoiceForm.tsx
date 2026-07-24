@@ -354,7 +354,7 @@ function InvoiceFormContent({
                             />
                         </>
                     )}
-                    {activeTab === 'other' && <InvoiceOtherFields control={control} disabled={isLocked} />}
+                    {activeTab === 'other' && <InvoiceOtherFields control={control} disabled={isLocked} customer={customer} />}
                     </fieldset>
                 </div>
 

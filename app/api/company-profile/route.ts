@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/auth-middleware'
+import { requireAuth, requireAdmin } from '@/lib/auth-middleware'
 import { serializeBigInt } from '@/lib/prisma-utils'
 import { prisma } from '@/lib/prisma'
 
@@ -24,8 +24,8 @@ export async function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
     try {
-        // JWT認証
-        const authResult = await requireAuth(request)
+        // JWT認証（管理者限定）
+        const authResult = await requireAdmin(request)
         if (authResult instanceof NextResponse) {
             return authResult
         }

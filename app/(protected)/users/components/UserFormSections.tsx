@@ -7,9 +7,10 @@ import { USER_ROLE_LABELS, UserRole } from '@/lib/users'
 
 interface UserFormSectionsProps {
     isEditing: boolean
+    canEditRole: boolean
 }
 
-export function UserFormSections({ isEditing }: UserFormSectionsProps) {
+export function UserFormSections({ isEditing, canEditRole }: UserFormSectionsProps) {
     const {
         control,
         formState: { errors },
@@ -101,22 +102,25 @@ export function UserFormSections({ isEditing }: UserFormSectionsProps) {
                                 return (
                                     <label
                                         key={value}
-                                        className="flex items-center gap-2 cursor-pointer font-mincho"
+                                        className="flex items-center gap-2 font-mincho"
                                         style={{
                                             padding: '10px 16px',
                                             border: `2px solid ${isSelected ? 'var(--brand-navy)' : 'var(--brand-border)'}`,
-                                            backgroundColor: isSelected ? '#f5f6fc' : '#ffffff',
+                                            backgroundColor: !canEditRole ? '#f5f5f2' : isSelected ? '#f5f6fc' : '#ffffff',
                                             fontSize: '14px',
                                             letterSpacing: '0.1em',
                                             color: isSelected ? 'var(--brand-navy)' : 'var(--brand-text-muted)',
                                             fontWeight: isSelected ? 600 : 400,
                                             transition: 'all 0.15s',
+                                            cursor: canEditRole ? 'pointer' : 'not-allowed',
+                                            opacity: canEditRole ? 1 : 0.7,
                                         }}
                                     >
                                         <input
                                             type="radio"
                                             value={value}
                                             checked={isSelected}
+                                            disabled={!canEditRole}
                                             onChange={() => field.onChange(value)}
                                             style={{ accentColor: 'var(--brand-navy)' }}
                                         />
@@ -127,6 +131,14 @@ export function UserFormSections({ isEditing }: UserFormSectionsProps) {
                         </div>
                     )}
                 />
+                {!canEditRole && (
+                    <p
+                        className="mt-1 font-mincho"
+                        style={{ fontSize: '12px', color: 'var(--brand-text-muted)', letterSpacing: '0.05em' }}
+                    >
+                        ※ ロールの変更はシステム管理者のみ行えます
+                    </p>
+                )}
             </div>
 
             {/* システム管理者フラグ */}
@@ -142,24 +154,27 @@ export function UserFormSections({ isEditing }: UserFormSectionsProps) {
                     control={control}
                     render={({ field }) => (
                         <label
-                            className="flex items-center gap-3 cursor-pointer"
+                            className="flex items-center gap-3"
                             style={{
                                 padding: '12px 16px',
                                 border: `2px solid ${field.value ? 'var(--brand-gold)' : 'var(--brand-border)'}`,
-                                backgroundColor: field.value ? '#fdf6e8' : '#ffffff',
+                                backgroundColor: !canEditRole ? '#f5f5f2' : field.value ? '#fdf6e8' : '#ffffff',
                                 display: 'inline-flex',
                                 transition: 'all 0.15s',
+                                cursor: canEditRole ? 'pointer' : 'not-allowed',
+                                opacity: canEditRole ? 1 : 0.7,
                             }}
                         >
                             <input
                                 type="checkbox"
                                 checked={field.value}
+                                disabled={!canEditRole}
                                 onChange={(e) => field.onChange(e.target.checked)}
                                 style={{
                                     width: '18px',
                                     height: '18px',
                                     accentColor: 'var(--brand-gold)',
-                                    cursor: 'pointer',
+                                    cursor: canEditRole ? 'pointer' : 'not-allowed',
                                 }}
                             />
                             <span
@@ -180,7 +195,9 @@ export function UserFormSections({ isEditing }: UserFormSectionsProps) {
                     className="mt-1 font-mincho"
                     style={{ fontSize: '12px', color: 'var(--brand-text-muted)', letterSpacing: '0.05em' }}
                 >
-                    ※ ロールとは別に付与できる管理権限フラグです
+                    {canEditRole
+                        ? '※ ロールとは別に付与できる管理権限フラグです'
+                        : '※ システム管理者フラグの変更はシステム管理者のみ行えます'}
                 </p>
             </div>
         </div>

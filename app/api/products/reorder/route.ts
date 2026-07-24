@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireAuth } from '@/lib/auth-middleware'
+import { requireAdmin } from '@/lib/auth-middleware'
 
 /**
  * 商品の並び順を一括更新。
@@ -8,7 +8,7 @@ import { requireAuth } from '@/lib/auth-middleware'
  */
 export async function PUT(request: NextRequest) {
     try {
-        const authResult = await requireAuth(request)
+        const authResult = await requireAdmin(request)
         if (authResult instanceof NextResponse) return authResult
 
         const body = await request.json()

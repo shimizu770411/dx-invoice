@@ -27,6 +27,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
                 role: true,
                 isAdmin: true,
                 requirePasswordChange: true,
+                isActive: true,
                 createdAt: true,
                 updatedAt: true,
             },
@@ -84,6 +85,21 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
             }
         }
 
+        // ロール・システム管理者フラグの変更はシステム管理者のみ許可（非管理者からの直接APIコールも防ぐ）
+        const requester = await prisma.user.findUnique({
+            where: { id: BigInt(authResult.payload.sub) },
+            select: { isAdmin: true },
+        })
+        const canManageRole = requester?.isAdmin === true
+
+        // 自分自身を非表示にするとログイン不可＝自分をロックアウトしてしまうため禁止
+        if (data.isActive === false && id === authResult.payload.sub) {
+            return NextResponse.json(
+                { error: 'Validation Error', message: '自分自身を非表示にすることはできません' },
+                { status: 400 }
+            )
+        }
+
         // 更新データを準備
         const updateData: any = {}
         if (data.name !== undefined) updateData.name = data.name
@@ -92,10 +108,11 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
         if (data.birthDate !== undefined) {
             updateData.birthDate = data.birthDate ? new Date(data.birthDate) : null
         }
-        if (data.role !== undefined && ['STAFF', 'CLERK', 'APPROVER'].includes(data.role)) {
+        if (canManageRole && data.role !== undefined && ['STAFF', 'CLERK', 'APPROVER'].includes(data.role)) {
             updateData.role = data.role
         }
-        if (data.isAdmin !== undefined) updateData.isAdmin = data.isAdmin === true
+        if (canManageRole && data.isAdmin !== undefined) updateData.isAdmin = data.isAdmin === true
+        if (canManageRole && data.isActive !== undefined) updateData.isActive = data.isActive === true
         if (data.requirePasswordChange !== undefined) updateData.requirePasswordChange = data.requirePasswordChange === true
         if (data.password) {
             updateData.password = await bcrypt.hash(data.password, 10)
@@ -114,6 +131,7 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
                 role: true,
                 isAdmin: true,
                 requirePasswordChange: true,
+                isActive: true,
                 createdAt: true,
                 updatedAt: true,
             },

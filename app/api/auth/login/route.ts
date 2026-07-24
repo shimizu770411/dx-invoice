@@ -28,6 +28,14 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'ログインIDまたはパスワードが正しくありません' }, { status: 401 })
         }
 
+        // 退職者処理等で非表示にされたアカウントはログイン不可
+        if (!user.isActive) {
+            return NextResponse.json(
+                { error: 'このアカウントは無効化されています。管理者にお問い合わせください' },
+                { status: 401 }
+            )
+        }
+
         // JWTトークンを生成
         const payload = { sub: user.id.toString(), tel: user.tel }
         const access_token = signToken(payload)

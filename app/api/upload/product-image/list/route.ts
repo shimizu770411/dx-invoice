@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/auth-middleware'
+import { requireAdmin } from '@/lib/auth-middleware'
 import { prisma } from '@/lib/prisma'
 import { serializeBigInt } from '@/lib/prisma-utils'
 import { readdir, stat } from 'fs/promises'
@@ -69,7 +69,7 @@ async function walkImages(rootDir: string, baseUrl: string): Promise<FileEntry[]
 
 export async function GET(request: NextRequest) {
     try {
-        const authResult = await requireAuth(request)
+        const authResult = await requireAdmin(request)
         if (authResult instanceof NextResponse) return authResult
 
         // ディスク上のファイル一覧（サブディレクトリも再帰的に）

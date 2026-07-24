@@ -17,6 +17,7 @@ export interface User {
   role: UserRole;
   isAdmin: boolean;
   requirePasswordChange: boolean;
+  isActive: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -41,6 +42,7 @@ export interface UpdateUserData {
   role?: UserRole;
   isAdmin?: boolean;
   requirePasswordChange?: boolean;
+  isActive?: boolean;
 }
 
 export async function getUsers(name?: string): Promise<User[]> {

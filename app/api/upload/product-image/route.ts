@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/auth-middleware'
+import { requireAdmin } from '@/lib/auth-middleware'
 import { writeFile, mkdir } from 'fs/promises'
 import path from 'path'
 import crypto from 'crypto'
@@ -9,7 +9,7 @@ const MAX_BYTES = 5 * 1024 * 1024 // 5MB
 
 export async function POST(request: NextRequest) {
     try {
-        const authResult = await requireAuth(request)
+        const authResult = await requireAdmin(request)
         if (authResult instanceof NextResponse) return authResult
 
         const formData = await request.formData()

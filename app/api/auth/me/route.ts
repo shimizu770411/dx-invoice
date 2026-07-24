@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
                 role: true,
                 isAdmin: true,
                 requirePasswordChange: true,
+                isActive: true,
                 createdAt: true,
                 updatedAt: true,
             },
@@ -29,6 +30,11 @@ export async function GET(request: NextRequest) {
 
         if (!user) {
             return NextResponse.json({ error: 'ユーザーが見つかりません' }, { status: 404 })
+        }
+
+        // 非表示化（退職者処理）されたアカウントはセッション中でも即座に無効化する
+        if (!user.isActive) {
+            return NextResponse.json({ error: 'このアカウントは無効化されています' }, { status: 401 })
         }
 
         // レスポンスを返す

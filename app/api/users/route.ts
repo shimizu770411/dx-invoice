@@ -12,18 +12,21 @@ export async function GET(request: NextRequest) {
             return authResult
         }
 
+        // 非表示（退職者処理）ユーザーは、システム管理者以外には一覧に出さない
+        const requester = await prisma.user.findUnique({
+            where: { id: BigInt(authResult.payload.sub) },
+            select: { isAdmin: true },
+        })
+        const isAdminRequester = requester?.isAdmin === true
+
         // クエリパラメータを取得
         const { searchParams } = new URL(request.url)
         const name = searchParams.get('name') || undefined
 
         // 検索条件を構築
-        const where = name
-            ? {
-                  name: {
-                      contains: name,
-                  },
-              }
-            : {}
+        const where: any = {}
+        if (name) where.name = { contains: name }
+        if (!isAdminRequester) where.isActive = true
 
         // ユーザーを取得
         const users = await prisma.user.findMany({
@@ -37,6 +40,7 @@ export async function GET(request: NextRequest) {
                 role: true,
                 isAdmin: true,
                 requirePasswordChange: true,
+                isActive: true,
                 createdAt: true,
                 updatedAt: true,
             },
@@ -93,6 +97,13 @@ export async function POST(request: NextRequest) {
         // パスワードをハッシュ化
         const hashedPassword = await bcrypt.hash(data.password, 10)
 
+        // ロール・システム管理者フラグの変更はシステム管理者のみ許可（非管理者からの直接APIコールも防ぐ）
+        const requester = await prisma.user.findUnique({
+            where: { id: BigInt(authResult.payload.sub) },
+            select: { isAdmin: true },
+        })
+        const canManageRole = requester?.isAdmin === true
+
         // ユーザーを作成
         const user = await prisma.user.create({
             data: {
@@ -101,8 +112,8 @@ export async function POST(request: NextRequest) {
                 password: hashedPassword,
                 email: data.email || null,
                 birthDate: data.birthDate ? new Date(data.birthDate) : null,
-                role: ['STAFF', 'CLERK', 'APPROVER'].includes(data.role) ? data.role : 'STAFF',
-                isAdmin: data.isAdmin === true,
+                role: canManageRole && ['STAFF', 'CLERK', 'APPROVER'].includes(data.role) ? data.role : 'STAFF',
+                isAdmin: canManageRole && data.isAdmin === true,
                 requirePasswordChange: data.requirePasswordChange === true,
             },
             select: {
@@ -114,6 +125,7 @@ export async function POST(request: NextRequest) {
                 role: true,
                 isAdmin: true,
                 requirePasswordChange: true,
+                isActive: true,
                 createdAt: true,
                 updatedAt: true,
             },

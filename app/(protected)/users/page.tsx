@@ -85,6 +85,26 @@ export default function UsersPage() {
         }
     }
 
+    const handleToggleActive = async (user: User) => {
+        const nextActive = !(user.isActive ?? true)
+        const confirmMessage = nextActive
+            ? `「${user.name}」を一覧に再表示しますか？`
+            : `「${user.name}」を非表示にします。退職者処理などで一覧・ログインができなくなります。よろしいですか？`
+        if (!confirm(confirmMessage)) return
+
+        try {
+            await updateMutation.mutateAsync({ id: user.id, data: { isActive: nextActive } })
+            toast({ title: nextActive ? '再表示しました' : '非表示にしました' })
+            handleCloseDialog()
+        } catch (error: any) {
+            toast({
+                title: '処理に失敗しました',
+                description: error?.response?.data?.message,
+                variant: 'destructive',
+            })
+        }
+    }
+
     if (isLoading) {
         return (
             <div
@@ -188,6 +208,10 @@ export default function UsersPage() {
                 user={editDialog.user}
                 onClose={handleCloseDialog}
                 onSubmit={handleSubmit}
+                canEditRole={currentUser?.isAdmin ?? false}
+                isAdminViewer={currentUser?.isAdmin ?? false}
+                isSelf={editDialog.user?.id === currentUser?.id}
+                onToggleActive={handleToggleActive}
             />
         </div>
     )

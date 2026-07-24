@@ -18,9 +18,22 @@ interface UserFormDialogProps {
     user: User | null
     onClose: () => void
     onSubmit: (data: UserFormData) => Promise<void>
+    canEditRole: boolean
+    isAdminViewer: boolean
+    isSelf: boolean
+    onToggleActive: (user: User) => Promise<void>
 }
 
-export function UserFormDialog({ open, user, onClose, onSubmit }: UserFormDialogProps) {
+export function UserFormDialog({
+    open,
+    user,
+    onClose,
+    onSubmit,
+    canEditRole,
+    isAdminViewer,
+    isSelf,
+    onToggleActive,
+}: UserFormDialogProps) {
     const isEditing = user !== null
     const schema = isEditing ? updateUserFormSchema : createUserFormSchema
 
@@ -91,11 +104,33 @@ export function UserFormDialog({ open, user, onClose, onSubmit }: UserFormDialog
                 </DialogHeader>
                 <FormProvider {...methods}>
                     <form onSubmit={handleSubmit(onSubmit)} noValidate>
-                        <UserFormSections isEditing={isEditing} />
+                        <UserFormSections isEditing={isEditing} canEditRole={canEditRole} />
                         <div
-                            className="mt-6 pt-5 flex justify-end gap-3"
+                            className="mt-6 pt-5 flex items-center justify-between gap-3"
                             style={{ borderTop: '1px solid var(--brand-border)' }}
                         >
+                            <div>
+                                {isEditing && isAdminViewer && user && !isSelf && (
+                                    <button
+                                        type="button"
+                                        onClick={() => onToggleActive(user)}
+                                        className="font-mincho transition-colors"
+                                        style={{
+                                            padding: '12px 24px',
+                                            backgroundColor: '#ffffff',
+                                            color: user.isActive === false ? 'var(--brand-navy)' : 'var(--brand-red, #c0392b)',
+                                            border: `1px solid ${user.isActive === false ? 'var(--brand-navy)' : 'var(--brand-red, #c0392b)'}`,
+                                            fontSize: '13px',
+                                            letterSpacing: '0.15em',
+                                            fontWeight: 500,
+                                            cursor: 'pointer',
+                                        }}
+                                    >
+                                        {user.isActive === false ? '表示に戻す' : '非表示にする（退職者処理）'}
+                                    </button>
+                                )}
+                            </div>
+                            <div className="flex justify-end gap-3">
                             <button
                                 type="button"
                                 onClick={onClose}
@@ -130,6 +165,7 @@ export function UserFormDialog({ open, user, onClose, onSubmit }: UserFormDialog
                             >
                                 {isSubmitting ? '保存中…' : '保　存'}
                             </button>
+                            </div>
                         </div>
                     </form>
                 </FormProvider>
