@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { MAX_REMARKS_LENGTH } from '@/components/document/DocumentOtherFields'
 
 export const companyFormSchema = z.object({
     companyNo: z.string().optional(),
@@ -29,6 +30,8 @@ export const companyFormSchema = z.object({
     bank4Account: z.string().optional(),
     bank4Holder: z.string().optional(),
     dateFormat: z.enum(['WESTERN', 'JAPANESE']),
+    estimateRemarksDefault: z.string().max(MAX_REMARKS_LENGTH, `${MAX_REMARKS_LENGTH}文字以内で入力してください`).optional(),
+    invoiceRemarksDefault: z.string().max(MAX_REMARKS_LENGTH, `${MAX_REMARKS_LENGTH}文字以内で入力してください`).optional(),
 })
 
 export type CompanyFormData = z.infer<typeof companyFormSchema>
@@ -62,4 +65,6 @@ export const DEFAULT_FORM_VALUES: CompanyFormData = {
     bank4Account: '',
     bank4Holder: '',
     dateFormat: 'WESTERN',
+    estimateRemarksDefault: '',
+    invoiceRemarksDefault: '',
 }

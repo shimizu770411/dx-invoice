@@ -50,6 +50,8 @@ export async function POST(
             return NextResponse.json({ error: '案件IDが一致しません' }, { status: 400 })
         }
 
+        const companyProfile = await prisma.companyProfile.findFirst()
+
         const membershipPaidAmount = estimate.customer.memberships.reduce(
             (sum: number, m: any) => sum + (m.paymentAmount || 0),
             0
@@ -88,7 +90,7 @@ export async function POST(
                 transportStaff: estimate.transportStaff,
                 decorationStaff: estimate.decorationStaff,
                 returnStaff: estimate.returnStaff,
-                remarks: estimate.remarks,
+                remarks: companyProfile?.invoiceRemarksDefault ?? null,
                 items: {
                     create: estimate.items.map((item: any) => ({
                         productItemId: item.productItemId,

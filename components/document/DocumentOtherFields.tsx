@@ -11,7 +11,7 @@ import { toast } from '@/hooks/use-toast'
 import { handleSaveError } from '@/lib/errorHandler'
 import type { DocumentFormData } from './DocumentItemTable'
 
-const MAX_REMARKS_LENGTH = 50
+export const MAX_REMARKS_LENGTH = 50
 
 type Props = {
     control: Control<DocumentFormData>

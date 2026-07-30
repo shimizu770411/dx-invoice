@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { useFormContext, Controller } from 'react-hook-form'
 import { FormInput } from '@/components/form/FormInput'
 import { FormSelect } from '@/components/form/FormSelect'
+import { FormTextarea } from '@/components/form/FormTextarea'
+import { MAX_REMARKS_LENGTH } from '@/components/document/DocumentOtherFields'
 import { CompanyFormData } from '../schemas/CompanyFormSchema'
 import { BANK_TYPE_OPTIONS } from '../constants/companyOptions'
 import { BankBranchSelector } from './BankBranchSelector'
@@ -245,6 +247,53 @@ export function BankInfoSection() {
                     <BankSection bankNumber={n} />
                 </div>
             ))}
+        </section>
+    )
+}
+
+export function RemarksDefaultSection() {
+    const {
+        control,
+        formState: { errors },
+    } = useFormContext<CompanyFormData>()
+
+    return (
+        <section style={sectionStyle}>
+            <div style={sectionHeaderStyle}>
+                <span style={enLabelStyle}>REMARKS DEFAULT</span>
+                <h2 style={jpLabelStyle}>備考初期値設定</h2>
+            </div>
+            <p
+                style={{
+                    fontFamily: 'var(--font-mincho)',
+                    fontSize: '13px',
+                    color: 'var(--brand-text-muted)',
+                    letterSpacing: '0.1em',
+                    marginBottom: '16px',
+                }}
+            >
+                見積書・請求書を新規作成した際、備考欄に自動で入力される初期文言を設定できます。
+            </p>
+            <div className="grid grid-cols-2 gap-4">
+                <FormTextarea
+                    name="estimateRemarksDefault"
+                    control={control}
+                    label="見積書"
+                    rows={4}
+                    maxLength={MAX_REMARKS_LENGTH}
+                    noResize
+                    error={errors.estimateRemarksDefault}
+                />
+                <FormTextarea
+                    name="invoiceRemarksDefault"
+                    control={control}
+                    label="請求書"
+                    rows={4}
+                    maxLength={MAX_REMARKS_LENGTH}
+                    noResize
+                    error={errors.invoiceRemarksDefault}
+                />
+            </div>
         </section>
     )
 }

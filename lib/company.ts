@@ -30,6 +30,8 @@ export interface CompanyProfile {
     bank4Account?: string
     bank4Holder?: string
     dateFormat?: string
+    estimateRemarksDefault?: string
+    invoiceRemarksDefault?: string
 }
 
 export interface UpdateCompanyProfileData {
@@ -61,6 +63,8 @@ export interface UpdateCompanyProfileData {
     bank4Account?: string
     bank4Holder?: string
     dateFormat?: string
+    estimateRemarksDefault?: string
+    invoiceRemarksDefault?: string
 }
 
 export async function getCompanyProfile(): Promise<CompanyProfile> {

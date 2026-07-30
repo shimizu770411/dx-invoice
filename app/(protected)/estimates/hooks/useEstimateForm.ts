@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
 import { getEstimate, createEstimate, updateEstimate, Estimate, EstimateItem, EstimateFreeItem } from '@/lib/estimates'
 import { getCustomer } from '@/lib/customers'
+import { getCompanyProfile } from '@/lib/company'
 import { getProducts, ProductItem } from '@/lib/products'
 import { expandMultiRowToItems } from '@/lib/expandMultiRow'
 import { toast } from '@/hooks/use-toast'
@@ -216,6 +217,7 @@ export function useEstimateCreate(customerId: string, reset: UseFormReset<Estima
     const loadData = useCallback(async () => {
         try {
             const [customerData, allProducts] = await Promise.all([getCustomer(customerId), getProducts()])
+            const companyProfile = await getCompanyProfile().catch(() => null)
             setCustomer(customerData)
             const storeId = customerData?.storeId ? String(customerData.storeId) : null
             const filteredProducts = filterProductsByStore(allProducts, storeId)
@@ -225,6 +227,7 @@ export function useEstimateCreate(customerId: string, reset: UseFormReset<Estima
             setFreeItems(initialFreeItems)
             reset({
                 ...DEFAULT_FORM_VALUES,
+                remarks: companyProfile?.estimateRemarksDefault || '',
                 items: initialItems.map((item) => ({
                     qty: item.qty,
                     description: item.description || '',

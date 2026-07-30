@@ -655,6 +655,8 @@ model CompanyProfile {
   bank4Account  String?  @db.VarChar(50) @map("bank4_account")
   bank4Holder   String?  @db.VarChar(100) @map("bank4_holder")
   dateFormat    String   @default("WESTERN") @db.VarChar(20) @map("date_format")
+  estimateRemarksDefault String? @db.Text @map("estimate_remarks_default")
+  invoiceRemarksDefault  String? @db.Text @map("invoice_remarks_default")
   createdAt     DateTime @default(now()) @db.Timestamptz(6) @map("created_at")
   updatedAt     DateTime @updatedAt @db.Timestamptz(6) @map("updated_at")
 
