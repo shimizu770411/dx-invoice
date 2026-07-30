@@ -1,9 +1,7 @@
 import { useFormContext } from 'react-hook-form'
 import { CaseFormData } from '../schemas/CaseFormSchema'
 import { FormInput } from '@/components/form/FormInput'
-import { FormAutocomplete } from '@/components/form/FormAutocomplete'
 import { FormInputWithPostalSearch } from '@/components/form/FormInputWithPostalSearch'
-import { RELATION_OPTIONS } from '../constants/casesOptions'
 
 export function ChiefMournerTab() {
     const {
@@ -23,11 +21,10 @@ export function ChiefMournerTab() {
             />
 
             {/* 故人との関係 */}
-            <FormAutocomplete<CaseFormData>
+            <FormInput<CaseFormData>
                 name="chiefMournerRelation"
                 control={control}
                 label="故人との関係"
-                options={[...RELATION_OPTIONS]}
                 error={errors.chiefMournerRelation}
             />
 
