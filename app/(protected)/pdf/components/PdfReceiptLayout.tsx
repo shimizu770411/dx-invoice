@@ -149,7 +149,7 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
 
     const addressee = customer?.payerName || customer?.chiefMournerName || ''
     const issuedAt = fmtDate(new Date())
-    const FIXED_ITEM_ROWS = 37
+    const FIXED_ITEM_ROWS = 38
     const displayRows = buildDisplayRows(products, doc.items, doc.freeItems)
 
     const [company, setCompany] = useState<CompanyProfile | null>(null)

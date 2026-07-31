@@ -400,7 +400,7 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
               returnStaff: docAny.returnStaff ?? null,
           }
         : undefined
-    const FIXED_ITEM_ROWS = 37
+    const FIXED_ITEM_ROWS = 38
     const displayRows = buildDisplayRows(products, items, doc.freeItems)
     return (
         <div
