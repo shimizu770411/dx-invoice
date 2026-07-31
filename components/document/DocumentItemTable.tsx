@@ -699,12 +699,11 @@ export function DocumentItemTable({
                                                 </div>
                                                 {groupAnyChecked &&
                                                     item?.productItem?.showProductVariantName &&
-                                                    (item?.productVariant?.name ?? item?.productRowVariant?.label) && (
+                                                    (item?.productVariant?.abbreviatedName ?? item?.productRowVariant?.abbreviatedName) && (
                                                     <div
-                                                        className="text-xs"
-                                                        style={{ color: 'var(--brand-text-muted)' }}
+                                                        style={{ fontSize: '10px', color: 'var(--brand-text-muted)' }}
                                                     >
-                                                        （{item.productVariant?.name ?? item.productRowVariant?.label}）
+                                                        （{item.productVariant?.abbreviatedName ?? item.productRowVariant?.abbreviatedName}）
                                                     </div>
                                                 )}
                                             </td>

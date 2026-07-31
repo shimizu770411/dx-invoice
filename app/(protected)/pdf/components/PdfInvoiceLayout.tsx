@@ -28,8 +28,8 @@ export type PdfDocumentItem = {
         setableScope?: 'NONE' | 'MEMBER_ONLY' | 'GENERAL_ONLY' | 'BOTH'
         isMaturityServiceable?: boolean
     } | null
-    productVariant?: { name?: string; imageUrl?: string | null; isDefaultSet?: boolean; setPrice?: number } | null
-    productRowVariant?: { label?: string } | null
+    productVariant?: { name?: string; abbreviatedName?: string | null; imageUrl?: string | null; isDefaultSet?: boolean; setPrice?: number } | null
+    productRowVariant?: { label?: string; abbreviatedName?: string | null } | null
     description?: string | null
     multiSelectVariantIds?: string | null
     qty: number
@@ -400,7 +400,7 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
               returnStaff: docAny.returnStaff ?? null,
           }
         : undefined
-    const FIXED_ITEM_ROWS = 39
+    const FIXED_ITEM_ROWS = 37
     const displayRows = buildDisplayRows(products, items, doc.freeItems)
     return (
         <div
@@ -575,11 +575,11 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                                                     </span>
                                                                 ))}
                                                             </div>
-                                                            <div className="text-center">
+                                                            <div className="text-center text-[0.625rem]">
                                                                 {(() => {
                                                                     const variantLabel =
-                                                                        row.estimateItem?.productVariant?.name ??
-                                                                        row.estimateItem?.productRowVariant?.label
+                                                                        row.estimateItem?.productVariant?.abbreviatedName ??
+                                                                        row.estimateItem?.productRowVariant?.abbreviatedName
                                                                     return row.estimateItem && row.showProductVariantName && variantLabel
                                                                         ? `(${variantLabel})`
                                                                         : ''

@@ -4,8 +4,10 @@ import { prisma } from '@/lib/prisma'
 import { serializeBigInt } from '@/lib/prisma-utils'
 import { readdir, stat } from 'fs/promises'
 import path from 'path'
+import { list as listBlobs } from '@vercel/blob'
 
 const IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif'])
+const BLOB_PRODUCT_PREFIX = 'products/'
 
 type Usage = {
     productId: string
@@ -67,14 +69,44 @@ async function walkImages(rootDir: string, baseUrl: string): Promise<FileEntry[]
     return result
 }
 
+/** Vercel Blobストア（products/ プレフィックス配下）の画像を列挙する */
+async function walkBlobImages(): Promise<FileEntry[]> {
+    const result: FileEntry[] = []
+    let cursor: string | undefined
+
+    do {
+        const page = await listBlobs({ prefix: BLOB_PRODUCT_PREFIX, cursor, limit: 1000 })
+        for (const b of page.blobs) {
+            const relPath = b.pathname.startsWith(BLOB_PRODUCT_PREFIX)
+                ? b.pathname.slice(BLOB_PRODUCT_PREFIX.length)
+                : b.pathname
+            result.push({
+                url: b.url,
+                fileName: relPath.split('/').pop() || relPath,
+                relativePath: relPath,
+                size: b.size,
+                modifiedAt: b.uploadedAt.toISOString(),
+                usedBy: [],
+            })
+        }
+        cursor = page.hasMore ? page.cursor : undefined
+    } while (cursor)
+
+    return result
+}
+
 export async function GET(request: NextRequest) {
     try {
         const authResult = await requireAdmin(request)
         if (authResult instanceof NextResponse) return authResult
 
-        // ディスク上のファイル一覧（サブディレクトリも再帰的に）
+        // ディスク上のファイル一覧（既存の import 済み画像、サブディレクトリも再帰的に）
         const dir = path.join(process.cwd(), 'public', 'uploads', 'products')
-        const fileEntries = await walkImages(dir, '/uploads/products')
+        const [localEntries, blobEntries] = await Promise.all([
+            walkImages(dir, '/uploads/products'),
+            walkBlobImages(),
+        ])
+        const fileEntries = [...localEntries, ...blobEntries]
 
         // DB側の使用状況を取得
         const variants = await prisma.productVariant.findMany({

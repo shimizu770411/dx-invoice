@@ -98,42 +98,50 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
         })
 
         // 明細行構成（複数行構成商品時のみ）: body.rows があれば全置換
+        // delete → re-create を1トランザクションにまとめ、再作成が途中で失敗しても
+        // 削除だけが確定してデータが消える事態を防ぐ
         if (Array.isArray(body.rows)) {
-            await prisma.productRow.deleteMany({
-                where: { productItemId: BigInt(params.id) },
-            })
-            for (const [rowIdx, row] of body.rows.entries()) {
-                await prisma.productRow.create({
-                    data: {
-                        productItemId: BigInt(params.id),
-                        label: typeof row.label === 'string' ? row.label : '',
-                        calcType: row.calcType === 'FIXED' ? 'FIXED' : 'UNIT_PRICE_X_QTY',
-                        defaultQty: Number.isFinite(Number(row.defaultQty))
-                            ? Number(row.defaultQty)
-                            : 1,
-                        hasReturn: Boolean(row.hasReturn),
-                        sortNo: rowIdx,
-                        isActive: row.isActive !== false,
-                        variants: {
-                            create: (Array.isArray(row.variants) ? row.variants : []).map(
-                                (v: any, vIdx: number) => ({
-                                    label: typeof v.label === 'string' ? v.label : '',
-                                    imageUrl:
-                                        typeof v.imageUrl === 'string' && v.imageUrl
-                                            ? v.imageUrl
-                                            : null,
-                                    unitPrice: Number.isFinite(Number(v.unitPrice))
-                                        ? Number(v.unitPrice)
-                                        : 0,
-                                    isDefault: Boolean(v.isDefault),
-                                    sortNo: vIdx,
-                                    isActive: v.isActive !== false,
-                                })
-                            ),
-                        },
-                    },
+            await prisma.$transaction(async (tx) => {
+                await tx.productRow.deleteMany({
+                    where: { productItemId: BigInt(params.id) },
                 })
-            }
+                for (const [rowIdx, row] of body.rows.entries()) {
+                    await tx.productRow.create({
+                        data: {
+                            productItemId: BigInt(params.id),
+                            label: typeof row.label === 'string' ? row.label : '',
+                            calcType: row.calcType === 'FIXED' ? 'FIXED' : 'UNIT_PRICE_X_QTY',
+                            defaultQty: Number.isFinite(Number(row.defaultQty))
+                                ? Number(row.defaultQty)
+                                : 1,
+                            hasReturn: Boolean(row.hasReturn),
+                            sortNo: rowIdx,
+                            isActive: row.isActive !== false,
+                            variants: {
+                                create: (Array.isArray(row.variants) ? row.variants : []).map(
+                                    (v: any, vIdx: number) => ({
+                                        label: typeof v.label === 'string' ? v.label : '',
+                                        abbreviatedName:
+                                            typeof v.abbreviatedName === 'string' && v.abbreviatedName
+                                                ? v.abbreviatedName
+                                                : null,
+                                        imageUrl:
+                                            typeof v.imageUrl === 'string' && v.imageUrl
+                                                ? v.imageUrl
+                                                : null,
+                                        unitPrice: Number.isFinite(Number(v.unitPrice))
+                                            ? Number(v.unitPrice)
+                                            : 0,
+                                        isDefault: Boolean(v.isDefault),
+                                        sortNo: vIdx,
+                                        isActive: v.isActive !== false,
+                                    })
+                                ),
+                            },
+                        },
+                    })
+                }
+            })
         }
 
         // バリアントグループ（重箱等の「基本セット＋追加オプション」構成）: body.groups があれば同期

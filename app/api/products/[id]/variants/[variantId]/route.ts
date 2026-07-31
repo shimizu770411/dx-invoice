@@ -15,6 +15,7 @@ export async function PUT(
         const body = await request.json()
         const data: any = {}
         if (body.name !== undefined) data.name = body.name
+        if (body.abbreviatedName !== undefined) data.abbreviatedName = body.abbreviatedName || null
         if (body.imageUrl !== undefined) data.imageUrl = body.imageUrl || null
         if (body.priceGeneral !== undefined) data.priceGeneral = Number(body.priceGeneral) || 0
         if (body.priceMember !== undefined) data.priceMember = Number(body.priceMember) || 0

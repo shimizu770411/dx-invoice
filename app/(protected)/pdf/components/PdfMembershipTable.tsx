@@ -33,7 +33,7 @@ export function PdfMembershipTable({ memberships = [] }: Props) {
                 <tbody>
                     {rows.map((m, i) => (
                         <tr key={i} className="border border-x-0 border-b-0 border-black text-center">
-                            <td className="border border-y-0 border-l-0 border-black p-2 text-center">
+                            <td className="border border-y-0 border-l-0 border-black px-2 text-center">
                                 {m.memberNo ?? ''}
                             </td>
                             <td className="border border-y-0 border-black px-2 text-left">

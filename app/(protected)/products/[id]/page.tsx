@@ -21,11 +21,16 @@ import { toast } from '@/hooks/use-toast'
 import { ImageGalleryDialog } from '../components/ImageGalleryDialog'
 import { CurrencyTextInput } from '@/components/form/CurrencyTextInput'
 
+/** 見積/請求書/PDFの括弧書き表示用略称の最大文字数 */
+const MAX_VARIANT_ABBREVIATION_LENGTH = 8
+
 type ProductKind = 'NORMAL' | 'PARENT' | 'CHILD'
 
 type VariantRow = {
     id?: string
     name: string
+    /** 見積/請求書/PDFの括弧書き表示用の略称（8文字まで） */
+    abbreviatedName: string
     imageUrl: string
     priceGeneral: number
     priceMember: number
@@ -103,6 +108,8 @@ export default function ProductEditPage() {
     type MultiRowVariant = {
         localId: string
         label: string
+        /** 見積/請求書/PDFの括弧書き表示用の略称（8文字まで） */
+        abbreviatedName: string
         imageUrl: string
         unitPrice: number
         isDefault: boolean
@@ -216,6 +223,7 @@ export default function ProductEditPage() {
             ...prev,
             {
                 name: '',
+                abbreviatedName: '',
                 imageUrl: '',
                 priceGeneral: 0,
                 priceMember: 0,
@@ -277,6 +285,7 @@ export default function ProductEditPage() {
                 variants: (r.variants || []).map((v: any) => ({
                     localId: String(v.id),
                     label: v.label ?? '',
+                    abbreviatedName: v.abbreviatedName ?? '',
                     imageUrl: v.imageUrl ?? '',
                     unitPrice: Number(v.unitPrice) || 0,
                     isDefault: Boolean(v.isDefault),
@@ -287,6 +296,7 @@ export default function ProductEditPage() {
             (g.variants || []).map((v: ProductVariant) => ({
                 id: v.id,
                 name: v.name,
+                abbreviatedName: v.abbreviatedName ?? '',
                 imageUrl: v.imageUrl || '',
                 priceGeneral: v.priceGeneral,
                 priceMember: v.priceMember,
@@ -303,6 +313,7 @@ export default function ProductEditPage() {
                 .map((v: ProductVariant) => ({
                     id: v.id,
                     name: v.name,
+                    abbreviatedName: v.abbreviatedName ?? '',
                     imageUrl: v.imageUrl || '',
                     priceGeneral: v.priceGeneral,
                     priceMember: v.priceMember,
@@ -377,6 +388,7 @@ export default function ProductEditPage() {
                           hasReturn: r.hasReturn,
                           variants: r.variants.map((v) => ({
                               label: v.label,
+                              abbreviatedName: v.abbreviatedName || null,
                               imageUrl: v.imageUrl || null,
                               unitPrice: v.unitPrice,
                               isDefault: v.isDefault,
@@ -424,6 +436,7 @@ export default function ProductEditPage() {
                 if (v.isNew) {
                     const created = await createVariant(productId, {
                         name: v.name,
+                        abbreviatedName: v.abbreviatedName || null,
                         storeId: v.storeId || null,
                         groupId,
                         imageUrl: v.imageUrl || null,
@@ -443,6 +456,7 @@ export default function ProductEditPage() {
                 } else if (v.id) {
                     await updateVariant(productId, v.id, {
                         name: v.name,
+                        abbreviatedName: v.abbreviatedName || null,
                         storeId: v.storeId || null,
                         groupId,
                         imageUrl: v.imageUrl || null,
@@ -525,6 +539,7 @@ export default function ProductEditPage() {
             ...prev,
             {
                 name: '',
+                abbreviatedName: '',
                 imageUrl: '',
                 priceGeneral: 0,
                 priceMember: 0,
@@ -618,6 +633,7 @@ export default function ProductEditPage() {
             if (v.isNew) {
                 const created = await createVariant(productId, {
                     name: v.name,
+                    abbreviatedName: v.abbreviatedName || null,
                     storeId: v.storeId || null,
                     imageUrl: v.imageUrl || null,
                     priceGeneral: v.priceGeneral,
@@ -641,6 +657,7 @@ export default function ProductEditPage() {
             } else if (v.id) {
                 await updateVariant(productId, v.id, {
                     name: v.name,
+                    abbreviatedName: v.abbreviatedName || null,
                     storeId: v.storeId || null,
                     imageUrl: v.imageUrl || null,
                     priceGeneral: v.priceGeneral,
@@ -1590,6 +1607,7 @@ export default function ProductEditPage() {
                                                                           {
                                                                               localId: genLocalId(),
                                                                               label: '',
+                                                                              abbreviatedName: '',
                                                                               imageUrl: '',
                                                                               unitPrice: 0,
                                                                               isDefault:
@@ -1797,6 +1815,29 @@ export default function ProductEditPage() {
                                                                     }
                                                                     style={inputStyle}
                                                                 />
+                                                                {showProductVariantName && (
+                                                                    <div className="mt-2">
+                                                                        <label
+                                                                            className="brand-label"
+                                                                            style={{ fontSize: 12 }}
+                                                                        >
+                                                                            表示用略称（見積/請求書/PDFの括弧書きに表示・{MAX_VARIANT_ABBREVIATION_LENGTH}文字まで）
+                                                                        </label>
+                                                                        <input
+                                                                            type="text"
+                                                                            className="w-full"
+                                                                            maxLength={MAX_VARIANT_ABBREVIATION_LENGTH}
+                                                                            placeholder="例: マイクロ"
+                                                                            value={v.abbreviatedName}
+                                                                            onChange={(e) =>
+                                                                                updateRowVariant(rIdx, vIdx, {
+                                                                                    abbreviatedName: e.target.value,
+                                                                                })
+                                                                            }
+                                                                            style={inputStyle}
+                                                                        />
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                             <div>
                                                                 <label
@@ -2237,6 +2278,7 @@ export default function ProductEditPage() {
                                                     v={v}
                                                     index={i}
                                                     kind={kind}
+                                                    showProductVariantName={showProductVariantName}
                                                     stores={stores}
                                                     uploadingId={uploadingId}
                                                     dragEnabled={false}
@@ -2333,6 +2375,7 @@ export default function ProductEditPage() {
                                 v={v}
                                 index={i}
                                 kind={kind}
+                                showProductVariantName={showProductVariantName}
                                 stores={stores}
                                 uploadingId={uploadingId}
                                 dragEnabled
@@ -2492,6 +2535,7 @@ type VariantCardProps = {
     v: VariantRow
     index: number
     kind: ProductKind
+    showProductVariantName: boolean
     stores: { id: string; name: string }[]
     uploadingId: string | null
     dragEnabled: boolean
@@ -2518,6 +2562,7 @@ function VariantCard({
     v,
     index: i,
     kind,
+    showProductVariantName,
     stores,
     uploadingId,
     dragEnabled,
@@ -2693,6 +2738,21 @@ function VariantCard({
                         style={inputStyle}
                     />
                 </div>
+                {showProductVariantName && (
+                    <div>
+                        <label className="brand-label">
+                            表示用略称（見積/請求書/PDFの括弧書きに表示・{MAX_VARIANT_ABBREVIATION_LENGTH}文字まで）
+                        </label>
+                        <input
+                            type="text"
+                            value={v.abbreviatedName}
+                            maxLength={MAX_VARIANT_ABBREVIATION_LENGTH}
+                            onChange={(e) => onSetVariant(i, { abbreviatedName: e.target.value })}
+                            placeholder="例: マイクロ"
+                            style={inputStyle}
+                        />
+                    </div>
+                )}
                 <div>
                     <label className="brand-label">取扱店舗</label>
                     <select

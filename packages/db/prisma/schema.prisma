@@ -291,6 +291,8 @@ model ProductRowVariant {
   id              BigInt       @id @default(autoincrement())
   productRowId    BigInt       @map("product_row_id")
   label           String       @db.VarChar(100)
+  // 見積/請求書/PDFの括弧書き表示用の略称（showProductVariantName有効時に label の代わりに使う）
+  abbreviatedName String?      @db.VarChar(8) @map("abbreviated_name")
   imageUrl        String?      @db.VarChar(500) @map("image_url")
   unitPrice       Int          @default(0) @map("unit_price")
   isDefault       Boolean      @default(false) @map("is_default")
@@ -329,6 +331,8 @@ model ProductVariant {
   storeId       BigInt?  @map("store_id")
   groupId       BigInt?  @map("group_id")
   name          String   @db.VarChar(120)
+  // 見積/請求書/PDFの括弧書き表示用の略称（showProductVariantName有効時に name の代わりに使う）
+  abbreviatedName String? @db.VarChar(8) @map("abbreviated_name")
   imageUrl      String?  @db.VarChar(500) @map("image_url")
   priceGeneral  Int      @map("price_general")
   priceMember   Int      @map("price_member")

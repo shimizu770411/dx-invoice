@@ -32,6 +32,13 @@ const nextConfig = {
     // Turbopack設定（Next.js 16でTurbopackがデフォルトのため）
     turbopack: {},
 
+    // next/image が Vercel Blob の商品画像URLを表示できるようにする
+    images: {
+        remotePatterns: [
+            { protocol: 'https', hostname: '*.public.blob.vercel-storage.com' },
+        ],
+    },
+
     // Webpackの設定
     webpack: (config, { isServer }) => {
         // パスエイリアスの設定

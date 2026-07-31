@@ -7,6 +7,8 @@ export interface ProductVariant {
     store?: { id: string; name: string } | null
     groupId?: string | null
     name: string
+    /** 見積/請求書/PDFの括弧書き表示用の略称（showProductVariantName有効時に name の代わりに使う） */
+    abbreviatedName?: string | null
     imageUrl?: string | null
     priceGeneral: number
     priceMember: number
@@ -54,6 +56,8 @@ export interface ProductRowVariant {
     id: string
     productRowId?: string
     label: string
+    /** 見積/請求書/PDFの括弧書き表示用の略称（showProductVariantName有効時に label の代わりに使う） */
+    abbreviatedName?: string | null
     imageUrl?: string | null
     unitPrice: number
     isDefault?: boolean
@@ -139,6 +143,7 @@ export async function setProductChildren(parentId: string, childIds: string[]): 
 
 export interface ProductVariantInput {
     name: string
+    abbreviatedName?: string | null
     storeId?: string | null
     groupId?: string | null
     imageUrl?: string | null

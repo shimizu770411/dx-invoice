@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/auth-middleware'
-import { writeFile, mkdir } from 'fs/promises'
-import path from 'path'
+import { put } from '@vercel/blob'
 import crypto from 'crypto'
 
 const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
@@ -30,15 +29,13 @@ export async function POST(request: NextRequest) {
         const ext = (file.name.split('.').pop() || 'bin').toLowerCase()
         const safeExt = /^[a-z0-9]{1,6}$/.test(ext) ? ext : 'bin'
         const fileName = `${crypto.randomBytes(8).toString('hex')}-${Date.now()}.${safeExt}`
-        const destDir = path.join(process.cwd(), 'public', 'uploads', 'products')
-        await mkdir(destDir, { recursive: true })
-        const destPath = path.join(destDir, fileName)
 
-        const buf = Buffer.from(await file.arrayBuffer())
-        await writeFile(destPath, buf)
+        const blob = await put(`products/${fileName}`, file, {
+            access: 'public',
+            addRandomSuffix: false,
+        })
 
-        const publicUrl = `/uploads/products/${fileName}`
-        return NextResponse.json({ url: publicUrl }, { status: 201 })
+        return NextResponse.json({ url: blob.url }, { status: 201 })
     } catch (error: any) {
         console.error('Upload error:', error)
         return NextResponse.json({ error: 'Internal server error', message: error.message }, { status: 500 })

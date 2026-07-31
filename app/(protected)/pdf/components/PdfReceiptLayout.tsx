@@ -149,6 +149,7 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
 
     const addressee = customer?.payerName || customer?.chiefMournerName || ''
     const issuedAt = fmtDate(new Date())
+    const FIXED_ITEM_ROWS = 37
     const displayRows = buildDisplayRows(products, doc.items, doc.freeItems)
 
     const [company, setCompany] = useState<CompanyProfile | null>(null)
@@ -282,11 +283,11 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
                                                                     </span>
                                                                 ))}
                                                             </div>
-                                                            <div className="text-center">
+                                                            <div className="text-center text-[0.625rem]">
                                                                 {(() => {
                                                                     const variantLabel =
-                                                                        row.estimateItem?.productVariant?.name ??
-                                                                        row.estimateItem?.productRowVariant?.label
+                                                                        row.estimateItem?.productVariant?.abbreviatedName ??
+                                                                        row.estimateItem?.productRowVariant?.abbreviatedName
                                                                     return row.estimateItem && row.showProductVariantName && variantLabel
                                                                         ? `(${variantLabel})`
                                                                         : ''
@@ -322,6 +323,14 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
                                     </Fragment>
                                     )
                                 })}
+                                {Array.from({ length: Math.max(0, FIXED_ITEM_ROWS - displayRows.length) }).map((_, i) => (
+                                    <tr key={`pad-${i}`}>
+                                        <td className="border border-l-0 border-black px-2">&nbsp;</td>
+                                        <td className="border border-l-0 border-black px-0.5">&nbsp;</td>
+                                        <td className="border border-black px-1">&nbsp;</td>
+                                        <td className="border border-r-0 border-black px-1">&nbsp;</td>
+                                    </tr>
+                                ))}
                             </tbody>
                             {/* 金額合計 */}
                             <tfoot className="border-0 border-t-2 border-black">

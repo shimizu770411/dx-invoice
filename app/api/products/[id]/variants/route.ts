@@ -62,6 +62,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
                     storeId: body.storeId ? BigInt(body.storeId) : null,
                     groupId,
                     name: body.name,
+                    abbreviatedName: body.abbreviatedName || null,
                     imageUrl: body.imageUrl || null,
                     priceGeneral: Number(body.priceGeneral) || 0,
                     priceMember: Number(body.priceMember) || 0,
