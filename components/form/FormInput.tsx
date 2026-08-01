@@ -18,6 +18,7 @@ interface FormInputProps<T extends FieldValues> {
     minYear?: number
     maxYear?: number
     maxLength?: number
+    onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void
 }
 
 export function FormInput<T extends FieldValues>({
@@ -36,6 +37,7 @@ export function FormInput<T extends FieldValues>({
     minYear,
     maxYear,
     maxLength,
+    onKeyDown,
 }: FormInputProps<T>) {
     const errorMessage = error && 'message' in error ? (error.message as string) : undefined
 
@@ -46,6 +48,7 @@ export function FormInput<T extends FieldValues>({
             render={({ field, fieldState }) => (
                 <InputUI
                     value={field.value || ''}
+                    onKeyDown={onKeyDown}
                     onChange={(value) => {
                         // type="number" で min/max が指定されている場合、範囲外の値は強制的にクリップする
                         // HTML の max 属性はスピンボタンだけ制限し手入力では超えられるため、ここで明示的に制限する

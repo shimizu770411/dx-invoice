@@ -4,6 +4,7 @@ interface InputUIProps {
     value?: string
     onChange: (value: string) => void
     onBlur?: () => void
+    onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void
     label?: string
     placeholder?: string
     type?: string
@@ -23,6 +24,7 @@ export function InputUI({
     value = '',
     onChange,
     onBlur,
+    onKeyDown,
     label,
     placeholder,
     type = 'text',
@@ -69,6 +71,7 @@ export function InputUI({
                     value={value}
                     onChange={(e) => onChange(e.target.value)}
                     onBlur={onBlur}
+                    onKeyDown={onKeyDown}
                     type={type}
                     min={minValue}
                     max={maxValue}

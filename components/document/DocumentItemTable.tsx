@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useState } from 'react'
+import { Fragment, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Control, FieldArrayWithId, UseFormSetValue, useWatch } from 'react-hook-form'
 import { FormInput } from '@/components/form/FormInput'
@@ -184,6 +184,18 @@ export function DocumentItemTable({
     const [pendingGroupSelections, setPendingGroupSelections] = useState<Record<string, string[]>>({})
     const [enlargedImage, setEnlargedImage] = useState<string | null>(null)
     const [checkedItems, setCheckedItems] = useState<boolean[]>([])
+    // 数量入力欄で Enter を押した際、次の商品のチェックボックスへ明示的にフォーカスを移すための参照
+    // (端末・ブラウザによって Enter キーのフォーカス移動挙動が異なるため、挙動を統一する)
+    const checkboxRefs = useRef<Record<number, HTMLInputElement | null>>({})
+    const focusNextCheckbox = (fromIndex: number) => {
+        for (let i = fromIndex + 1; i < items.length; i++) {
+            const el = checkboxRefs.current[i]
+            if (el) {
+                el.focus()
+                return
+            }
+        }
+    }
     const [prevQtySignature, setPrevQtySignature] = useState('')
     const [freeCheckedItems, setFreeCheckedItems] = useState<boolean[]>([])
     const [prevFreeSignature, setPrevFreeSignature] = useState('')
@@ -553,6 +565,9 @@ export function DocumentItemTable({
                                                 {!readOnly && (
                                                     <input
                                                         type="checkbox"
+                                                        ref={(el) => {
+                                                            checkboxRefs.current[index] = el
+                                                        }}
                                                         checked={isGroupableItem ? groupAnyChecked : (checkedItems[index] ?? false)}
                                                         onChange={(e) => {
                                                             const checked = e.target.checked
@@ -741,6 +756,16 @@ export function DocumentItemTable({
                                                 min={0}
                                                 max={3000}
                                                 disabled={isGroupableItem ? !groupAnyChecked : !checkedItems[index]}
+                                                onKeyDown={(e) => {
+                                                    if (e.key !== 'Enter') return
+                                                    e.preventDefault()
+                                                    // 端末・ブラウザによって Enter キーのフォーカス移動先が異なるため、
+                                                    // 次の商品のチェックボックスへ明示的にフォーカスを移す
+                                                    const gStart = groupStartIndexOf(index)
+                                                    const gSize = groupSizeOf(gStart)
+                                                    const groupEndIndex = isGroupableItem ? gStart + gSize - 1 : index
+                                                    focusNextCheckbox(groupEndIndex)
+                                                }}
                                             />
                                         </td>
                                         <td className="border border-gray-300 p-3 text-right">
@@ -885,6 +910,14 @@ export function DocumentItemTable({
                                                     min={0}
                                                     max={3000}
                                                     disabled={isGroupableItem ? !groupAnyChecked : !checkedItems[index]}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key !== 'Enter') return
+                                                        e.preventDefault()
+                                                        const gStart = groupStartIndexOf(index)
+                                                        const gSize = groupSizeOf(gStart)
+                                                        const groupEndIndex = isGroupableItem ? gStart + gSize - 1 : index
+                                                        focusNextCheckbox(groupEndIndex)
+                                                    }}
                                                 />
                                             </td>
                                             <td className="border border-gray-300 p-3 text-right">
