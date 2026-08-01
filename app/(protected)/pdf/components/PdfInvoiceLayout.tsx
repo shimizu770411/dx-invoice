@@ -402,6 +402,125 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
         : undefined
     const FIXED_ITEM_ROWS = 38
     const displayRows = buildDisplayRows(products, items, doc.freeItems)
+    // 満期サービス行は商品行群の直後ではなく、明細欄の最終行（小計の直前）に固定表示する
+    const normalRows = displayRows.filter((row) => !row.isMaturity)
+    const maturityRows = displayRows.filter((row) => row.isMaturity)
+    const renderItemRow = (row: DisplayRow, index: number, rows: DisplayRow[], keyPrefix: string) => {
+        const isNextSecondary = rows[index + 1]?.isSecondaryRow
+        const mergeCls = `${row.isSecondaryRow ? 'border-t-0' : ''} ${isNextSecondary ? 'border-b-0' : ''}`
+        return (
+        <Fragment key={`${keyPrefix}-${index}`}>
+            <tr key={`${keyPrefix}-main-${index}`}>
+                {!row.isSecondaryRow && (
+                <td
+                    className="border border-l-0 border-black px-2 align-top"
+                    rowSpan={row.multiRowGroupSize}
+                >
+                    {(() => {
+                        const chars = (row.label || '-').split('')
+                        return (
+                            <>
+                                <div
+                                    className={`mx-auto flex w-[6rem] ${chars.length === 1 ? 'justify-center' : 'justify-between'}`}
+                                >
+                                    {chars.map((char, i) => (
+                                        <span key={i} className="text-center">
+                                            {char}
+                                        </span>
+                                    ))}
+                                </div>
+                                <div className="text-center text-[0.625rem]">
+                                    {(() => {
+                                        const variantLabel =
+                                            row.estimateItem?.productVariant?.abbreviatedName ??
+                                            row.estimateItem?.productRowVariant?.abbreviatedName
+                                        return row.estimateItem && row.showProductVariantName && variantLabel
+                                            ? `(${variantLabel})`
+                                            : ''
+                                    })()}
+                                </div>
+                            </>
+                        )
+                    })()}
+                </td>
+                )}
+                {!row.isSecondaryRow && (
+                <td
+                    className="border border-l-0 border-black px-0.5 text-left align-top"
+                    rowSpan={row.multiRowGroupSize}
+                >
+                    <div className="whitespace-pre-wrap break-words">
+                        {row.displayDescription ?? row.estimateItem?.description ?? ''}
+                    </div>
+                    <div>
+                        {/* 複数行構成商品(単価×数量型)は「数量 × 単価」を表示。それ以外は数量が1より大きい場合のみ表示。親付きフリー行（満期サービス以外）は qty=1 でも常に数量を表示。 */}
+                        {row.estimateItem && isMultiRowItem(row.estimateItem) && row.estimateItem.calcType === 'UNIT_PRICE_X_QTY'
+                            ? `${row.estimateItem.qty.toLocaleString()} × ¥${fmtAmount(isMember ? row.estimateItem.unitPriceMember : row.estimateItem.unitPriceGeneral)}`
+                            : row.estimateItem &&
+                              (row.estimateItem.qty > 1 ||
+                                  (row.isFreeItem && row.isFixedRow && !row.isMaturity))
+                            ? `数量: ${row.estimateItem.qty.toLocaleString()}`
+                            : ''}
+                        {row.isFreeItem && !row.isFixedRow && row.estimateItem
+                            ? `${row.estimateItem.qty > 1 ? '　' : ''}単価: ¥${fmtAmount(row.estimateItem.unitPriceGeneral)}`
+                            : ''}
+                    </div>
+                </td>
+                )}
+                <td
+                    className={`border border-black px-1 text-right ${mergeCls}`}
+                >
+                    {row.estimateItem ? (
+                        isServiceIncludedFor(row.estimateItem, false) ? (
+                            <span style={{ color: '#8a7e5c', fontWeight: 600 }}>
+                                サービス
+                            </span>
+                        ) : isSetIncludedFor(row.estimateItem, false) ? (
+                            <span style={{ color: '#8a7e5c', fontWeight: 600 }}>
+                                セット
+                            </span>
+                        ) : (
+                            fmtAmount(
+                                isMultiRowItem(row.estimateItem)
+                                    ? multiRowAmount(row.estimateItem, row.estimateItem.unitPriceGeneral)
+                                    : row.estimateItem.unitPriceGeneral * row.estimateItem.qty
+                            )
+                        )
+                    ) : (
+                        ''
+                    )}
+                </td>
+                <td
+                    className={`border border-r-0 border-black px-1 text-right ${mergeCls}`}
+                >
+                    {row.estimateItem ? (
+                        isMaturityServiceIncludedFor(row.estimateItem) ? (
+                            <span style={{ color: '#8a7e5c', fontWeight: 600 }}>
+                                満期サービス
+                            </span>
+                        ) : isServiceIncludedFor(row.estimateItem, true) ? (
+                            <span style={{ color: '#8a7e5c', fontWeight: 600 }}>
+                                サービス
+                            </span>
+                        ) : isSetIncludedFor(row.estimateItem, true) ? (
+                            <span style={{ color: '#8a7e5c', fontWeight: 600 }}>
+                                セット
+                            </span>
+                        ) : (
+                            fmtAmount(
+                                isMultiRowItem(row.estimateItem)
+                                    ? multiRowAmount(row.estimateItem, row.estimateItem.unitPriceMember)
+                                    : row.estimateItem.unitPriceMember * row.estimateItem.qty
+                            )
+                        )
+                    ) : (
+                        ''
+                    )}
+                </td>
+            </tr>
+        </Fragment>
+        )
+    }
     return (
         <div
             id={contentId}
@@ -551,122 +670,7 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                 </tr>
                             </thead>
                             <tbody>
-                                {displayRows.map((row, index) => {
-                                    const isNextSecondary = displayRows[index + 1]?.isSecondaryRow
-                                    const mergeCls = `${row.isSecondaryRow ? 'border-t-0' : ''} ${isNextSecondary ? 'border-b-0' : ''}`
-                                    return (
-                                    <Fragment key={index}>
-                                        <tr key={`main-${index}`}>
-                                            {!row.isSecondaryRow && (
-                                            <td
-                                                className="border border-l-0 border-black px-2 align-top"
-                                                rowSpan={row.multiRowGroupSize}
-                                            >
-                                                {(() => {
-                                                    const chars = (row.label || '-').split('')
-                                                    return (
-                                                        <>
-                                                            <div
-                                                                className={`mx-auto flex w-[6rem] ${chars.length === 1 ? 'justify-center' : 'justify-between'}`}
-                                                            >
-                                                                {chars.map((char, i) => (
-                                                                    <span key={i} className="text-center">
-                                                                        {char}
-                                                                    </span>
-                                                                ))}
-                                                            </div>
-                                                            <div className="text-center text-[0.625rem]">
-                                                                {(() => {
-                                                                    const variantLabel =
-                                                                        row.estimateItem?.productVariant?.abbreviatedName ??
-                                                                        row.estimateItem?.productRowVariant?.abbreviatedName
-                                                                    return row.estimateItem && row.showProductVariantName && variantLabel
-                                                                        ? `(${variantLabel})`
-                                                                        : ''
-                                                                })()}
-                                                            </div>
-                                                        </>
-                                                    )
-                                                })()}
-                                            </td>
-                                            )}
-                                            {!row.isSecondaryRow && (
-                                            <td
-                                                className="border border-l-0 border-black px-0.5 text-left align-top"
-                                                rowSpan={row.multiRowGroupSize}
-                                            >
-                                                <div className="whitespace-pre-wrap break-words">
-                                                    {row.displayDescription ?? row.estimateItem?.description ?? ''}
-                                                </div>
-                                                <div>
-                                                    {/* 複数行構成商品(単価×数量型)は「数量 × 単価」を表示。それ以外は数量が1より大きい場合のみ表示。親付きフリー行（満期サービス以外）は qty=1 でも常に数量を表示。 */}
-                                                    {row.estimateItem && isMultiRowItem(row.estimateItem) && row.estimateItem.calcType === 'UNIT_PRICE_X_QTY'
-                                                        ? `${row.estimateItem.qty.toLocaleString()} × ¥${fmtAmount(isMember ? row.estimateItem.unitPriceMember : row.estimateItem.unitPriceGeneral)}`
-                                                        : row.estimateItem &&
-                                                          (row.estimateItem.qty > 1 ||
-                                                              (row.isFreeItem && row.isFixedRow && !row.isMaturity))
-                                                        ? `数量: ${row.estimateItem.qty.toLocaleString()}`
-                                                        : ''}
-                                                    {row.isFreeItem && !row.isFixedRow && row.estimateItem
-                                                        ? `${row.estimateItem.qty > 1 ? '　' : ''}単価: ¥${fmtAmount(row.estimateItem.unitPriceGeneral)}`
-                                                        : ''}
-                                                </div>
-                                            </td>
-                                            )}
-                                            <td
-                                                className={`border border-black px-1 text-right ${mergeCls}`}
-                                            >
-                                                {row.estimateItem ? (
-                                                    isServiceIncludedFor(row.estimateItem, false) ? (
-                                                        <span style={{ color: '#8a7e5c', fontWeight: 600 }}>
-                                                            サービス
-                                                        </span>
-                                                    ) : isSetIncludedFor(row.estimateItem, false) ? (
-                                                        <span style={{ color: '#8a7e5c', fontWeight: 600 }}>
-                                                            セット
-                                                        </span>
-                                                    ) : (
-                                                        fmtAmount(
-                                                            isMultiRowItem(row.estimateItem)
-                                                                ? multiRowAmount(row.estimateItem, row.estimateItem.unitPriceGeneral)
-                                                                : row.estimateItem.unitPriceGeneral * row.estimateItem.qty
-                                                        )
-                                                    )
-                                                ) : (
-                                                    ''
-                                                )}
-                                            </td>
-                                            <td
-                                                className={`border border-r-0 border-black px-1 text-right ${mergeCls}`}
-                                            >
-                                                {row.estimateItem ? (
-                                                    isMaturityServiceIncludedFor(row.estimateItem) ? (
-                                                        <span style={{ color: '#8a7e5c', fontWeight: 600 }}>
-                                                            満期サービス
-                                                        </span>
-                                                    ) : isServiceIncludedFor(row.estimateItem, true) ? (
-                                                        <span style={{ color: '#8a7e5c', fontWeight: 600 }}>
-                                                            サービス
-                                                        </span>
-                                                    ) : isSetIncludedFor(row.estimateItem, true) ? (
-                                                        <span style={{ color: '#8a7e5c', fontWeight: 600 }}>
-                                                            セット
-                                                        </span>
-                                                    ) : (
-                                                        fmtAmount(
-                                                            isMultiRowItem(row.estimateItem)
-                                                                ? multiRowAmount(row.estimateItem, row.estimateItem.unitPriceMember)
-                                                                : row.estimateItem.unitPriceMember * row.estimateItem.qty
-                                                        )
-                                                    )
-                                                ) : (
-                                                    ''
-                                                )}
-                                            </td>
-                                        </tr>
-                                    </Fragment>
-                                    )
-                                })}
+                                {normalRows.map((row, index) => renderItemRow(row, index, normalRows, 'normal'))}
                                 {Array.from({ length: Math.max(0, FIXED_ITEM_ROWS - displayRows.length) }).map((_, i) => (
                                     <tr key={`pad-${i}`}>
                                         <td className="border border-l-0 border-black px-2">&nbsp;</td>
@@ -675,6 +679,7 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                         <td className="border border-r-0 border-black px-1">&nbsp;</td>
                                     </tr>
                                 ))}
+                                {maturityRows.map((row, index) => renderItemRow(row, index, maturityRows, 'maturity'))}
                             </tbody>
                             {/* 金額合計 */}
                             <tfoot className="border-0 border-t-2 border-black">
@@ -733,11 +738,10 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                     </td>
                                 </tr>
                                 {(customer?.memberships ?? [])
-                                    .filter((m) => m.paymentAmount != null)
+                                    .filter((m) => m.paymentAmountOnce != null && m.paymentTimes != null)
                                     .map((m, idx) => {
-                                        const subtotal = m.paymentAmount ?? 0
-                                        const hasBreakdown =
-                                            m.paymentAmountOnce != null && m.paymentTimes != null
+                                        const subtotal =
+                                            (m.paymentAmountOnce ?? 0) * (m.paymentTimes ?? 0)
                                         return (
                                             <tr key={`membership-${idx}`}>
                                                 <th className="border border-l-0 border-black text-center">
@@ -754,9 +758,7 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                                     )}
                                                 </th>
                                                 <td className="border border-black text-center">
-                                                    {hasBreakdown
-                                                        ? `${(m.paymentAmountOnce ?? 0).toLocaleString()}円×${m.paymentTimes ?? 0}回`
-                                                        : <>&nbsp;</>}
+                                                    {`${(m.paymentAmountOnce ?? 0).toLocaleString()}円×${m.paymentTimes ?? 0}回`}
                                                 </td>
                                                 <td className="border border-black px-1 text-left">&nbsp;</td>
                                                 <td className="border border-black px-1 border-r-0 text-right">

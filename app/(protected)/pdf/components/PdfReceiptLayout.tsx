@@ -151,6 +151,77 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
     const issuedAt = fmtDate(new Date())
     const FIXED_ITEM_ROWS = 38
     const displayRows = buildDisplayRows(products, doc.items, doc.freeItems)
+    // 満期サービス行は商品行群の直後ではなく、明細欄の最終行（小計の直前）に固定表示する
+    const normalRows = displayRows.filter((row) => !row.isMaturity)
+    const maturityRows = displayRows.filter((row) => row.isMaturity)
+    const renderItemRow = (row: DisplayRow, index: number, rows: DisplayRow[], keyPrefix: string) => {
+        const isNextSecondary = rows[index + 1]?.isSecondaryRow
+        const mergeCls = `${row.isSecondaryRow ? 'border-t-0' : ''} ${isNextSecondary ? 'border-b-0' : ''}`
+        return (
+        <Fragment key={`${keyPrefix}-${index}`}>
+            <tr key={`${keyPrefix}-main-${index}`}>
+                <td
+                    className={`border border-l-0 border-black px-2 ${mergeCls}`}
+                >
+                    {(() => {
+                        const chars = row.isSecondaryRow
+                            ? []
+                            : (row.label || '-').split('')
+                        return (
+                            <>
+                                <div
+                                    className={`mx-auto flex w-[6rem] ${
+                                        chars.length === 1
+                                            ? 'justify-center'
+                                            : 'justify-between'
+                                    }`}
+                                >
+                                    {chars.map((char, i) => (
+                                        <span key={i} className="text-center">
+                                            {char}
+                                        </span>
+                                    ))}
+                                </div>
+                                <div className="text-center text-[0.625rem]">
+                                    {(() => {
+                                        const variantLabel =
+                                            row.estimateItem?.productVariant?.abbreviatedName ??
+                                            row.estimateItem?.productRowVariant?.abbreviatedName
+                                        return row.estimateItem && row.showProductVariantName && variantLabel
+                                            ? `(${variantLabel})`
+                                            : ''
+                                    })()}
+                                </div>
+                            </>
+                        )
+                    })()}
+                </td>
+                <td
+                    className={`border border-l-0 border-black px-0.5 text-left ${mergeCls}`}
+                >
+                    <div className="whitespace-pre-wrap break-words">
+                        {row.hideDescription ? '' : (row.estimateItem?.description ?? '')}
+                    </div>
+                    {row.isFreeItem && !row.isFixedRow && row.estimateItem && (
+                        <div>
+                            単価: ¥{row.estimateItem.unitPriceGeneral.toLocaleString()}
+                        </div>
+                    )}
+                </td>
+                <td
+                    className={`border border-black px-1 text-right ${mergeCls}`}
+                >
+                    {row.estimateItem ? `${row.estimateItem.qty.toLocaleString()}` : ''}
+                </td>
+                <td
+                    className={`border border-r-0 border-black px-1 text-right ${mergeCls}`}
+                >
+                    {row.estimateItem ? row.estimateItem.amount.toLocaleString() : ''}
+                </td>
+            </tr>
+        </Fragment>
+        )
+    }
 
     const [company, setCompany] = useState<CompanyProfile | null>(null)
     useEffect(() => {
@@ -255,74 +326,7 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
                                 </tr>
                             </thead>
                             <tbody>
-                                {displayRows.map((row, index) => {
-                                    const isNextSecondary = displayRows[index + 1]?.isSecondaryRow
-                                    const mergeCls = `${row.isSecondaryRow ? 'border-t-0' : ''} ${isNextSecondary ? 'border-b-0' : ''}`
-                                    return (
-                                    <Fragment key={index}>
-                                        <tr key={`main-${index}`}>
-                                            <td
-                                                className={`border border-l-0 border-black px-2 ${mergeCls}`}
-                                            >
-                                                {(() => {
-                                                    const chars = row.isSecondaryRow
-                                                        ? []
-                                                        : (row.label || '-').split('')
-                                                    return (
-                                                        <>
-                                                            <div
-                                                                className={`mx-auto flex w-[6rem] ${
-                                                                    chars.length === 1
-                                                                        ? 'justify-center'
-                                                                        : 'justify-between'
-                                                                }`}
-                                                            >
-                                                                {chars.map((char, i) => (
-                                                                    <span key={i} className="text-center">
-                                                                        {char}
-                                                                    </span>
-                                                                ))}
-                                                            </div>
-                                                            <div className="text-center text-[0.625rem]">
-                                                                {(() => {
-                                                                    const variantLabel =
-                                                                        row.estimateItem?.productVariant?.abbreviatedName ??
-                                                                        row.estimateItem?.productRowVariant?.abbreviatedName
-                                                                    return row.estimateItem && row.showProductVariantName && variantLabel
-                                                                        ? `(${variantLabel})`
-                                                                        : ''
-                                                                })()}
-                                                            </div>
-                                                        </>
-                                                    )
-                                                })()}
-                                            </td>
-                                            <td
-                                                className={`border border-l-0 border-black px-0.5 text-left ${mergeCls}`}
-                                            >
-                                                <div className="whitespace-pre-wrap break-words">
-                                                    {row.hideDescription ? '' : (row.estimateItem?.description ?? '')}
-                                                </div>
-                                                {row.isFreeItem && !row.isFixedRow && row.estimateItem && (
-                                                    <div>
-                                                        単価: ¥{row.estimateItem.unitPriceGeneral.toLocaleString()}
-                                                    </div>
-                                                )}
-                                            </td>
-                                            <td
-                                                className={`border border-black px-1 text-right ${mergeCls}`}
-                                            >
-                                                {row.estimateItem ? `${row.estimateItem.qty.toLocaleString()}` : ''}
-                                            </td>
-                                            <td
-                                                className={`border border-r-0 border-black px-1 text-right ${mergeCls}`}
-                                            >
-                                                {row.estimateItem ? row.estimateItem.amount.toLocaleString() : ''}
-                                            </td>
-                                        </tr>
-                                    </Fragment>
-                                    )
-                                })}
+                                {normalRows.map((row, index) => renderItemRow(row, index, normalRows, 'normal'))}
                                 {Array.from({ length: Math.max(0, FIXED_ITEM_ROWS - displayRows.length) }).map((_, i) => (
                                     <tr key={`pad-${i}`}>
                                         <td className="border border-l-0 border-black px-2">&nbsp;</td>
@@ -331,6 +335,7 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
                                         <td className="border border-r-0 border-black px-1">&nbsp;</td>
                                     </tr>
                                 ))}
+                                {maturityRows.map((row, index) => renderItemRow(row, index, maturityRows, 'maturity'))}
                             </tbody>
                             {/* 金額合計 */}
                             <tfoot className="border-0 border-t-2 border-black">
@@ -419,11 +424,10 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
                                     </>
                                 )}
                                 {(customer?.memberships ?? [])
-                                    .filter((m) => m.paymentAmount != null)
+                                    .filter((m) => m.paymentAmountOnce != null && m.paymentTimes != null)
                                     .map((m, idx) => {
-                                        const subtotal = m.paymentAmount ?? 0
-                                        const hasBreakdown =
-                                            m.paymentAmountOnce != null && m.paymentTimes != null
+                                        const subtotal =
+                                            (m.paymentAmountOnce ?? 0) * (m.paymentTimes ?? 0)
                                         return (
                                             <tr key={`membership-${idx}`}>
                                                 <th className="border border-l-0 border-black text-center">
@@ -440,9 +444,7 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
                                                     )}
                                                 </th>
                                                 <td className="border border-black text-center">
-                                                    {hasBreakdown
-                                                        ? `${(m.paymentAmountOnce ?? 0).toLocaleString()}円×${m.paymentTimes ?? 0}回`
-                                                        : <>&nbsp;</>}
+                                                    {`${(m.paymentAmountOnce ?? 0).toLocaleString()}円×${m.paymentTimes ?? 0}回`}
                                                 </td>
                                                 <td className="border border-black px-1 text-left">&nbsp;</td>
                                                 <td className="border border-r-0 border-black px-1 text-right">
