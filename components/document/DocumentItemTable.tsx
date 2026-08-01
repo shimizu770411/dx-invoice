@@ -40,6 +40,7 @@ export type DocumentFormData = {
 type DocumentRowVariant = {
     id: string
     label: string
+    abbreviatedName?: string | null
     imageUrl?: string | null
     unitPrice: number
     isDefault?: boolean
@@ -87,6 +88,7 @@ type DocumentItem = {
     productVariant?: {
         id: string
         name: string
+        abbreviatedName?: string | null
         isDefaultSet?: boolean
         setPrice?: number
         storeId?: string | null

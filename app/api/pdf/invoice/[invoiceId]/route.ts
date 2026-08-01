@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth-middleware'
-import { getBrowser } from '@/lib/puppeteer'
+import { getBrowser, createJstPage } from '@/lib/puppeteer'
 
 /** Vercel Serverless 最大実行時間（秒） */
 export const maxDuration = 60
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ invoi
 
     const browser = await getBrowser()
     try {
-        const page = await browser.newPage()
+        const page = await createJstPage(browser)
 
         // 認証クッキーをセット
         if (accessToken) {

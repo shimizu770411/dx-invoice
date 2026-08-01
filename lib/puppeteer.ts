@@ -1,4 +1,4 @@
-import puppeteer, { type Browser } from 'puppeteer-core'
+import puppeteer, { type Browser, type Page } from 'puppeteer-core'
 
 /**
  * Puppeteer ブラウザインスタンスを取得する
@@ -43,4 +43,16 @@ export async function getBrowser(): Promise<Browser> {
         headless: true,
         args: chromium.args,
     })
+}
+
+/**
+ * PDF生成用のページを作成する。
+ * サーバーの実行環境（Vercel/Docker）はタイムゾーン未設定でUTC動作のため、
+ * 明示的に日本時間へ固定しないと、PDF内の時刻表示（受付・通夜・出棺等）が
+ * 実際の時刻より9時間ズレて印字される。
+ */
+export async function createJstPage(browser: Browser): Promise<Page> {
+    const page = await browser.newPage()
+    await page.emulateTimezone('Asia/Tokyo')
+    return page
 }
