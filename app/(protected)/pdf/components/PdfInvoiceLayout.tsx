@@ -308,7 +308,7 @@ function fmtDate(v?: string | Date | null): string {
 function fmtTime(v?: string | Date | null): string {
     if (!v) return ''
     const d = new Date(v)
-    return `${String(d.getHours()).padStart(2, '0')}時${String(d.getMinutes()).padStart(2, '0')}分`
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
 // 金額フォーマッタ。負値は会計表記に合わせて「▲ 1,234」のように出力する。
@@ -908,7 +908,7 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                             {
                                                 label: '告別式',
                                                 data: customer?.funeralFrom
-                                                    ? `${fmtDate(customer.funeralFrom)} ${String(new Date(customer.funeralFrom).getHours()).padStart(2, '0')}時〜${customer.funeralTo ? String(new Date(customer.funeralTo).getHours()).padStart(2, '0') + '時' : ''}`
+                                                    ? `${fmtDate(customer.funeralFrom)} ${fmtTime(customer.funeralFrom)}〜${customer.funeralTo ? fmtTime(customer.funeralTo) : ''}`
                                                     : '未定',
                                                 place: customer?.funeralPlace,
                                             },
