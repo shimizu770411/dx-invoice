@@ -419,10 +419,11 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
                                     </>
                                 )}
                                 {(customer?.memberships ?? [])
-                                    .filter((m) => m.paymentAmountOnce != null && m.paymentTimes != null)
+                                    .filter((m) => m.paymentAmount != null)
                                     .map((m, idx) => {
-                                        const subtotal =
-                                            (m.paymentAmountOnce ?? 0) * (m.paymentTimes ?? 0)
+                                        const subtotal = m.paymentAmount ?? 0
+                                        const hasBreakdown =
+                                            m.paymentAmountOnce != null && m.paymentTimes != null
                                         return (
                                             <tr key={`membership-${idx}`}>
                                                 <th className="border border-l-0 border-black text-center">
@@ -439,7 +440,9 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
                                                     )}
                                                 </th>
                                                 <td className="border border-black text-center">
-                                                    {`${(m.paymentAmountOnce ?? 0).toLocaleString()}円×${m.paymentTimes ?? 0}回`}
+                                                    {hasBreakdown
+                                                        ? `${(m.paymentAmountOnce ?? 0).toLocaleString()}円×${m.paymentTimes ?? 0}回`
+                                                        : <>&nbsp;</>}
                                                 </td>
                                                 <td className="border border-black px-1 text-left">&nbsp;</td>
                                                 <td className="border border-r-0 border-black px-1 text-right">
