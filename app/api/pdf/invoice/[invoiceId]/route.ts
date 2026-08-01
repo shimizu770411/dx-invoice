@@ -79,6 +79,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ invoi
                 'Content-Disposition': isDownload
                     ? `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`
                     : `inline; filename*=UTF-8''${encodeURIComponent(filename)}`,
+                'Cache-Control': 'no-store',
             },
         })
     } catch (error: any) {
