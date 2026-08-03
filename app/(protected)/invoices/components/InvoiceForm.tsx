@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm, FormProvider, useFieldArray, useWatch, UseFormReturn } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -62,6 +62,20 @@ function InvoiceFormContent({
     const [activeTab, setActiveTab] = useState<'items' | 'other'>('items')
     const [showSelectedOptions, setShowSelectedOptions] = useState(false)
 
+    // 画面下部固定フッターの高さぶんコンテンツに余白を確保する（タブレット幅ではボタンが折り返してフッターが高くなるため、固定値ではなく実測値を使う）
+    const footerRef = useRef<HTMLDivElement>(null)
+    const [footerHeight, setFooterHeight] = useState(0)
+
+    useEffect(() => {
+        const el = footerRef.current
+        if (!el) return
+        const observer = new ResizeObserver((entries) => {
+            setFooterHeight(entries[0].contentRect.height)
+        })
+        observer.observe(el)
+        return () => observer.disconnect()
+    }, [])
+
     // 入金済みの請求書は編集不可にする
     const isLocked = !!invoice?.isPaid
 
@@ -83,6 +97,9 @@ function InvoiceFormContent({
         const isService = options?.isService ?? false
         const isMaturityService = options?.isMaturityService ?? false
         const adhocSetScope = options?.adhocSetScope ?? 'NONE'
+        // setItems の updater 内では setValue（別コンポーネントの状態更新）を直接呼ばない。
+        // updater は React 内部で複数回呼ばれ得るため、副作用はここに一旦控えて updater の外で発火する。
+        let overwrittenDescription: string | undefined
         setItems((prev) =>
             prev.map((item, i) => {
                 if (i !== index) return item
@@ -104,7 +121,7 @@ function InvoiceFormContent({
                 let description = item.description
                 if (product?.overwriteDescriptionOnVariantChange) {
                     description = variant.name
-                    setValue(`items.${index}.description`, description)
+                    overwrittenDescription = description
                 }
                 return {
                     ...item,
@@ -121,6 +138,9 @@ function InvoiceFormContent({
                 } as any
             })
         )
+        if (overwrittenDescription !== undefined) {
+            setValue(`items.${index}.description`, overwrittenDescription)
+        }
     }
 
     const handleMultiSelectChange = (
@@ -272,8 +292,12 @@ function InvoiceFormContent({
         <FormProvider {...methods}>
             <form
                 onSubmit={handleSubmit(onSubmitWithStoreCheck, onInvalid)}
-                className="flex flex-col px-10 py-8 pb-28"
-                style={{ backgroundColor: '#fbfaf7', minHeight: 'calc(100vh - 68px)' }}
+                className="flex flex-col px-10 py-8"
+                style={{
+                    backgroundColor: '#fbfaf7',
+                    minHeight: 'calc(100vh - 68px)',
+                    paddingBottom: footerHeight + 32,
+                }}
             >
                 {/* ページヘッダー */}
                 <div
@@ -360,6 +384,7 @@ function InvoiceFormContent({
 
                 {/* 操作ボタン & 合計（画面下部固定） */}
                 <div
+                    ref={footerRef}
                     className="fixed bottom-0 left-0 right-0 flex items-center justify-between gap-6 px-10 py-3"
                     style={{
                         backgroundColor: '#ffffff',

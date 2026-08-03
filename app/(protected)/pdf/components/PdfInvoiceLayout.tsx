@@ -4,6 +4,7 @@ import { PdfMembershipTable } from './PdfMembershipTable'
 import { resolveProductImageUrl } from '@/lib/utils'
 import { scopeApplies } from '@/lib/productScope'
 import { computeMultiRowAmount } from '@/lib/expandMultiRow'
+import { useDateFormat } from '@/hooks/useDateFormat'
 
 export type PdfProductItem = {
     id: string
@@ -320,6 +321,7 @@ function fmtAmount(n: number): string {
 export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc, products, hideSelectedOptions }: Props) {
     const { docNo, membershipPaidAmount, items } = doc
     const docAny = doc as any
+    const formatDate = useDateFormat()
     const isMember = doc.isMember === true
     // DB保存値ではなく実際のitems/freeItemsから合計を再計算
     // 解約手数料: qty>0 で登録されていれば、合計欄に「解約手数料」「値引」の2行を表示。
@@ -563,18 +565,8 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                     <div className="grid grid-cols-[2.8fr_1.2fr] gap-4 px-3 py-1 text-[0.8rem] leading-[1] tracking-tight">
                         <div className="flex w-[28rem] justify-between">
                             <div>告別式</div>
-                            {/* 月 */}
-                            <div>
-                                {customer?.funeralFrom
-                                    ? String(new Date(customer.funeralFrom).getMonth() + 1).padStart(2, '0') + '月'
-                                    : ''}
-                            </div>
-                            {/* 日 */}
-                            <div>
-                                {customer?.funeralFrom
-                                    ? String(new Date(customer.funeralFrom).getDate()).padStart(2, '0') + '日'
-                                    : ''}
-                            </div>
+                            {/* 年月日 */}
+                            <div>{customer?.funeralFrom ? formatDate(customer.funeralFrom) : ''}</div>
                             {/* 開始時間 */}
                             <div className="flex gap-1">
                                 <div>自</div>

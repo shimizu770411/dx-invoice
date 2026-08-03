@@ -69,45 +69,45 @@ export function DeceasedInfoTab() {
             />
 
             {/* 行年 */}
-            <div>
-                <div className="flex items-center justify-between mb-2">
-                    <label className="brand-label" style={{ marginBottom: 0 }}>
-                        行年
-                        <span className="brand-label-required">*</span>
-                    </label>
-                    <button
-                        type="button"
-                        onClick={() => setCalcOpen(true)}
-                        className="inline-flex items-center gap-1 font-mincho transition-colors"
-                        style={{
-                            padding: '4px 12px',
-                            fontSize: '12px',
-                            letterSpacing: '0.1em',
-                            border: '1px solid var(--brand-gold)',
-                            backgroundColor: '#ffffff',
-                            color: 'var(--brand-gold-soft)',
-                            cursor: 'pointer',
-                        }}
-                        onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = 'var(--brand-gold)'
-                            e.currentTarget.style.color = 'var(--brand-navy-dark)'
-                        }}
-                        onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = '#ffffff'
-                            e.currentTarget.style.color = 'var(--brand-gold-soft)'
-                        }}
-                    >
-                        <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>
-                            calculate
-                        </span>
-                        生年月日から算出
-                    </button>
-                </div>
+            <div style={{ position: 'relative' }}>
+                <label className="brand-label">
+                    行年
+                    <span className="brand-label-required">*</span>
+                </label>
+                <button
+                    type="button"
+                    onClick={() => setCalcOpen(true)}
+                    className="inline-flex items-center gap-1 font-mincho transition-colors"
+                    style={{
+                        position: 'absolute',
+                        top: 0,
+                        right: 0,
+                        padding: '4px 12px',
+                        fontSize: '12px',
+                        letterSpacing: '0.1em',
+                        border: '1px solid var(--brand-gold)',
+                        backgroundColor: '#ffffff',
+                        color: 'var(--brand-gold-soft)',
+                        cursor: 'pointer',
+                    }}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--brand-gold)'
+                        e.currentTarget.style.color = 'var(--brand-navy-dark)'
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = '#ffffff'
+                        e.currentTarget.style.color = 'var(--brand-gold-soft)'
+                    }}
+                >
+                    <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>
+                        calculate
+                    </span>
+                    生年月日から算出
+                </button>
                 <FormInput<CaseFormData>
                     name="age"
                     control={control}
                     type="number"
-                    prefix="満"
                     suffix="歳"
                     min={0}
                     max={999}

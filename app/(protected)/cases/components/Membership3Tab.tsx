@@ -15,7 +15,7 @@ export function Membership3Tab() {
 
     return (
         <div style={{ border: '1px solid #ddd', borderRadius: '8px', padding: '1.5rem' }}>
-            <h4 style={{ marginBottom: '1rem' }}>その他</h4>
+            <h4 style={{ marginBottom: '1rem' }}>けやき</h4>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
                 {/* 会員番号 */}
                 <FormInput<CaseFormData>
@@ -51,18 +51,10 @@ export function Membership3Tab() {
                     style={{
                         gridColumn: '1 / -1',
                         display: 'grid',
-                        gridTemplateColumns: 'repeat(5, 1fr)',
+                        gridTemplateColumns: 'repeat(4, 1fr)',
                         gap: '0.75rem',
                     }}
                 >
-                    <FormInput<CaseFormData>
-                        name={`memberships.${INDEX}.courseUnits`}
-                        control={control}
-                        label="コース口数"
-                        type="number"
-                        suffix="万口"
-                        error={errors.memberships?.[INDEX]?.courseUnits}
-                    />
                     <FormCurrencyInput<CaseFormData>
                         name={`memberships.${INDEX}.maturityAmount`}
                         control={control}

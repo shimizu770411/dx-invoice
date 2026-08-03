@@ -64,18 +64,10 @@ export function Membership2Tab() {
                     style={{
                         gridColumn: '1 / -1',
                         display: 'grid',
-                        gridTemplateColumns: 'repeat(5, 1fr)',
+                        gridTemplateColumns: 'repeat(4, 1fr)',
                         gap: '0.75rem',
                     }}
                 >
-                    <FormInput<CaseFormData>
-                        name={`memberships.${INDEX}.courseUnits`}
-                        control={control}
-                        label="コース口数"
-                        type="number"
-                        suffix="万口"
-                        error={errors.memberships?.[INDEX]?.courseUnits}
-                    />
                     <FormCurrencyInput<CaseFormData>
                         name={`memberships.${INDEX}.maturityAmount`}
                         control={control}
