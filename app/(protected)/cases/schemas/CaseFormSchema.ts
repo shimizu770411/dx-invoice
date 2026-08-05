@@ -57,6 +57,7 @@ export const caseFormSchema = z.object({
         z.number({ required_error: '必須です', invalid_type_error: '必須です' }).min(1, '必須です')
     ),
     religion: z.string().optional(),
+    estimateDisplayName: z.string().max(8, '8文字以内で入力してください').optional(),
 
     // 喪主情報
     chiefMournerName: z.coerce.string().min(1, '必須です'),

@@ -13,6 +13,7 @@ import { ProductVariant } from '@/lib/products'
 import { resolveProductImageUrl } from '@/lib/utils'
 import { scopeApplies } from '@/lib/productScope'
 import { computeMultiRowAmount } from '@/lib/expandMultiRow'
+import { EXECUTION_SURCHARGE_NAME } from '@/lib/documentUtils'
 
 /**
  * EstimateFormData と InvoiceFormData は構造が完全に一致するため、
@@ -215,8 +216,8 @@ export function DocumentItemTable({
             freeItems.map((it) => {
                 const name = (it?.productItemName ?? '').trim()
                 const qty = it?.qty ?? 0
-                const isFixedRow = name === '満期サービス' || name === '解約手数料'
-                // 固定行（満期サービス・解約手数料）は qty>0 のときのみチェック扱い。
+                const isFixedRow = name === '満期サービス' || name === '解約手数料' || name === EXECUTION_SURCHARGE_NAME
+                // 固定行（満期サービス・解約手数料・施行割増券）は qty>0 のときのみチェック扱い。
                 // 通常フリー行は qty>0 または品目名入力済みなら有効扱い。
                 if (isFixedRow) return qty > 0
                 return qty > 0 || name !== ''
@@ -958,7 +959,8 @@ export function DocumentItemTable({
                                     ''
                                 const isMaturity = itemName === '満期サービス'
                                 const isCancellationFee = itemName === '解約手数料'
-                                const isFixedRow = isMaturity || isCancellationFee
+                                const isExecutionSurcharge = itemName === EXECUTION_SURCHARGE_NAME
+                                const isFixedRow = isMaturity || isCancellationFee || isExecutionSurcharge
                                 const amount = isChecked
                                     ? isFixedRow
                                         ? liveUnitPrice
@@ -968,7 +970,9 @@ export function DocumentItemTable({
                                     ? 'bg-amber-50'
                                     : isCancellationFee
                                       ? 'bg-rose-50'
-                                      : 'bg-blue-50'
+                                      : isExecutionSurcharge
+                                        ? 'bg-orange-50'
+                                        : 'bg-blue-50'
                                 return (
                                     <tr key={field.id} className={rowBgClass}>
                                         <td className="border border-gray-300 p-1 text-center">
@@ -1013,14 +1017,20 @@ export function DocumentItemTable({
                                                 </td>
                                                 <td className="border border-gray-300 p-3" />
                                                 <td className="border border-gray-300 p-3 text-right">
-                                                    <FormCurrencyInput
-                                                        name={`freeItems.${index}.unitPriceGeneral`}
-                                                        control={control}
-                                                        disabled={inputsDisabled}
-                                                    />
-                                                    <div className="text-md mt-1">
-                                                        ¥{amount.toLocaleString()}
-                                                    </div>
+                                                    {isExecutionSurcharge ? (
+                                                        <div className="text-md">¥{amount.toLocaleString()}</div>
+                                                    ) : (
+                                                        <>
+                                                            <FormCurrencyInput
+                                                                name={`freeItems.${index}.unitPriceGeneral`}
+                                                                control={control}
+                                                                disabled={inputsDisabled}
+                                                            />
+                                                            <div className="text-md mt-1">
+                                                                ¥{amount.toLocaleString()}
+                                                            </div>
+                                                        </>
+                                                    )}
                                                 </td>
                                                 <td className="border border-gray-300 p-3" />
                                             </>

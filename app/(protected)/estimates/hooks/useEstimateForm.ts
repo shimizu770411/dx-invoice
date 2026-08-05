@@ -11,7 +11,7 @@ import { toast } from '@/hooks/use-toast'
 import { handleLoadError, handleSaveError } from '@/lib/errorHandler'
 import { calculateDocumentFormTotals } from '@/lib/documentTotals'
 import { useDocumentItems } from '@/hooks/useDocumentItems'
-import { expandEachModeItems, expandVariantGroupItems, buildDocumentFreeItems, MATURITY_SERVICE_NAME } from '@/lib/documentUtils'
+import { expandEachModeItems, expandVariantGroupItems, buildDocumentFreeItems, MATURITY_SERVICE_NAME, EXECUTION_SURCHARGE_NAME, EXECUTION_SURCHARGE_AMOUNT } from '@/lib/documentUtils'
 import { useDocumentProductSearch } from '@/hooks/useDocumentProductSearch'
 import { EstimateFormData, DEFAULT_FORM_VALUES } from '../schemas/EstimateFormSchema'
 
@@ -223,7 +223,7 @@ export function useEstimateCreate(customerId: string, reset: UseFormReset<Estima
             const filteredProducts = filterProductsByStore(allProducts, storeId)
             const initialItems = buildNewEstimateItems(filteredProducts)
             setItems(initialItems)
-            const initialFreeItems = buildDocumentFreeItems<EstimateFreeItem>([], initialItems, [MATURITY_SERVICE_NAME], { ignoreQtyFilter: true })
+            const initialFreeItems = buildDocumentFreeItems<EstimateFreeItem>([], initialItems, [MATURITY_SERVICE_NAME, EXECUTION_SURCHARGE_NAME], { ignoreQtyFilter: true })
             setFreeItems(initialFreeItems)
             reset({
                 ...DEFAULT_FORM_VALUES,
@@ -283,11 +283,14 @@ export function useEstimateCreate(customerId: string, reset: UseFormReset<Estima
                 .map((item, i) => {
                     const productItemName = formValues.freeItems[i]?.productItemName ?? item.productItemName ?? ''
                     const isMaturity = productItemName === MATURITY_SERVICE_NAME
-                    const description = isMaturity
+                    const isExecutionSurcharge = productItemName === EXECUTION_SURCHARGE_NAME
+                    const description = isMaturity || isExecutionSurcharge
                         ? ''
                         : formValues.freeItems[i]?.description ?? item.description ?? ''
-                    const unitPriceGeneral =
-                        formValues.freeItems[i]?.unitPriceGeneral ?? item.unitPriceGeneral
+                    // 施行割増券は金額固定・編集不可のため、フォーム送信値に関わらず規定額を強制する
+                    const unitPriceGeneral = isExecutionSurcharge
+                        ? EXECUTION_SURCHARGE_AMOUNT
+                        : formValues.freeItems[i]?.unitPriceGeneral ?? item.unitPriceGeneral
                     const qty = formValues.freeItems[i]?.qty ?? item.qty
                     const amount = unitPriceGeneral * qty
                     return { ...item, productItemName, description, unitPriceGeneral, qty, amount }
@@ -330,7 +333,7 @@ export function useEstimateEdit(estimateId: string, reset: UseFormReset<Estimate
             const filteredProducts = filterProductsByStore(allProducts, storeId)
             const mergedItems = buildMergedEstimateItems(filteredProducts, existingItems)
             const loadedFreeItems: EstimateFreeItem[] = (estimateData as any).freeItems || []
-            const paddedFreeItems = buildDocumentFreeItems(loadedFreeItems, mergedItems, [MATURITY_SERVICE_NAME])
+            const paddedFreeItems = buildDocumentFreeItems(loadedFreeItems, mergedItems, [MATURITY_SERVICE_NAME, EXECUTION_SURCHARGE_NAME])
             setItems(mergedItems)
             setFreeItems(paddedFreeItems)
             reset({
@@ -403,11 +406,14 @@ export function useEstimateEdit(estimateId: string, reset: UseFormReset<Estimate
                 .map((item, i) => {
                     const productItemName = formValues.freeItems[i]?.productItemName ?? item.productItemName ?? ''
                     const isMaturity = productItemName === MATURITY_SERVICE_NAME
-                    const description = isMaturity
+                    const isExecutionSurcharge = productItemName === EXECUTION_SURCHARGE_NAME
+                    const description = isMaturity || isExecutionSurcharge
                         ? ''
                         : formValues.freeItems[i]?.description ?? item.description ?? ''
-                    const unitPriceGeneral =
-                        formValues.freeItems[i]?.unitPriceGeneral ?? item.unitPriceGeneral
+                    // 施行割増券は金額固定・編集不可のため、フォーム送信値に関わらず規定額を強制する
+                    const unitPriceGeneral = isExecutionSurcharge
+                        ? EXECUTION_SURCHARGE_AMOUNT
+                        : formValues.freeItems[i]?.unitPriceGeneral ?? item.unitPriceGeneral
                     const qty = formValues.freeItems[i]?.qty ?? item.qty
                     const amount = unitPriceGeneral * qty
                     return { ...item, productItemName, description, unitPriceGeneral, qty, amount }

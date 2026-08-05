@@ -124,6 +124,16 @@ export function DeceasedInfoTab() {
                 error={errors.religion}
             />
 
+            {/* 見積お名前（見積書タイトルの「○○家御葬儀見積書」に表示する苗字） */}
+            <FormInput<CaseFormData>
+                name="estimateDisplayName"
+                control={control}
+                label="見積お名前"
+                maxLength={8}
+                suffix="家"
+                error={errors.estimateDisplayName}
+            />
+
             <AgeCalculatorDialog
                 open={calcOpen}
                 onClose={() => setCalcOpen(false)}

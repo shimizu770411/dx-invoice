@@ -126,6 +126,7 @@ model Customer {
   gender                Gender?
   age                   Int?
   religion              String?   @db.VarChar(50)
+  estimateDisplayName   String?   @db.VarChar(8) @map("estimate_display_name")
   chiefMournerName      String?   @db.VarChar(100) @map("chief_mourner_name")
   chiefMournerRelation  String?   @db.VarChar(50) @map("chief_mourner_relation")
   chiefMournerCityId    BigInt?   @map("chief_mourner_city_id")

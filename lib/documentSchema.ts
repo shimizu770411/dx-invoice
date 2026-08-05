@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { EXECUTION_SURCHARGE_NAME, EXECUTION_SURCHARGE_AMOUNT } from './documentUtils'
 
 export const documentItemFieldSchema = z.object({
     qty: z.coerce.number().min(0).max(3000, '数量オーバー'),
@@ -21,6 +22,14 @@ export const documentFreeItemFieldSchema = z
                     code: z.ZodIssueCode.custom,
                     path: ['unitPriceGeneral'],
                     message: '満期サービスは0以下の金額を入力してください',
+                })
+            }
+        } else if (data.productItemName === EXECUTION_SURCHARGE_NAME) {
+            if (data.unitPriceGeneral !== EXECUTION_SURCHARGE_AMOUNT && data.qty > 0) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    path: ['unitPriceGeneral'],
+                    message: `施行割増券は${EXECUTION_SURCHARGE_AMOUNT.toLocaleString()}円固定です`,
                 })
             }
         } else if (data.unitPriceGeneral < 0) {

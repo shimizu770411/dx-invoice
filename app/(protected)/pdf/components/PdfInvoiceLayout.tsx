@@ -48,6 +48,7 @@ export type PdfDocumentItem = {
 
 export type PdfMembership = {
     memberNo?: string | null
+    joinedAt?: string | Date | null
     memberName?: string | null
     courseUnits?: number | null
     maturityAmount?: number | null
@@ -60,6 +61,7 @@ export type PdfMembership = {
 
 export type PdfDocumentCustomer = {
     deceasedName?: string
+    estimateDisplayName?: string | null
     gender?: 'MALE' | 'FEMALE' | 'OTHER' | null
     age?: number | null
     receptionAt?: string | Date | null
@@ -144,7 +146,7 @@ type DisplayRow = {
     estimateItem?: PdfDocumentItem | null
     showProductVariantName: boolean // 霊柩車のように、品名の下に商品詳細を表示するかどうか
     isFreeItem?: boolean // フリー項目（商品マスタ非連動）の場合に単価を表示
-    isMaturity?: boolean // 満期サービス（固定行）。qty=1なので単価表示はスキップ
+    isMaturity?: boolean // 満期サービス・施行割増券（固定行、明細欄末尾に固定表示）。qty=1なので単価表示はスキップ
     isFixedRow?: boolean // 満期サービス・解約手数料など固定行（単価表示スキップ）
     hideDescription?: boolean // 複数行構成商品の2行目以降は摘要を非表示
     isSecondaryRow?: boolean // 複数行構成商品の2行目以降（品名空・上罫線なし）
@@ -258,7 +260,8 @@ function buildDisplayRows(
         if (fi.parentProductItemId) continue
         if ((fi.qty ?? 0) <= 0) continue
         if (fi.productItemName === '解約手数料') continue
-        const isMaturity = fi.productItemName === '満期サービス'
+        // 施行割増券は満期サービスと同様に明細欄の最終行（小計の直前）に固定表示する
+        const isMaturity = fi.productItemName === '満期サービス' || fi.productItemName === '施行割増券'
         const isCancellationFee = false
         rows.push({
             label: fi.productItemName,
@@ -318,6 +321,16 @@ function fmtAmount(n: number): string {
     return n.toLocaleString()
 }
 
+// 故人名の文字数に応じてフォントサイズを縮小し、「故　○○○○　様」欄が枠内で1行に収まるようにする
+function getDeceasedNameFontSize(name?: string | null): string {
+    const len = (name ?? '').length
+    if (len <= 6) return '1.875rem' // text-3xl 相当（通常の氏名）
+    if (len <= 9) return '1.5rem' // text-2xl 相当
+    if (len <= 12) return '1.25rem' // text-xl 相当
+    if (len <= 16) return '1rem' // text-base 相当
+    return '0.875rem' // text-sm 相当
+}
+
 export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc, products, hideSelectedOptions }: Props) {
     const { docNo, membershipPaidAmount, items } = doc
     const docAny = doc as any
@@ -334,6 +347,9 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
     const freeSubtotal = (doc.freeItems ?? [])
         .filter((fi) => fi.productItemName !== '解約手数料')
         .reduce((sum, fi) => sum + fi.unitPriceGeneral * fi.qty, 0)
+    // けやき（互助会1・2とは別枠、会員情報の3行目）の入金額は満期サービスと同様に
+    // 明細欄の最終行（小計の直前）で控除し、会費入金額ブロックには重複表示しない。
+    const keyakiPaymentAmount = docAny.customer?.memberships?.[2]?.paymentAmount ?? 0
     // 見積/請求書単位の任意セット扱い（adhocSetScope）。
     // 'BOTH' は一般・会員ともにセット、'MEMBER_ONLY' は会員のみ、'GENERAL_ONLY' は一般のみ。
     const isAdhocSetFor = (item: PdfDocumentItem, isMember: boolean): boolean => {
@@ -371,7 +387,7 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
         if (isMultiRowItem(item)) return sum + multiRowAmount(item, item.unitPriceMember)
         return sum + (item.unitPriceMember * item.qty || 0)
     }, 0)
-    const memberSubtotal = itemsMemberSubtotal + freeSubtotal
+    const memberSubtotal = itemsMemberSubtotal + freeSubtotal - keyakiPaymentAmount
     const memberTax = Math.floor(memberSubtotal * 0.1) // 消費税は10%で固定、端数は切り捨て
     const memberTotal = memberSubtotal + memberTax
     // 一般価格（一般モード時に該当する行のみ除外）
@@ -385,8 +401,11 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
     const generalTotal = generalSubtotal + generalTax
     // 差引合計: 解約手数料と値引（=解約手数料×-1）が相殺されるため、解約手数料分の影響は無い。
     // 会費入金額は互助会員のみ持つ事前積立なので、会員価格列のみ控除する。一般価格列は控除しない。
+    // membershipPaidAmount は互助会1・2・けやき全員分の合計。けやきは既に memberTotal 側で控除済みのため、
+    // ここでは互助会1・2分のみを差し引く（二重控除を避ける）。
     const generalGrandTotal = Math.max(0, generalTotal)
-    const memberGrandTotal = Math.max(0, memberTotal - membershipPaidAmount)
+    const mutualAidPaidAmount = membershipPaidAmount - keyakiPaymentAmount
+    const memberGrandTotal = Math.max(0, memberTotal - mutualAidPaidAmount)
     const customer: PdfDocumentCustomer | undefined = docAny.customer
         ? {
               ...docAny.customer,
@@ -406,7 +425,28 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
     const displayRows = buildDisplayRows(products, items, doc.freeItems)
     // 満期サービス行は商品行群の直後ではなく、明細欄の最終行（小計の直前）に固定表示する
     const normalRows = displayRows.filter((row) => !row.isMaturity)
-    const maturityRows = displayRows.filter((row) => row.isMaturity)
+    // けやきの控除行は満期サービスの直後、明細欄の最終行に固定表示する
+    const keyakiRow: DisplayRow | null =
+        keyakiPaymentAmount > 0
+            ? {
+                  label: 'けやき',
+                  estimateItem: {
+                      description: null,
+                      qty: 1,
+                      unitPriceGeneral: 0,
+                      unitPriceMember: -keyakiPaymentAmount,
+                      amount: -keyakiPaymentAmount,
+                      sortNo: 9999,
+                  } as any,
+                  showProductVariantName: false,
+                  isFreeItem: true,
+                  isFixedRow: true,
+              }
+            : null
+    const maturityRows = [
+        ...displayRows.filter((row) => row.isMaturity),
+        ...(keyakiRow ? [keyakiRow] : []),
+    ]
     const renderItemRow = (row: DisplayRow, index: number, rows: DisplayRow[], keyPrefix: string) => {
         const isNextSecondary = rows[index + 1]?.isSecondaryRow
         const mergeCls = `${row.isSecondaryRow ? 'border-t-0' : ''} ${isNextSecondary ? 'border-b-0' : ''}`
@@ -535,7 +575,9 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                 {/* タイトル */}
                 <div className="grid grid-cols-[1fr_2fr_171.5px] items-end border-b-2 border-black px-2 py-1">
                     <div>&nbsp;</div>
-                    <h1 className="text-center text-4xl font-black leading-[1] tracking-widest">{title}</h1>
+                    <h1 className="text-center text-4xl font-black leading-[1] tracking-widest whitespace-nowrap">
+                        {customer?.estimateDisplayName ?? ''}{title}
+                    </h1>
                     <div className="flex justify-end">
                         <div className="whitespace-nowrap border-b border-black pb-[2px] align-bottom text-[0.8rem] leading-none tracking-tight">
                             受付No.{docNo ? ` ${docNo}` : ''}
@@ -548,7 +590,10 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                     <div className="grid grid-cols-[1fr_2fr_171.5px] items-center px-2 py-1">
                         <div>&nbsp;</div>
                         <div className="text-center">
-                            <div className="inline-block border-b border-black pb-[4px] align-bottom text-3xl font-black leading-none tracking-wide">
+                            <div
+                                className="inline-block whitespace-nowrap border-b border-black pb-[4px] align-bottom font-black leading-none tracking-wide"
+                                style={{ fontSize: getDeceasedNameFontSize(customer?.deceasedName) }}
+                            >
                                 故　
                                 <span className="px-3">{customer?.deceasedName || ''}</span>
                                 　様
@@ -730,6 +775,8 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                     </td>
                                 </tr>
                                 {(customer?.memberships ?? [])
+                                    // けやき（3行目）は明細欄最終行で控除済みのため、この会費入金額ブロックには出さない
+                                    .slice(0, 2)
                                     .filter((m) => m.paymentAmountOnce != null && m.paymentTimes != null)
                                     .map((m, idx) => {
                                         const subtotal =
@@ -1080,7 +1127,7 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                 </div>
             </div>
             {/* 互助会テーブル（差引合計の下・全幅・独立枠） */}
-            <PdfMembershipTable memberships={customer?.memberships} />
+            <PdfMembershipTable memberships={customer?.memberships} formatDate={formatDate} />
 
             {/* 選択オプション画像ページ */}
             {(() => {

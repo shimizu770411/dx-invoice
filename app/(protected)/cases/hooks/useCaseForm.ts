@@ -80,6 +80,7 @@ function toCustomerFormData(customerData: any, formatDateForInput: (v: any) => s
         gender: customerData.gender || '',
         age: customerData.age ?? 0,
         religion: customerData.religion || '',
+        estimateDisplayName: customerData.estimateDisplayName || '',
         chiefMournerName: customerData.chiefMournerName || '',
         chiefMournerRelation: customerData.chiefMournerRelation || '',
         chiefMournerCityId: customerData.chiefMournerCityId || '',
@@ -121,7 +122,7 @@ function toCustomerFormData(customerData: any, formatDateForInput: (v: any) => s
 function applyCustomerFormData(data: CaseFormData, setValue: UseFormSetValue<any>): void {
     const fields: (keyof CaseFormData)[] = [
         'receptionAt', 'deceasedName', 'deceasedLastName', 'deceasedFirstName',
-        'gender', 'age', 'religion',
+        'gender', 'age', 'religion', 'estimateDisplayName',
         'chiefMournerName', 'chiefMournerRelation', 'chiefMournerCityId',
         'chiefMournerTownId', 'chiefMournerAddress', 'chiefMournerTel',
         'payerName', 'payerRelation', 'payerAddress', 'payerTel',

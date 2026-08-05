@@ -2,11 +2,15 @@ import type { PdfMembership } from './PdfInvoiceLayout'
 
 type Props = {
     memberships?: PdfMembership[]
+    formatDate: (dateString: string | null | undefined) => string
 }
 
-const HEADERS = ['会員番号', '入金', '会員名', 'コース', '入金回数', '入金金額', '営業担当者名', '故人との続柄']
+const HEADERS = ['会員番号', '入会日', '会員名', 'コース', '入金回数', '入金金額', '営業担当者名', '故人との続柄']
 
-export function PdfMembershipTable({ memberships = [] }: Props) {
+const MUTUAL_AID_ROW_COUNT = 2
+const MUTUAL_AID_COURSE_LABEL = '27万コース'
+
+export function PdfMembershipTable({ memberships = [], formatDate }: Props) {
     const rows = [0, 1, 2].map((i) => memberships[i] || ({} as PdfMembership))
 
     return (
@@ -36,15 +40,19 @@ export function PdfMembershipTable({ memberships = [] }: Props) {
                             <td className="border border-y-0 border-l-0 border-black px-2 text-center">
                                 {m.memberNo ?? ''}
                             </td>
-                            <td className="border border-y-0 border-black px-2 text-left">
-                                {m.paymentAmount != null ? `¥ ${Number(m.paymentAmount).toLocaleString()}` : ''}
+                            <td className="border border-y-0 border-black px-2 text-center">
+                                {m.joinedAt ? formatDate(m.joinedAt as string) : ''}
                             </td>
                             <td className="border border-y-0 border-black px-2 text-center">{m.memberName ?? ''}</td>
-                            <td className="border border-y-0 border-black px-2 text-right">
-                                {m.courseUnits != null ? `${m.courseUnits}\u00A0万口` : ''}
+                            <td className="border border-y-0 border-black px-2 text-center">
+                                {i < MUTUAL_AID_ROW_COUNT && m.memberNo ? MUTUAL_AID_COURSE_LABEL : ''}
                             </td>
                             <td className="border border-y-0 border-black px-2 text-right">
-                                {m.paymentTimes != null ? `${m.paymentTimes}\u00A0回` : ''}
+                                {m.paymentTimes != null && m.paymentAmountOnce != null
+                                    ? `${m.paymentTimes} 回×¥${Number(m.paymentAmountOnce).toLocaleString()}`
+                                    : m.paymentTimes != null
+                                      ? `${m.paymentTimes} 回`
+                                      : ''}
                             </td>
                             <td className="border border-y-0 border-black px-2 text-left">
                                 {m.paymentAmount != null ? `¥ ${Number(m.paymentAmount).toLocaleString()}` : ''}

@@ -1,5 +1,7 @@
 export const MATURITY_SERVICE_NAME = '満期サービス'
 export const CANCELLATION_FEE_NAME = '解約手数料'
+export const EXECUTION_SURCHARGE_NAME = '施行割増券'
+export const EXECUTION_SURCHARGE_AMOUNT = -50000
 
 type DocumentFreeItemBase = {
     parentProductItemId?: string | null
@@ -29,10 +31,24 @@ export function padDocumentFreeItems<T extends DocumentFreeItemBase>(
 
     fixedRowNames.forEach((name, idx) => {
         const existing = arr.find((it) => it.productItemName === name)
+        // 施行割増券は金額固定・編集不可のため、既存データがあっても常に規定額で上書きする
+        const forcedUnitPrice = name === EXECUTION_SURCHARGE_NAME ? EXECUTION_SURCHARGE_AMOUNT : undefined
         padded.push(
             existing
-                ? { ...existing, description: '', sortNo: FIXED_FREE_ROW_COUNT + idx }
-                : { productItemName: name, description: '', unitPriceGeneral: 0, qty: 0, amount: 0, sortNo: FIXED_FREE_ROW_COUNT + idx } as T
+                ? {
+                      ...existing,
+                      description: '',
+                      sortNo: FIXED_FREE_ROW_COUNT + idx,
+                      ...(forcedUnitPrice !== undefined ? { unitPriceGeneral: forcedUnitPrice } : {}),
+                  }
+                : {
+                      productItemName: name,
+                      description: '',
+                      unitPriceGeneral: forcedUnitPrice ?? 0,
+                      qty: 0,
+                      amount: 0,
+                      sortNo: FIXED_FREE_ROW_COUNT + idx,
+                  } as T
         )
     })
 

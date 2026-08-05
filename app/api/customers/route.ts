@@ -334,6 +334,7 @@ export async function POST(request: NextRequest) {
             gender: gender,
             age: toIntOrNull(data.age),
             religion: toNullIfEmpty(data.religion),
+            estimateDisplayName: toNullIfEmpty(data.estimateDisplayName),
             receptionAt: data.receptionAt ? new Date(data.receptionAt) : null,
             storeId: data.storeId ? BigInt(data.storeId) : null,
             chiefMournerName: toNullIfEmpty(data.chiefMournerName),

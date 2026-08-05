@@ -89,7 +89,8 @@ function buildDisplayRows(
     for (const fi of freeItems ?? []) {
         if (fi.parentProductItemId) continue
         if (fi.productItemName === '解約手数料') continue
-        const isMaturity = fi.productItemName === '満期サービス'
+        // 施行割増券は満期サービスと同様に明細欄の最終行（小計の直前）に固定表示する
+        const isMaturity = fi.productItemName === '満期サービス' || fi.productItemName === '施行割増券'
         rows.push({
             label: fi.productItemName,
             estimateItem: {

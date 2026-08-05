@@ -9,12 +9,12 @@ import { toast } from '@/hooks/use-toast'
 import { handleLoadError, handleSaveError } from '@/lib/errorHandler'
 import { calculateDocumentFormTotals } from '@/lib/documentTotals'
 import { useDocumentItems } from '@/hooks/useDocumentItems'
-import { expandEachModeItems, expandVariantGroupItems, buildDocumentFreeItems, MATURITY_SERVICE_NAME, CANCELLATION_FEE_NAME } from '@/lib/documentUtils'
+import { expandEachModeItems, expandVariantGroupItems, buildDocumentFreeItems, MATURITY_SERVICE_NAME, CANCELLATION_FEE_NAME, EXECUTION_SURCHARGE_NAME, EXECUTION_SURCHARGE_AMOUNT } from '@/lib/documentUtils'
 import { useDocumentProductSearch } from '@/hooks/useDocumentProductSearch'
 import { InvoiceFormData } from '../schemas/InvoiceFormSchema'
 
 
-const FIXED_ROW_NAMES = [MATURITY_SERVICE_NAME, CANCELLATION_FEE_NAME]
+const FIXED_ROW_NAMES = [MATURITY_SERVICE_NAME, EXECUTION_SURCHARGE_NAME, CANCELLATION_FEE_NAME]
 
 // -------------------------------------------------------
 // 編集フック（invoiceId から）
@@ -252,8 +252,11 @@ export function useInvoiceEdit(invoiceId: string, reset: UseFormReset<InvoiceFor
                     const description = isFixed
                         ? ''
                         : formValues.freeItems[i]?.description ?? item.description ?? ''
+                    // 施行割増券は金額固定・編集不可のため、フォーム送信値に関わらず規定額を強制する
                     const unitPriceGeneral =
-                        formValues.freeItems[i]?.unitPriceGeneral ?? item.unitPriceGeneral
+                        productItemName === EXECUTION_SURCHARGE_NAME
+                            ? EXECUTION_SURCHARGE_AMOUNT
+                            : formValues.freeItems[i]?.unitPriceGeneral ?? item.unitPriceGeneral
                     const qty = formValues.freeItems[i]?.qty ?? item.qty
                     const amount = unitPriceGeneral * qty
                     return { ...item, productItemName, description, unitPriceGeneral, qty, amount }

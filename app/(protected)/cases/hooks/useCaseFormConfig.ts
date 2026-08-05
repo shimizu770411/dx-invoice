@@ -23,6 +23,7 @@ export function getFormDefaultValues(): CaseFormData {
         gender: undefined,
         age: 0,
         religion: undefined,
+        estimateDisplayName: undefined,
         chiefMournerName: '',
         chiefMournerRelation: undefined,
         chiefMournerCityId: undefined,
