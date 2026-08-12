@@ -437,7 +437,7 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
               returnStaff: docAny.returnStaff ?? null,
           }
         : undefined
-    const FIXED_ITEM_ROWS = 37
+    const FIXED_ITEM_ROWS = 36
     const displayRows = buildDisplayRows(products, items, doc.freeItems)
     // 満期サービス行は商品行群の直後ではなく、明細欄の最終行（小計の直前）に固定表示する
     const normalRows = displayRows.filter((row) => !row.isMaturity)
