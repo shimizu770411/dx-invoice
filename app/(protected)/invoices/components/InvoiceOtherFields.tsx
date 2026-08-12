@@ -8,15 +8,13 @@ import type { DocumentFormData } from '@/components/document/DocumentItemTable'
 type Props = {
     control: Control<InvoiceFormData>
     disabled?: boolean
-    customer?: { id: string; memberCardNote?: string | null } | null
 }
 
-export function InvoiceOtherFields({ control, disabled, customer }: Props) {
+export function InvoiceOtherFields({ control, disabled }: Props) {
     return (
         <DocumentOtherFields
             control={control as unknown as Control<DocumentFormData>}
             disabled={disabled}
-            customer={customer}
             estimateStaffLabel="請求書発行担当"
         />
     )

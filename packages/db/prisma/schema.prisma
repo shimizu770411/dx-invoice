@@ -29,6 +29,12 @@ enum AltarPlaceType {
   OTHER
 }
 
+enum MemberCardStatus {
+  COLLECTED
+  NOT_COLLECTED
+  LOST
+}
+
 enum DocumentStatus {
   DRAFT
   CONFIRMED
@@ -149,7 +155,7 @@ model Customer {
   funeralPlace          String?   @db.VarChar(255) @map("funeral_place")
   returnAt              DateTime? @db.Timestamptz(6) @map("return_at")
   returnPlace           String?   @db.VarChar(255) @map("return_place")
-  memberCardNote        String?   @db.VarChar(255) @map("member_card_note")
+  memberCardNote        MemberCardStatus? @map("member_card_note")
   createdAt             DateTime  @default(now()) @db.Timestamptz(6) @map("created_at")
   updatedAt             DateTime  @updatedAt @db.Timestamptz(6) @map("updated_at")
 
@@ -274,6 +280,8 @@ model ProductRow {
   calcType        RowCalcType  @default(UNIT_PRICE_X_QTY) @map("calc_type")
   defaultQty      Int          @default(1) @map("default_qty")
   hasReturn       Boolean      @default(false) @map("has_return")
+  // showProductVariantName有効時、複数行構成商品のどの行の選択種類名を括弧書き表示に使うか（1商品につき1行のみtrue）
+  useForVariantLabel Boolean   @default(false) @map("use_for_variant_label")
   sortNo          Int          @default(0) @map("sort_no")
   isActive        Boolean      @default(true) @map("is_active")
   createdAt       DateTime     @default(now()) @db.Timestamptz(6) @map("created_at")

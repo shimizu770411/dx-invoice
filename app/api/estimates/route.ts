@@ -268,6 +268,18 @@ export async function POST(request: NextRequest) {
             })
         }
 
+        // 会員証欄（顧客レコード）も見積の新規作成時に保存する
+        if (data.memberCardNote !== undefined) {
+            const validMemberCardStatuses = ['COLLECTED', 'NOT_COLLECTED', 'LOST']
+            const memberCardNote = validMemberCardStatuses.includes(data.memberCardNote)
+                ? data.memberCardNote
+                : null
+            await prisma.customer.update({
+                where: { id: BigInt(customerId) },
+                data: { memberCardNote },
+            })
+        }
+
         await recordOperationLog({
             userId: authResult.payload.sub,
             action: OperationAction.CREATE,

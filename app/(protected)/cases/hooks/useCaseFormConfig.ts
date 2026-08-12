@@ -45,7 +45,6 @@ export function getFormDefaultValues(): CaseFormData {
         funeralFrom: undefined,
         funeralTo: undefined,
         funeralPlace: undefined,
-        notes: undefined,
         memberships: [
             {
                 rowNo: 1,

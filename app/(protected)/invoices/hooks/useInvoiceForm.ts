@@ -188,6 +188,7 @@ export function useInvoiceEdit(invoiceId: string, reset: UseFormReset<InvoiceFor
                 altarPlaceType: (invoiceData as any).altarPlaceType || '',
                 altarPlaceOther: (invoiceData as any).altarPlaceOther || '',
                 ceilingHeight: (invoiceData as any).ceilingHeight || '',
+                memberCardNote: customerData?.memberCardNote || '',
                 estimateStaff: (invoiceData as any).estimateStaff || '',
                 ceremonyStaff: (invoiceData as any).ceremonyStaff || '',
                 transportStaff: (invoiceData as any).transportStaff || '',
@@ -280,7 +281,7 @@ export function useInvoiceEdit(invoiceId: string, reset: UseFormReset<InvoiceFor
         }
     }
 
-    return { loading, customer, invoice, setInvoice, items, setItems, freeItems, setFreeItems, onSubmit }
+    return { loading, customer, setCustomer, invoice, setInvoice, items, setItems, freeItems, setFreeItems, onSubmit }
 }
 
 // -------------------------------------------------------

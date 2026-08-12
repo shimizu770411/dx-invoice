@@ -14,6 +14,7 @@ type DisplayRow = {
     isFixedRow?: boolean
     hideDescription?: boolean
     isSecondaryRow?: boolean
+    variantLabelOverride?: string // 複数行構成商品(isMultiRow)の括弧書き用。useForVariantLabel行の選択種類名
 }
 
 function buildDisplayRows(
@@ -54,33 +55,46 @@ function buildDisplayRows(
             // 複数行構成商品（同じ productItemId の複数行）は、1行目のみ品名と摘要を表示
             itemsForProduct.forEach((estimateItem, idx) => {
                 const isFirstRow = idx === 0
+                // 商品マスタ側で useForVariantLabel=true とした行の選択種類名を、1行目の括弧書きに使う
+                let variantLabelOverride: string | undefined
+                if (isFirstRow && itemsForProduct.length > 1) {
+                    const labelSourceItem = itemsForProduct.find((it) => it.productRow?.useForVariantLabel)
+                    variantLabelOverride =
+                        labelSourceItem?.productVariant?.abbreviatedName ??
+                        labelSourceItem?.productRowVariant?.abbreviatedName ??
+                        undefined
+                }
                 rows.push({
                     label: isFirstRow ? product.name : '',
                     estimateItem,
                     showProductVariantName: isFirstRow && !!product.showProductVariantName,
                     hideDescription: !isFirstRow,
                     isSecondaryRow: !isFirstRow,
+                    variantLabelOverride,
                 })
             })
         }
-        // canAddFreeRow=ON の商品はフリー行を直下に追加表示（親商品が選択されている場合のみ）
+        // canAddFreeRow=ON の商品はフリー行を直下に追加表示（親商品が選択され、かつ自由入力に品目名または数量の入力がある場合のみ）
         if (product.canAddFreeRow && itemsForProduct.length > 0) {
             const linkedFi = linkedFreeByProductId.get(String(product.id))
-            rows.push({
-                label: linkedFi?.productItemName || '　',
-                estimateItem: {
-                    description: linkedFi?.description ?? null,
-                    qty: linkedFi?.qty ?? 0,
-                    unitPriceGeneral: linkedFi?.unitPriceGeneral ?? 0,
-                    unitPriceMember: linkedFi?.unitPriceGeneral ?? 0,
-                    amount: (linkedFi?.unitPriceGeneral ?? 0) * (linkedFi?.qty ?? 0),
-                    sortNo: 9999,
-                } as any,
-                showProductVariantName: false,
-                isFreeItem: true,
-                // 「単価: ¥XX」表示をスキップし、qty>1 のときの「数量: XX」のみ表示させる
-                isFixedRow: true,
-            })
+            const hasFreeRowContent = !!(linkedFi?.productItemName || (linkedFi?.qty ?? 0) > 0)
+            if (hasFreeRowContent) {
+                rows.push({
+                    label: linkedFi?.productItemName || '　',
+                    estimateItem: {
+                        description: linkedFi?.description ?? null,
+                        qty: linkedFi?.qty ?? 0,
+                        unitPriceGeneral: linkedFi?.unitPriceGeneral ?? 0,
+                        unitPriceMember: linkedFi?.unitPriceGeneral ?? 0,
+                        amount: (linkedFi?.unitPriceGeneral ?? 0) * (linkedFi?.qty ?? 0),
+                        sortNo: 9999,
+                    } as any,
+                    showProductVariantName: false,
+                    isFreeItem: true,
+                    // 「単価: ¥XX」表示をスキップし、qty>1 のときの「数量: XX」のみ表示させる
+                    isFixedRow: true,
+                })
+            }
         }
     }
     // フリー項目を末尾に追加
@@ -150,7 +164,7 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
 
     const addressee = customer?.payerName || customer?.chiefMournerName || ''
     const issuedAt = fmtDate(new Date())
-    const FIXED_ITEM_ROWS = 38
+    const FIXED_ITEM_ROWS = 37
     const displayRows = buildDisplayRows(products, doc.items, doc.freeItems)
     // 満期サービス行は商品行群の直後ではなく、明細欄の最終行（小計の直前）に固定表示する
     const normalRows = displayRows.filter((row) => !row.isMaturity)
@@ -186,6 +200,7 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
                                 <div className="text-center text-[0.625rem]">
                                     {(() => {
                                         const variantLabel =
+                                            row.variantLabelOverride ??
                                             row.estimateItem?.productVariant?.abbreviatedName ??
                                             row.estimateItem?.productRowVariant?.abbreviatedName
                                         return row.estimateItem && row.showProductVariantName && variantLabel

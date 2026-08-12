@@ -120,6 +120,8 @@ export default function ProductEditPage() {
         calcType: 'FIXED' | 'UNIT_PRICE_X_QTY'
         defaultQty: number
         hasReturn: boolean
+        /** showProductVariantName有効時、この行の選択種類名を括弧書き表示に使うか（1商品につき1行のみtrue） */
+        useForVariantLabel: boolean
         variants: MultiRowVariant[]
     }
     const [multiRows, setMultiRows] = useState<MultiRow[]>([])
@@ -282,6 +284,7 @@ export default function ProductEditPage() {
                 calcType: r.calcType === 'FIXED' ? 'FIXED' : 'UNIT_PRICE_X_QTY',
                 defaultQty: typeof r.defaultQty === 'number' ? r.defaultQty : 1,
                 hasReturn: Boolean(r.hasReturn),
+                useForVariantLabel: Boolean(r.useForVariantLabel),
                 variants: (r.variants || []).map((v: any) => ({
                     localId: String(v.id),
                     label: v.label ?? '',
@@ -386,6 +389,7 @@ export default function ProductEditPage() {
                           calcType: r.calcType,
                           defaultQty: r.defaultQty,
                           hasReturn: r.hasReturn,
+                          useForVariantLabel: r.useForVariantLabel,
                           variants: r.variants.map((v) => ({
                               label: v.label,
                               abbreviatedName: v.abbreviatedName || null,
@@ -1402,6 +1406,7 @@ export default function ProductEditPage() {
                                         calcType: 'UNIT_PRICE_X_QTY',
                                         defaultQty: 1,
                                         hasReturn: false,
+                                        useForVariantLabel: false,
                                         variants: [],
                                     },
                                 ])
@@ -1581,6 +1586,30 @@ export default function ProductEditPage() {
                                             </label>
                                         </div>
                                     </div>
+
+                                    {showProductVariantName && (
+                                        <label
+                                            className="flex items-center gap-2 mb-3"
+                                            style={{ fontSize: 13, cursor: 'pointer' }}
+                                            title="見積/請求書/PDFの品名下の括弧書きに、この行で選択した種類名を表示する"
+                                        >
+                                            <input
+                                                type="radio"
+                                                name="useForVariantLabel"
+                                                checked={row.useForVariantLabel}
+                                                onChange={() =>
+                                                    setMultiRows((prev) =>
+                                                        prev.map((r, i) => ({
+                                                            ...r,
+                                                            useForVariantLabel: i === rIdx,
+                                                        }))
+                                                    )
+                                                }
+                                                className="h-4 w-4"
+                                            />
+                                            <span>この行の種類名を括弧書き表示に使う</span>
+                                        </label>
+                                    )}
 
                                     {/* 行内の種類リスト */}
                                     <div

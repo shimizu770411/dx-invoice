@@ -10,6 +10,12 @@ export const ALTAR_OPTIONS = [
     { value: 'FUNERAL_HALL', label: '斎場' },
     { value: 'OTHER', label: 'その他' },
 ]
+export const MEMBER_CARD_OPTIONS = [
+    { value: 'COLLECTED', label: '回収済' },
+    { value: 'NOT_COLLECTED', label: '未回収' },
+    { value: 'LOST', label: '紛失' },
+]
+
 export const STATUS_OPTIONS = [
     { value: 'DRAFT', label: '事前相談見積' },
     { value: 'CONFIRMED', label: '本見積' },

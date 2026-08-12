@@ -6,7 +6,6 @@ import {
     getCustomer,
     createCustomer,
     updateCustomer,
-    updateMemberCardNote,
 } from '@/lib/customers'
 
 /**
@@ -59,21 +58,6 @@ export function useUpdateCustomerMutation() {
         onSuccess: (_, { customerId }) => {
             queryClient.invalidateQueries({ queryKey: ['customer', customerId] })
             queryClient.invalidateQueries({ queryKey: ['customers'] })
-        },
-    })
-}
-
-/**
- * 会員証欄（memberCardNote）のみを更新するミューテーション
- */
-export function useUpdateMemberCardNoteMutation() {
-    const queryClient = useQueryClient()
-
-    return useMutation({
-        mutationFn: ({ customerId, memberCardNote }: { customerId: string; memberCardNote: string }) =>
-            updateMemberCardNote(customerId, memberCardNote),
-        onSuccess: (_, { customerId }) => {
-            queryClient.invalidateQueries({ queryKey: ['customer', customerId] })
         },
     })
 }

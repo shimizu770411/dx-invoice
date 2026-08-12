@@ -273,6 +273,18 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
                     })),
                 })
             }
+
+            // 会員証欄（顧客レコード）も請求書の更新と同じトランザクションで保存する
+            if (data.memberCardNote !== undefined) {
+                const validMemberCardStatuses = ['COLLECTED', 'NOT_COLLECTED', 'LOST']
+                const memberCardNote = validMemberCardStatuses.includes(data.memberCardNote)
+                    ? data.memberCardNote
+                    : null
+                await tx.customer.update({
+                    where: { id: invoice.customerId },
+                    data: { memberCardNote },
+                })
+            }
         })
 
         const updated = await prisma.invoice.findUnique({

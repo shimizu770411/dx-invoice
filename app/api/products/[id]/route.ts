@@ -115,6 +115,7 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
                                 ? Number(row.defaultQty)
                                 : 1,
                             hasReturn: Boolean(row.hasReturn),
+                            useForVariantLabel: Boolean(row.useForVariantLabel),
                             sortNo: rowIdx,
                             isActive: row.isActive !== false,
                             variants: {

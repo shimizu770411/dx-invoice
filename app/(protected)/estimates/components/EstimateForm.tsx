@@ -379,7 +379,7 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                 {/* タブ */}
                 <div className="flex" style={{ borderBottom: '2px solid var(--brand-border)', backgroundColor: '#fbfaf7' }}>
                     <button type="button" onClick={() => setActiveTab('items')} style={tabStyle(activeTab === 'items')}>明　細</button>
-                    <button type="button" onClick={() => setActiveTab('other')} style={tabStyle(activeTab === 'other')}>その他</button>
+                    <button type="button" onClick={() => setActiveTab('other')} style={tabStyle(activeTab === 'other')}>各担当、備考欄</button>
                 </div>
 
                 {/* タブコンテンツ */}
@@ -469,7 +469,7 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                             </>
                         )}
                         {activeTab === 'other' && (
-                            <EstimateOtherFields control={control} disabled={isLocked} customer={customer} />
+                            <EstimateOtherFields control={control} disabled={isLocked} />
                         )}
                     </fieldset>
                 </div>

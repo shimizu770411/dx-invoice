@@ -10,7 +10,7 @@ import { formatDateByFormat } from '@/lib/dateUtils'
  *   const formatDate = useDateFormat()
  *   formatDate('2025-03-31') // → "2025年3月31日" or "令和7年3月31日"
  */
-export function useDateFormat(): (dateString: string | null | undefined) => string {
+export function useDateFormat(): (dateString: string | Date | null | undefined) => string {
     const { data: profile } = useQuery({
         queryKey: ['companyProfile'],
         queryFn: getCompanyProfile,

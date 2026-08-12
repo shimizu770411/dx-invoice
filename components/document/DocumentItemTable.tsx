@@ -28,6 +28,7 @@ export type DocumentFormData = {
     altarPlaceType: string
     altarPlaceOther: string
     ceilingHeight: string
+    memberCardNote: string
     estimateStaff: string
     ceremonyStaff: string
     transportStaff: string

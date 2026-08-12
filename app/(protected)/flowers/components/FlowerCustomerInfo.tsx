@@ -1,6 +1,7 @@
 'use client'
 
 import { useDateFormat } from '@/hooks/useDateFormat'
+import { MEMBER_CARD_OPTIONS } from '@/app/(protected)/estimates/constants/estimateOptions'
 
 type Props = {
     customer: any
@@ -8,6 +9,7 @@ type Props = {
 
 export function FlowerCustomerInfo({ customer }: Props) {
     const formatDate = useDateFormat()
+    const memberCardLabel = MEMBER_CARD_OPTIONS.find((o) => o.value === customer.memberCardNote)?.label
     return (
         <div
             className="mb-8"
@@ -53,10 +55,10 @@ export function FlowerCustomerInfo({ customer }: Props) {
                 <dt style={{ color: 'var(--brand-text-muted)', letterSpacing: '0.15em' }}>住所</dt>
                 <dd>{customer.chiefMournerAddress || '-'}</dd>
 
-                {customer.memberCardNote && (
+                {memberCardLabel && (
                     <>
                         <dt style={{ color: 'var(--brand-text-muted)', letterSpacing: '0.15em' }}>会員証</dt>
-                        <dd>{customer.memberCardNote}</dd>
+                        <dd>{memberCardLabel}</dd>
                     </>
                 )}
             </dl>

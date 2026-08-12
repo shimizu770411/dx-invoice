@@ -1,89 +1,40 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import { Control, useWatch } from 'react-hook-form'
-import { CREMATION_OPTIONS, ALTAR_OPTIONS } from '@/app/(protected)/estimates/constants/estimateOptions'
+import { CREMATION_OPTIONS, ALTAR_OPTIONS, MEMBER_CARD_OPTIONS } from '@/app/(protected)/estimates/constants/estimateOptions'
 import { FormInput } from '@/components/form/FormInput'
 import { FormSelect } from '@/components/form/FormSelect'
 import { FormTextarea } from '@/components/form/FormTextarea'
-import { useUpdateMemberCardNoteMutation } from '@/hooks/useCustomer'
-import { toast } from '@/hooks/use-toast'
-import { handleSaveError } from '@/lib/errorHandler'
 import type { DocumentFormData } from './DocumentItemTable'
 
-export const MAX_REMARKS_LENGTH = 50
+// PDF出力時の備考欄1行の折り返し文字数（例:「【別料金】　・火葬料金：１２３４５６７８９０１２」）× 表示行数
+export const REMARKS_LINE_LENGTH = 24
+export const REMARKS_ROWS = 15
+export const MAX_REMARKS_LENGTH = REMARKS_LINE_LENGTH * REMARKS_ROWS
+// 備考欄の入力幅。実測した24文字ぶんの表示幅(約471px)にpadding/borderと安全マージンを加えた値
+export const REMARKS_TEXTAREA_MAX_WIDTH = '510px'
 
 type Props = {
     control: Control<DocumentFormData>
     disabled?: boolean
     estimateStaffLabel?: string
     preConsultStaffSlot?: React.ReactNode
-    customer?: { id: string; memberCardNote?: string | null } | null
 }
 
-// 会員証欄（customers.member_card_note）: 見積・請求書の項目ではなく顧客レコードの値のため、
-// このタブの他項目とは別に専用ボタンで保存する（このフォームの登録・更新には含まれない）
-function MemberCardNoteField({ customer, disabled }: { customer?: { id: string; memberCardNote?: string | null } | null; disabled?: boolean }) {
-    const [value, setValue] = useState(customer?.memberCardNote ?? '')
-    const mutation = useUpdateMemberCardNoteMutation()
-
-    useEffect(() => {
-        setValue(customer?.memberCardNote ?? '')
-    }, [customer?.id, customer?.memberCardNote])
-
-    const isDirty = value !== (customer?.memberCardNote ?? '')
-
-    const handleSave = async () => {
-        if (!customer?.id) return
-        try {
-            await mutation.mutateAsync({ customerId: customer.id, memberCardNote: value })
-            toast({ title: '会員証欄を保存しました', variant: 'success', duration: 2000 })
-        } catch (error) {
-            handleSaveError(error)
-        }
-    }
-
-    return (
-        <div className="mb-6 flex items-end gap-3">
-            <div className="flex-1">
-                <label className="brand-label">会員証</label>
-                <input
-                    value={value}
-                    onChange={(e) => setValue(e.target.value)}
-                    disabled={disabled || !customer?.id}
-                    maxLength={255}
-                    className="w-full rounded border border-gray-300 px-3 py-2 text-xl focus:outline-none disabled:cursor-not-allowed disabled:bg-gray-100 disabled:opacity-60"
-                />
-            </div>
-            <button
-                type="button"
-                onClick={handleSave}
-                disabled={disabled || !customer?.id || !isDirty || mutation.isPending}
-                className="font-mincho transition-colors"
-                style={{
-                    padding: '10px 24px',
-                    fontSize: '14px',
-                    letterSpacing: '0.15em',
-                    fontWeight: 500,
-                    color: '#ffffff',
-                    backgroundColor: disabled || !customer?.id || !isDirty || mutation.isPending ? '#a8a29a' : 'var(--brand-navy)',
-                    border: 'none',
-                    cursor: disabled || !customer?.id || !isDirty || mutation.isPending ? 'not-allowed' : 'pointer',
-                }}
-            >
-                {mutation.isPending ? '保存中…' : '保存'}
-            </button>
-        </div>
-    )
-}
-
-export function DocumentOtherFields({ control, disabled, estimateStaffLabel = '見積担当', preConsultStaffSlot, customer }: Props) {
+export function DocumentOtherFields({ control, disabled, estimateStaffLabel = '見積担当', preConsultStaffSlot }: Props) {
     const altarPlaceType = useWatch({ control, name: 'altarPlaceType' })
 
     return (
         <div className="mb-8">
-            <MemberCardNoteField customer={customer} disabled={disabled} />
             <div className="grid grid-cols-2 gap-4">
+                <FormSelect
+                    name="memberCardNote"
+                    control={control}
+                    label="会員証"
+                    options={MEMBER_CARD_OPTIONS}
+                    placeholder="選択してください"
+                    disabled={disabled}
+                />
                 <FormSelect
                     name="cremationProcessType"
                     control={control}
@@ -113,12 +64,17 @@ export function DocumentOtherFields({ control, disabled, estimateStaffLabel = '�
                 <FormInput name="decorationStaff" control={control} label="飾り担当" />
                 <FormInput name="returnStaff" control={control} label="引上担当" />
             </div>
-            <div className="mt-4">
+            {/* PDF出力時の備考欄1行の折り返し幅（例:「【別料金】　・火葬料金：１２３４５６７８９０１２」）に合わせて、
+                ブラウザの自動折り返しではなく maxLineLength/maxRows で1行の文字数・最大行数そのものを制御する。
+                行数が REMARKS_ROWS を超えないためスクロールバーは表示されず、幅もその分の余白は不要 */}
+            <div className="mt-4" style={{ maxWidth: REMARKS_TEXTAREA_MAX_WIDTH }}>
                 <FormTextarea
                     name="remarks"
                     control={control}
                     label="備考"
-                    rows={6}
+                    rows={REMARKS_ROWS}
+                    maxRows={REMARKS_ROWS}
+                    maxLineLength={REMARKS_LINE_LENGTH}
                     maxLength={MAX_REMARKS_LENGTH}
                     noResize
                 />

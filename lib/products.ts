@@ -74,6 +74,8 @@ export interface ProductRow {
     defaultQty: number
     /** true の場合、明細展開時に加算行と返品（減算）行の2行を生成 */
     hasReturn: boolean
+    /** showProductVariantName有効時、この行の選択種類名を括弧書き表示に使うか（1商品につき1行のみtrue） */
+    useForVariantLabel?: boolean
     sortNo?: number
     isActive?: boolean
     variants: ProductRowVariant[]

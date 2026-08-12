@@ -65,9 +65,3 @@ export async function updateCustomer(id: string, data: any) {
     const response = await apiClient.put(`/customers/${id}`, data)
     return response.data
 }
-
-// 会員証欄のみを更新する（PUT /customers/:id は全項目洗い替えのため専用エンドポイントを使う）
-export async function updateMemberCardNote(id: string, memberCardNote: string) {
-    const response = await apiClient.patch(`/customers/${id}/member-card-note`, { memberCardNote })
-    return response.data
-}

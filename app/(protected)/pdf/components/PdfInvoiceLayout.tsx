@@ -30,6 +30,7 @@ export type PdfDocumentItem = {
         isMaturityServiceable?: boolean
     } | null
     productVariant?: { name?: string; abbreviatedName?: string | null; imageUrl?: string | null; isDefaultSet?: boolean; setPrice?: number } | null
+    productRow?: { useForVariantLabel?: boolean } | null
     productRowVariant?: { label?: string; abbreviatedName?: string | null } | null
     description?: string | null
     multiSelectVariantIds?: string | null
@@ -152,6 +153,7 @@ type DisplayRow = {
     isSecondaryRow?: boolean // 複数行構成商品の2行目以降（品名空・上罫線なし）
     multiRowGroupSize?: number // 複数行構成商品の先頭行のみ設定（rowSpan に使用）
     displayDescription?: string // MERGEDモード複数選択時: 種類名を「、」で連結した表示用文字列
+    variantLabelOverride?: string // 複数行構成商品(isMultiRow)の括弧書き用。useForVariantLabel行の選択種類名
     deductionLabel?: string
     deductionItem?: PdfDocumentItem | null
 }
@@ -221,6 +223,16 @@ function buildDisplayRows(
                         .filter(Boolean)
                         .join('\n')
                 }
+                // 複数行構成商品(isMultiRow)は、商品マスタ側で useForVariantLabel=true とした行の
+                // 選択種類名を、1行目セルの括弧書き表示に使う（どの行を出すか商品ごとに指定可能にするため）
+                let variantLabelOverride: string | undefined
+                if (isFirstRow && !isVariantGroupMode && !isMergedMode && itemsForProduct.length > 1) {
+                    const labelSourceItem = itemsForProduct.find((it) => it.productRow?.useForVariantLabel)
+                    variantLabelOverride =
+                        labelSourceItem?.productVariant?.abbreviatedName ??
+                        labelSourceItem?.productRowVariant?.abbreviatedName ??
+                        undefined
+                }
                 rows.push({
                     label: isFirstRow ? product.name : '',
                     estimateItem,
@@ -228,28 +240,32 @@ function buildDisplayRows(
                     hideDescription: isEachMode ? false : !isFirstRow,
                     isSecondaryRow: !isFirstRow,
                     displayDescription,
+                    variantLabelOverride,
                     multiRowGroupSize: isFirstRow && itemsForProduct.length > 1 ? itemsForProduct.length : undefined,
                 })
             })
         }
-        // canAddFreeRow=ON の商品はフリー行を直下に追加表示（親商品が選択されている場合のみ）
+        // canAddFreeRow=ON の商品はフリー行を直下に追加表示（親商品が選択され、かつ自由入力に品目名または数量の入力がある場合のみ）
         if (product.canAddFreeRow && itemsForProduct.length > 0) {
             const linkedFi = linkedFreeByProductId.get(String(product.id))
-            rows.push({
-                label: linkedFi?.productItemName || '　',
-                estimateItem: {
-                    description: linkedFi?.description ?? null,
-                    qty: linkedFi?.qty ?? 0,
-                    unitPriceGeneral: linkedFi?.unitPriceGeneral ?? 0,
-                    unitPriceMember: linkedFi?.unitPriceGeneral ?? 0,
-                    amount: (linkedFi?.unitPriceGeneral ?? 0) * (linkedFi?.qty ?? 0),
-                    sortNo: 9999,
-                } as any,
-                showProductVariantName: false,
-                isFreeItem: true,
-                // 「単価: ¥XX」表示をスキップし、qty>1 のときの「数量: XX」のみ表示させる
-                isFixedRow: true,
-            })
+            const hasFreeRowContent = !!(linkedFi?.productItemName || (linkedFi?.qty ?? 0) > 0)
+            if (hasFreeRowContent) {
+                rows.push({
+                    label: linkedFi?.productItemName || '　',
+                    estimateItem: {
+                        description: linkedFi?.description ?? null,
+                        qty: linkedFi?.qty ?? 0,
+                        unitPriceGeneral: linkedFi?.unitPriceGeneral ?? 0,
+                        unitPriceMember: linkedFi?.unitPriceGeneral ?? 0,
+                        amount: (linkedFi?.unitPriceGeneral ?? 0) * (linkedFi?.qty ?? 0),
+                        sortNo: 9999,
+                    } as any,
+                    showProductVariantName: false,
+                    isFreeItem: true,
+                    // 「単価: ¥XX」表示をスキップし、qty>1 のときの「数量: XX」のみ表示させる
+                    isFixedRow: true,
+                })
+            }
         }
     }
 
@@ -296,6 +312,12 @@ const ALTAR_LABEL: Record<string, string> = {
     HOME: '自宅',
     FUNERAL_HALL: '斎場',
     OTHER: 'その他',
+}
+
+const MEMBER_CARD_LABEL: Record<string, string> = {
+    COLLECTED: '回収済',
+    NOT_COLLECTED: '未回収',
+    LOST: '紛失',
 }
 
 // ──────────────────────────────────────────────────────────
@@ -347,9 +369,6 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
     const freeSubtotal = (doc.freeItems ?? [])
         .filter((fi) => fi.productItemName !== '解約手数料')
         .reduce((sum, fi) => sum + fi.unitPriceGeneral * fi.qty, 0)
-    // けやき（互助会1・2とは別枠、会員情報の3行目）の入金額は満期サービスと同様に
-    // 明細欄の最終行（小計の直前）で控除し、会費入金額ブロックには重複表示しない。
-    const keyakiPaymentAmount = docAny.customer?.memberships?.[2]?.paymentAmount ?? 0
     // 見積/請求書単位の任意セット扱い（adhocSetScope）。
     // 'BOTH' は一般・会員ともにセット、'MEMBER_ONLY' は会員のみ、'GENERAL_ONLY' は一般のみ。
     const isAdhocSetFor = (item: PdfDocumentItem, isMember: boolean): boolean => {
@@ -387,7 +406,7 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
         if (isMultiRowItem(item)) return sum + multiRowAmount(item, item.unitPriceMember)
         return sum + (item.unitPriceMember * item.qty || 0)
     }, 0)
-    const memberSubtotal = itemsMemberSubtotal + freeSubtotal - keyakiPaymentAmount
+    const memberSubtotal = itemsMemberSubtotal + freeSubtotal
     const memberTax = Math.floor(memberSubtotal * 0.1) // 消費税は10%で固定、端数は切り捨て
     const memberTotal = memberSubtotal + memberTax
     // 一般価格（一般モード時に該当する行のみ除外）
@@ -401,11 +420,8 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
     const generalTotal = generalSubtotal + generalTax
     // 差引合計: 解約手数料と値引（=解約手数料×-1）が相殺されるため、解約手数料分の影響は無い。
     // 会費入金額は互助会員のみ持つ事前積立なので、会員価格列のみ控除する。一般価格列は控除しない。
-    // membershipPaidAmount は互助会1・2・けやき全員分の合計。けやきは既に memberTotal 側で控除済みのため、
-    // ここでは互助会1・2分のみを差し引く（二重控除を避ける）。
     const generalGrandTotal = Math.max(0, generalTotal)
-    const mutualAidPaidAmount = membershipPaidAmount - keyakiPaymentAmount
-    const memberGrandTotal = Math.max(0, memberTotal - mutualAidPaidAmount)
+    const memberGrandTotal = Math.max(0, memberTotal - membershipPaidAmount)
     const customer: PdfDocumentCustomer | undefined = docAny.customer
         ? {
               ...docAny.customer,
@@ -421,32 +437,11 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
               returnStaff: docAny.returnStaff ?? null,
           }
         : undefined
-    const FIXED_ITEM_ROWS = 38
+    const FIXED_ITEM_ROWS = 37
     const displayRows = buildDisplayRows(products, items, doc.freeItems)
     // 満期サービス行は商品行群の直後ではなく、明細欄の最終行（小計の直前）に固定表示する
     const normalRows = displayRows.filter((row) => !row.isMaturity)
-    // けやきの控除行は満期サービスの直後、明細欄の最終行に固定表示する
-    const keyakiRow: DisplayRow | null =
-        keyakiPaymentAmount > 0
-            ? {
-                  label: 'けやき',
-                  estimateItem: {
-                      description: null,
-                      qty: 1,
-                      unitPriceGeneral: 0,
-                      unitPriceMember: -keyakiPaymentAmount,
-                      amount: -keyakiPaymentAmount,
-                      sortNo: 9999,
-                  } as any,
-                  showProductVariantName: false,
-                  isFreeItem: true,
-                  isFixedRow: true,
-              }
-            : null
-    const maturityRows = [
-        ...displayRows.filter((row) => row.isMaturity),
-        ...(keyakiRow ? [keyakiRow] : []),
-    ]
+    const maturityRows = displayRows.filter((row) => row.isMaturity)
     const renderItemRow = (row: DisplayRow, index: number, rows: DisplayRow[], keyPrefix: string) => {
         const isNextSecondary = rows[index + 1]?.isSecondaryRow
         const mergeCls = `${row.isSecondaryRow ? 'border-t-0' : ''} ${isNextSecondary ? 'border-b-0' : ''}`
@@ -474,6 +469,7 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                 <div className="text-center text-[0.625rem]">
                                     {(() => {
                                         const variantLabel =
+                                            row.variantLabelOverride ??
                                             row.estimateItem?.productVariant?.abbreviatedName ??
                                             row.estimateItem?.productRowVariant?.abbreviatedName
                                         return row.estimateItem && row.showProductVariantName && variantLabel
@@ -774,16 +770,27 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                         {fmtAmount(memberTotal)}
                                     </td>
                                 </tr>
-                                {(customer?.memberships ?? [])
-                                    // けやき（3行目）は明細欄最終行で控除済みのため、この会費入金額ブロックには出さない
-                                    .slice(0, 2)
-                                    .filter((m) => m.paymentAmountOnce != null && m.paymentTimes != null)
-                                    .map((m, idx) => {
-                                        const subtotal =
-                                            (m.paymentAmountOnce ?? 0) * (m.paymentTimes ?? 0)
+                                {(() => {
+                                    const displayedMemberships = (customer?.memberships ?? [])
+                                        .map((m, originalIdx) => ({ m, originalIdx }))
+                                        // けやき（3行目）は「1回の入金額×回数」ではなく入金額を直接入力する仕様のため、判定を分ける
+                                        .filter(({ m, originalIdx }) =>
+                                            originalIdx === 2
+                                                ? m.paymentAmount != null
+                                                : m.paymentAmountOnce != null && m.paymentTimes != null
+                                        )
+                                    return displayedMemberships.map(({ m, originalIdx }, idx) => {
+                                        const isKeyaki = originalIdx === 2
+                                        const subtotal = isKeyaki
+                                            ? m.paymentAmount ?? 0
+                                            : (m.paymentAmountOnce ?? 0) * (m.paymentTimes ?? 0)
+                                        // 「会費入金額」ラベル列（品名列）のみ、複数行にわたる場合の行間境界線を消して1ブロックに見せる。
+                                        // border-collapse下では隣接セルの border-bottom/border-top が競合表示されるため両方消す
+                                        const isLast = idx === displayedMemberships.length - 1
+                                        const labelBorderCls = `${idx > 0 ? 'border-t-0' : ''} ${!isLast ? 'border-b-0' : ''}`
                                         return (
-                                            <tr key={`membership-${idx}`}>
-                                                <th className="border border-l-0 border-black text-center">
+                                            <tr key={`membership-${originalIdx}`}>
+                                                <th className={`border border-l-0 border-black text-center ${labelBorderCls}`}>
                                                     {idx === 0 ? (
                                                         <div className="mx-auto flex w-[6rem] justify-between">
                                                             {'会費入金額'.split('').map((char, i) => (
@@ -797,7 +804,9 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                                     )}
                                                 </th>
                                                 <td className="border border-black text-center">
-                                                    {`${(m.paymentAmountOnce ?? 0).toLocaleString()}円×${m.paymentTimes ?? 0}回`}
+                                                    {isKeyaki
+                                                        ? 'けやき入金額'
+                                                        : `${(m.paymentAmountOnce ?? 0).toLocaleString()}円×${m.paymentTimes ?? 0}回`}
                                                 </td>
                                                 <td className="border border-black px-1 text-left">&nbsp;</td>
                                                 <td className="border border-black px-1 border-r-0 text-right">
@@ -806,7 +815,8 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                                 </td>
                                             </tr>
                                         )
-                                    })}
+                                    })
+                                })()}
                                 {showCancellationFee && (
                                     <>
                                         <tr>
@@ -1019,7 +1029,9 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                             {'会員証'.split('').map((char, j) => <span key={j}>{char}</span>)}
                                         </div>
                                     </th>
-                                    <td className="px-1" colSpan={3}>{customer?.memberCardNote ?? ''}</td>
+                                    <td className="px-1" colSpan={3}>
+                                        {customer?.memberCardNote ? (MEMBER_CARD_LABEL[customer.memberCardNote] ?? '') : ''}
+                                    </td>
                                 </tr>
                                 {/* 火葬許可証手続: 全選択肢を表示、選択中は下線+太字 */}
                                 <tr className="border-b border-black">

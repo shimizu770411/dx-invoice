@@ -232,7 +232,6 @@ async function main() {
                 chiefMournerTel: s.mournerTel,
                 funeralFrom: s.funeralFrom,
                 funeralPlace: s.funeralPlace,
-                notes: s.notes,
             },
         })
         console.log(`  ✓ ${customer.receptionNo} ${customer.deceasedName} (${s.storeName})`)

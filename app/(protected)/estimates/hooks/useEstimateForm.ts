@@ -228,6 +228,7 @@ export function useEstimateCreate(customerId: string, reset: UseFormReset<Estima
             reset({
                 ...DEFAULT_FORM_VALUES,
                 remarks: companyProfile?.estimateRemarksDefault || '',
+                memberCardNote: customerData?.memberCardNote || '',
                 items: initialItems.map((item) => ({
                     qty: item.qty,
                     description: item.description || '',
@@ -308,7 +309,7 @@ export function useEstimateCreate(customerId: string, reset: UseFormReset<Estima
         }
     }
 
-    return { loading, customer, estimate: null as Estimate | null, items, setItems, freeItems, setFreeItems, onSubmit }
+    return { loading, customer, setCustomer, estimate: null as Estimate | null, items, setItems, freeItems, setFreeItems, onSubmit }
 }
 
 // -------------------------------------------------------
@@ -344,6 +345,7 @@ export function useEstimateEdit(estimateId: string, reset: UseFormReset<Estimate
                 altarPlaceType: (estimateData as any).altarPlaceType || '',
                 altarPlaceOther: (estimateData as any).altarPlaceOther || '',
                 ceilingHeight: (estimateData as any).ceilingHeight || '',
+                memberCardNote: customerData?.memberCardNote || '',
                 preConsultStaff: (estimateData as any).preConsultStaff || '',
                 estimateStaff: (estimateData as any).estimateStaff || '',
                 ceremonyStaff: (estimateData as any).ceremonyStaff || '',
@@ -430,7 +432,7 @@ export function useEstimateEdit(estimateId: string, reset: UseFormReset<Estimate
         }
     }
 
-    return { loading, customer, estimate, items, setItems, freeItems, setFreeItems, onSubmit }
+    return { loading, customer, setCustomer, estimate, items, setItems, freeItems, setFreeItems, onSubmit }
 }
 
 // -------------------------------------------------------

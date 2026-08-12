@@ -5,7 +5,12 @@ import { useFormContext, Controller } from 'react-hook-form'
 import { FormInput } from '@/components/form/FormInput'
 import { FormSelect } from '@/components/form/FormSelect'
 import { FormTextarea } from '@/components/form/FormTextarea'
-import { MAX_REMARKS_LENGTH } from '@/components/document/DocumentOtherFields'
+import {
+    MAX_REMARKS_LENGTH,
+    REMARKS_LINE_LENGTH,
+    REMARKS_ROWS,
+    REMARKS_TEXTAREA_MAX_WIDTH,
+} from '@/components/document/DocumentOtherFields'
 import { CompanyFormData } from '../schemas/CompanyFormSchema'
 import { BANK_TYPE_OPTIONS } from '../constants/companyOptions'
 import { BankBranchSelector } from './BankBranchSelector'
@@ -275,24 +280,32 @@ export function RemarksDefaultSection() {
                 見積書・請求書を新規作成した際、備考欄に自動で入力される初期文言を設定できます。
             </p>
             <div className="grid grid-cols-2 gap-4">
-                <FormTextarea
-                    name="estimateRemarksDefault"
-                    control={control}
-                    label="見積書"
-                    rows={4}
-                    maxLength={MAX_REMARKS_LENGTH}
-                    noResize
-                    error={errors.estimateRemarksDefault}
-                />
-                <FormTextarea
-                    name="invoiceRemarksDefault"
-                    control={control}
-                    label="請求書"
-                    rows={4}
-                    maxLength={MAX_REMARKS_LENGTH}
-                    noResize
-                    error={errors.invoiceRemarksDefault}
-                />
+                <div style={{ maxWidth: REMARKS_TEXTAREA_MAX_WIDTH }}>
+                    <FormTextarea
+                        name="estimateRemarksDefault"
+                        control={control}
+                        label="見積書"
+                        rows={REMARKS_ROWS}
+                        maxRows={REMARKS_ROWS}
+                        maxLineLength={REMARKS_LINE_LENGTH}
+                        maxLength={MAX_REMARKS_LENGTH}
+                        noResize
+                        error={errors.estimateRemarksDefault}
+                    />
+                </div>
+                <div style={{ maxWidth: REMARKS_TEXTAREA_MAX_WIDTH }}>
+                    <FormTextarea
+                        name="invoiceRemarksDefault"
+                        control={control}
+                        label="請求書"
+                        rows={REMARKS_ROWS}
+                        maxRows={REMARKS_ROWS}
+                        maxLineLength={REMARKS_LINE_LENGTH}
+                        maxLength={MAX_REMARKS_LENGTH}
+                        noResize
+                        error={errors.invoiceRemarksDefault}
+                    />
+                </div>
             </div>
         </section>
     )

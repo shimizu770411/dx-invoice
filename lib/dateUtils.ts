@@ -1,7 +1,7 @@
 /**
  * 日付文字列を西暦表示でフォーマット（例: 2025年3月31日）
  */
-export function formatDateWestern(dateString: string | null | undefined): string {
+export function formatDateWestern(dateString: string | Date | null | undefined): string {
     if (!dateString) return ''
     try {
         const date = new Date(dateString)
@@ -19,7 +19,7 @@ export function formatDateWestern(dateString: string | null | undefined): string
 /**
  * 日付文字列を和暦表示でフォーマット（例: 令和7年3月31日）
  */
-export function formatDateJapanese(dateString: string | null | undefined): string {
+export function formatDateJapanese(dateString: string | Date | null | undefined): string {
     if (!dateString) return ''
     try {
         const date = new Date(dateString)
@@ -39,7 +39,7 @@ export function formatDateJapanese(dateString: string | null | undefined): strin
  * dateFormat 設定に基づいて日付をフォーマット
  */
 export function formatDateByFormat(
-    dateString: string | null | undefined,
+    dateString: string | Date | null | undefined,
     dateFormat: 'WESTERN' | 'JAPANESE'
 ): string {
     return dateFormat === 'JAPANESE'

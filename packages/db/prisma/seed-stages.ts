@@ -158,7 +158,6 @@ async function main() {
                 chiefMournerTel: s.mournerTel,
                 funeralFrom: s.funeralFrom,
                 funeralPlace: s.funeralPlace,
-                notes: s.notes,
             },
         })
         console.log(`✓ 顧客作成: ${customer.receptionNo} ${customer.deceasedName}`)

@@ -139,7 +139,8 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
             funeralPlace: toNullIfEmpty(data.funeralPlace),
             returnAt: data.returnAt ? new Date(data.returnAt) : null,
             returnPlace: toNullIfEmpty(data.returnPlace),
-            memberCardNote: toNullIfEmpty(data.memberCardNote),
+            // 会員証欄（memberCardNote）は案件編集画面の項目ではなく、
+            // 見積・請求書の保存（PUT /api/estimates/[id] 等）でのみ更新する
         }
 
         // 顧客を更新
