@@ -63,6 +63,10 @@ export async function GET(request: NextRequest, props: { params: Promise<{ invoi
             }
         })
 
+        // Webフォントの読み込み完了を待つ（コールドスタート等でネットワークが遅い場合、
+        // フォールバックフォントのまま描画されて1文字ずつ均等配置のレイアウトが崩れることがあるため）
+        await page.evaluateHandle('document.fonts.ready')
+
         const pdfBuffer = await page.pdf({
             format: 'A4',
             printBackground: true,
