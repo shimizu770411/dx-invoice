@@ -460,7 +460,12 @@ function InvoiceFormContent({
                             <button
                                 type="button"
                                 disabled={isDirty}
-                                onClick={() => invoice && window.open(`/api/pdf/invoice/${invoice.id}${!showSelectedOptions ? '?showOptions=false' : ''}`, '_blank')}
+                                onClick={() => {
+                                    if (!invoice) return
+                                    const params = new URLSearchParams({ _t: Date.now().toString() })
+                                    if (!showSelectedOptions) params.set('showOptions', 'false')
+                                    window.open(`/api/pdf/invoice/${invoice.id}?${params.toString()}`, '_blank')
+                                }}
                                 className="font-mincho transition-colors"
                                 style={{
                                     padding: '12px 28px',

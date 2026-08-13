@@ -589,7 +589,11 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                                     <button
                                         type="button"
                                         disabled={isDirty}
-                                        onClick={() => window.open(`/api/pdf/estimate/${estimate.id}${!showSelectedOptions ? '?showOptions=false' : ''}`, '_blank')}
+                                        onClick={() => {
+                                            const params = new URLSearchParams({ _t: Date.now().toString() })
+                                            if (!showSelectedOptions) params.set('showOptions', 'false')
+                                            window.open(`/api/pdf/estimate/${estimate.id}?${params.toString()}`, '_blank')
+                                        }}
                                         className={`rounded border-0 px-6 py-3 text-white ${isDirty ? 'cursor-not-allowed bg-gray-300' : 'cursor-pointer bg-cyan-600'}`}
                                     >
                                         PDFプレビュー
