@@ -91,7 +91,10 @@ export default function EditCustomerPage() {
                 sameAsChiefMourner: isSameAsMourner,
                 memberships:
                     formData.memberships && formData.memberships.length > 0
-                        ? formData.memberships
+                        ? formData.memberships.map((m) => ({
+                              ...m,
+                              joinedAt: formatDateForInput(m.joinedAt).split('T')[0],
+                          }))
                         : defaultValues.memberships,
             }
             methods.reset(mergedData)
