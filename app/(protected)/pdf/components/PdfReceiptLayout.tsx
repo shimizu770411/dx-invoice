@@ -139,6 +139,12 @@ function fmtDate(v?: string | Date | null): string {
     return `${mm}月${dd}日`
 }
 
+// 金額フォーマッタ。負値は会計表記に合わせて「▲ 1,234」のように出力する。
+function fmtAmount(n: number): string {
+    if (n < 0) return `▲${Math.abs(n).toLocaleString()}`
+    return n.toLocaleString()
+}
+
 export function PdfReceiptLayout({ contentId, containerRef, document: doc, products }: Props) {
     const { membershipPaidAmount } = doc
     const docAny = doc as any
@@ -232,7 +238,7 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
                 <td
                     className={`border border-r-0 border-black px-1 text-right ${mergeCls}`}
                 >
-                    {row.estimateItem ? row.estimateItem.amount.toLocaleString() : ''}
+                    {row.estimateItem ? fmtAmount(row.estimateItem.amount) : ''}
                 </td>
             </tr>
         </Fragment>
@@ -434,7 +440,7 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
                                             <td className="border border-black text-center">&nbsp;</td>
                                             <td className="border border-black px-1 text-right">&nbsp;</td>
                                             <td className="border border-r-0 border-black px-1 text-right">
-                                                -{cancellationFee.toLocaleString()}
+                                                {fmtAmount(-cancellationFee)}
                                             </td>
                                         </tr>
                                     </>

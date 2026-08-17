@@ -154,8 +154,7 @@ type DisplayRow = {
     multiRowGroupSize?: number // 複数行構成商品の先頭行のみ設定（rowSpan に使用）
     displayDescription?: string // MERGEDモード複数選択時: 種類名を「、」で連結した表示用文字列
     variantLabelOverride?: string // 複数行構成商品(isMultiRow)の括弧書き用。useForVariantLabel行の選択種類名
-    deductionLabel?: string
-    deductionItem?: PdfDocumentItem | null
+    deductionItem?: PdfDocumentItem | null // 複数行構成商品(hasReturn)の返品行。1行目セルに「▲数量 × 単価」を追記表示する
 }
 
 function buildDisplayRows(
@@ -242,6 +241,7 @@ function buildDisplayRows(
                     displayDescription,
                     variantLabelOverride,
                     multiRowGroupSize: isFirstRow && itemsForProduct.length > 1 ? itemsForProduct.length : undefined,
+                    deductionItem: isFirstRow ? itemsForProduct.find((it) => it.sign === -1) ?? undefined : undefined,
                 })
             })
         }
@@ -490,7 +490,7 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                     <div className="whitespace-pre-wrap break-words">
                         {row.displayDescription ?? row.estimateItem?.description ?? ''}
                     </div>
-                    <div>
+                    <div className="whitespace-pre-wrap">
                         {/* 複数行構成商品(単価×数量型)は「数量 × 単価」を表示。それ以外は数量が1より大きい場合のみ表示。親付きフリー行（満期サービス以外）は qty=1 でも常に数量を表示。 */}
                         {row.estimateItem && isMultiRowItem(row.estimateItem) && row.estimateItem.calcType === 'UNIT_PRICE_X_QTY'
                             ? `${row.estimateItem.qty.toLocaleString()} × ¥${fmtAmount(isMember ? row.estimateItem.unitPriceMember : row.estimateItem.unitPriceGeneral)}`
@@ -498,6 +498,10 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                               (row.estimateItem.qty > 1 ||
                                   (row.isFreeItem && row.isFixedRow && !row.isMaturity))
                             ? `数量: ${row.estimateItem.qty.toLocaleString()}`
+                            : ''}
+                        {/* 複数行構成商品(hasReturn)の返品行。数量>0のときのみ「▲数量 × 単価」を2行目に追記する */}
+                        {row.deductionItem && (row.deductionItem.qty ?? 0) > 0
+                            ? `\n▲${row.deductionItem.qty.toLocaleString()} × ¥${fmtAmount(isMember ? row.deductionItem.unitPriceMember : row.deductionItem.unitPriceGeneral)}`
                             : ''}
                         {row.isFreeItem && !row.isFixedRow && row.estimateItem
                             ? `${row.estimateItem.qty > 1 ? '　' : ''}単価: ¥${fmtAmount(row.estimateItem.unitPriceGeneral)}`
