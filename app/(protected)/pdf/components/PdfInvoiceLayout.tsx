@@ -534,10 +534,11 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                     </div>
                     {!row.isSecondaryRow && (
                     <div className="whitespace-pre-wrap">
-                        {/* 複数行構成商品(単価×数量型)は「数量 × 単価」を表示。それ以外は数量が1より大きい場合のみ表示。親付きフリー行（満期サービス以外）は qty=1 でも常に数量を表示。 */}
+                        {/* 複数行構成商品(単価×数量型)は「数量 × 単価」を表示。それ以外は数量が1より大きい場合のみ表示。親付きフリー行（満期サービス以外）は qty=1 でも常に数量を表示。showQtyInDescription有効時は摘要欄に個数を出しているため重複を避ける。 */}
                         {row.estimateItem && isMultiRowItem(row.estimateItem) && row.estimateItem.calcType === 'UNIT_PRICE_X_QTY'
                             ? `${row.estimateItem.qty.toLocaleString()} × ¥${fmtAmount(isMember ? row.estimateItem.unitPriceMember : row.estimateItem.unitPriceGeneral)}`
                             : row.estimateItem &&
+                              !row.showQtyInDescription &&
                               (row.estimateItem.qty > 1 ||
                                   (row.isFreeItem && row.isFixedRow && !row.isMaturity))
                             ? `数量: ${row.estimateItem.qty.toLocaleString()}`
