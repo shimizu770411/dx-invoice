@@ -85,8 +85,21 @@ function buildEstimateItemsForProduct(
         let cursor = startSortNo
         for (const row of product.rows as any[]) {
             const def = row.variants?.find((v: any) => v.isDefault) ?? row.variants?.[0]
-            const unitPrice = def?.unitPrice ?? 0
             const signs: (1 | -1)[] = row.hasReturn ? [1, -1] : [1]
+            // 加算行(sign=1)が既に保存されていれば、その種類・単価を新規生成する行のデフォルトにする。
+            // 返品数量が未入力(qty=0)の間は返品行が保存されず、再読込のたびに商品マスタの
+            // デフォルト種類(先頭行)で作り直されてしまい、加算行で選んだ種類と単価がズレるため。
+            const existingPrimary = existingItems.find(
+                (item) =>
+                    String((item as any).productRowId ?? '') === String(row.id) &&
+                    Number((item as any).sign ?? 1) === 1
+            )
+            const primaryVariant = existingPrimary
+                ? row.variants?.find(
+                      (v: any) => String(v.id) === String((existingPrimary as any).productRowVariantId)
+                  ) ?? def
+                : def
+            const primaryUnitPrice = existingPrimary?.unitPriceGeneral ?? primaryVariant?.unitPrice ?? 0
             for (const sign of signs) {
                 const existing = existingItems.find(
                     (item) =>
@@ -99,18 +112,18 @@ function buildEstimateItemsForProduct(
                     out.push({
                         productItemId: product.id,
                         productRowId: String(row.id),
-                        productRowVariantId: def ? String(def.id) : null,
+                        productRowVariantId: primaryVariant ? String(primaryVariant.id) : null,
                         calcType: row.calcType,
                         sign,
                         description: product.defaultDescription ?? '',
-                        unitPriceGeneral: unitPrice,
-                        unitPriceMember: unitPrice,
+                        unitPriceGeneral: primaryUnitPrice,
+                        unitPriceMember: primaryUnitPrice,
                         qty: 0,
                         amount: 0,
                         sortNo: cursor,
                         productItem: { ...product },
                         productRow: row,
-                        productRowVariant: def,
+                        productRowVariant: primaryVariant,
                     } as EstimateItem)
                 }
                 cursor++
