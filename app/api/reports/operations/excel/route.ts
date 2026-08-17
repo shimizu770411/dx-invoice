@@ -7,6 +7,7 @@ const ENTITY_TYPE_LABELS: Record<string, string> = {
     ESTIMATE: '見積',
     INVOICE: '請求書',
     RECEIPT: '領収書',
+    FLOWER: '生花',
 }
 
 const ACTION_LABELS: Record<string, string> = {
@@ -24,6 +25,8 @@ const REPORT_COLUMNS: { entityType: string; action: string }[] = [
     { entityType: 'INVOICE', action: 'UPDATE' },
     { entityType: 'RECEIPT', action: 'ISSUE_PDF' },
     { entityType: 'RECEIPT', action: 'REISSUE_PDF' },
+    { entityType: 'FLOWER', action: 'CREATE' },
+    { entityType: 'FLOWER', action: 'UPDATE' },
 ]
 
 const UNKNOWN_USER_LABEL = '(不明)'

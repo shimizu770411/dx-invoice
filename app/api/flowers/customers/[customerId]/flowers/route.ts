@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-middleware'
 import { serializeBigInt } from '@/lib/prisma-utils'
+import { recordOperationLog } from '@/lib/operationLog'
+import { OperationAction, OperationEntityType } from '@phoenix-jpn/db'
 import * as crypto from 'crypto'
 
 function generateBillToKey(name: string, address: string, tel?: string): string {
@@ -119,6 +121,13 @@ export async function POST(request: NextRequest, props: { params: Promise<{ cust
                 flowerBillingTargetId: target.id,
                 flowerId: flower.id,
             },
+        })
+
+        await recordOperationLog({
+            userId: authResult.payload.sub,
+            action: OperationAction.CREATE,
+            entityType: OperationEntityType.FLOWER,
+            entityId: flower.id,
         })
 
         return NextResponse.json(

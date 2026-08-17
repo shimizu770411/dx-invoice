@@ -66,6 +66,7 @@ enum OperationEntityType {
   ESTIMATE
   INVOICE
   RECEIPT
+  FLOWER
 }
 
 model User {

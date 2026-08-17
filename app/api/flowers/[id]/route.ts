@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-middleware'
 import { serializeBigInt } from '@/lib/prisma-utils'
+import { recordOperationLog } from '@/lib/operationLog'
+import { OperationAction, OperationEntityType } from '@phoenix-jpn/db'
 
 export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
     const params = await props.params
@@ -95,6 +97,13 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
                 })
             }
         }
+
+        await recordOperationLog({
+            userId: authResult.payload.sub,
+            action: OperationAction.UPDATE,
+            entityType: OperationEntityType.FLOWER,
+            entityId: updated.id,
+        })
 
         // レスポンスを返す
         return NextResponse.json(

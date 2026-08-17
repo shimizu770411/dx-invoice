@@ -1,12 +1,13 @@
 import apiClient from './api'
 
-export type OperationLogEntityType = 'ESTIMATE' | 'INVOICE' | 'RECEIPT'
+export type OperationLogEntityType = 'ESTIMATE' | 'INVOICE' | 'RECEIPT' | 'FLOWER'
 export type OperationLogAction = 'CREATE' | 'UPDATE' | 'ISSUE_PDF' | 'REISSUE_PDF'
 
 export const OPERATION_LOG_ENTITY_TYPE_LABELS: Record<OperationLogEntityType, string> = {
     ESTIMATE: '見積',
     INVOICE: '請求書',
     RECEIPT: '領収書',
+    FLOWER: '生花',
 }
 
 export const OPERATION_LOG_ACTION_LABELS: Record<OperationLogAction, string> = {
