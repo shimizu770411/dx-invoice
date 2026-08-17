@@ -94,6 +94,7 @@ export async function POST(request: NextRequest) {
                 hasVariantGroups: Boolean(body.hasVariantGroups),
                 overwriteDescriptionOnVariantChange: Boolean(body.overwriteDescriptionOnVariantChange),
                 showProductVariantName: Boolean(body.showProductVariantName),
+                showQtyInDescription: Boolean(body.showQtyInDescription),
                 defaultDescription: body.defaultDescription || null,
                 variantGroups: Array.isArray(body.groups)
                     ? {

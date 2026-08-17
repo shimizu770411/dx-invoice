@@ -15,6 +15,7 @@ export type PdfProductItem = {
     multiSelectMerge?: boolean
     hasVariantGroups?: boolean
     showProductVariantName?: boolean
+    showQtyInDescription?: boolean
     variants?: { id: string; name: string }[]
 }
 
@@ -29,9 +30,9 @@ export type PdfDocumentItem = {
         setableScope?: 'NONE' | 'MEMBER_ONLY' | 'GENERAL_ONLY' | 'BOTH'
         isMaturityServiceable?: boolean
     } | null
-    productVariant?: { name?: string; abbreviatedName?: string | null; imageUrl?: string | null; isDefaultSet?: boolean; setPrice?: number } | null
-    productRow?: { useForVariantLabel?: boolean } | null
-    productRowVariant?: { label?: string; abbreviatedName?: string | null } | null
+    productVariant?: { name?: string; abbreviatedName?: string | null; unitLabel?: string | null; imageUrl?: string | null; isDefaultSet?: boolean; setPrice?: number } | null
+    productRow?: { useForVariantLabel?: boolean; useForDescriptionLabel?: boolean } | null
+    productRowVariant?: { label?: string; abbreviatedName?: string | null; unitLabel?: string | null } | null
     description?: string | null
     multiSelectVariantIds?: string | null
     qty: number
@@ -155,6 +156,12 @@ type DisplayRow = {
     displayDescription?: string // MERGEDモード複数選択時: 種類名を「、」で連結した表示用文字列
     variantLabelOverride?: string // 複数行構成商品(isMultiRow)の括弧書き用。useForVariantLabel行の選択種類名
     deductionItem?: PdfDocumentItem | null // 複数行構成商品(hasReturn)の返品行。1行目セルに「▲数量 × 単価」を追記表示する
+    showQtyInDescription?: boolean // 商品マスタ設定: 摘要欄の末尾に個数を追記表示する（種類も表示する場合は「種類　個数」の順）
+    descriptionLabelOverride?: string // useForDescriptionLabel行（isDescriptionLabelRowがtrueの行）自身の選択種類名
+    descriptionUnitLabel?: string // 同、選択種類の単位
+    descriptionQtyOverride?: number // 同、その行自体の数量（1行目=固定行のqtyと異なるため）
+    hasDescriptionLabelRow?: boolean // 商品全体でuseForDescriptionLabel行が存在するか（商品グループ内の全行で共通）。trueの間、摘要セルは1行目にrowSpanせず各行が個別に持つ
+    isDescriptionLabelRow?: boolean // この行自体がuseForDescriptionLabel行か（実際に選ばれた種類名・個数をこの行の摘要欄に表示する）
 }
 
 function buildDisplayRows(
@@ -205,6 +212,14 @@ function buildDisplayRows(
             // グループ商品（重箱など、hasVariantGroups）: 品名・摘要セルは1行目に rowSpan 結合されるため、
             // 各行の摘要（選択した種類名）を改行区切りで1行目のセルにまとめて表示する。
             const isVariantGroupMode = !!product.hasVariantGroups
+            // 複数行構成商品(isMultiRow)で、商品マスタ側の useForDescriptionLabel=true とした行の
+            // 選択種類名（と単位・数量）は、1行目にまとめず「その行自体」の摘要欄に表示する
+            // （会葬礼状のように、実際にその種類が選ばれている行に「種類　個数」を出したいケース向け）
+            const hasDescriptionLabelRow =
+                !isVariantGroupMode &&
+                !isMergedMode &&
+                itemsForProduct.length > 1 &&
+                itemsForProduct.some((it) => it.productRow?.useForDescriptionLabel && it.sign !== -1)
             itemsForProduct.forEach((estimateItem, idx) => {
                 const isFirstRow = idx === 0
                 let displayDescription: string | undefined
@@ -232,6 +247,10 @@ function buildDisplayRows(
                         labelSourceItem?.productRowVariant?.abbreviatedName ??
                         undefined
                 }
+                const isDescriptionLabelRow =
+                    hasDescriptionLabelRow &&
+                    !!estimateItem.productRow?.useForDescriptionLabel &&
+                    estimateItem.sign !== -1
                 rows.push({
                     label: isFirstRow ? product.name : '',
                     estimateItem,
@@ -242,6 +261,16 @@ function buildDisplayRows(
                     variantLabelOverride,
                     multiRowGroupSize: isFirstRow && itemsForProduct.length > 1 ? itemsForProduct.length : undefined,
                     deductionItem: isFirstRow ? itemsForProduct.find((it) => it.sign === -1) ?? undefined : undefined,
+                    showQtyInDescription: product.showQtyInDescription,
+                    hasDescriptionLabelRow,
+                    isDescriptionLabelRow,
+                    descriptionLabelOverride: isDescriptionLabelRow
+                        ? estimateItem.productRowVariant?.label ?? undefined
+                        : undefined,
+                    descriptionUnitLabel: isDescriptionLabelRow
+                        ? estimateItem.productRowVariant?.unitLabel ?? undefined
+                        : undefined,
+                    descriptionQtyOverride: isDescriptionLabelRow ? estimateItem.qty : undefined,
                 })
             })
         }
@@ -365,9 +394,14 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
         .filter((fi) => fi.productItemName === '解約手数料' && (fi.qty ?? 0) > 0)
         .reduce((sum, fi) => sum + fi.unitPriceGeneral * fi.qty, 0)
     const showCancellationFee = cancellationFee >= 1
-    // フリー項目の小計（解約手数料を除く）
-    const freeSubtotal = (doc.freeItems ?? [])
+    // フリー項目の小計（解約手数料を除く）。満期サービス・施行割増券は会員価格のみの割引のため、一般価格には含めない。
+    const isMaturityFreeItem = (fi: PdfFreeItem) =>
+        fi.productItemName === '満期サービス' || fi.productItemName === '施行割増券'
+    const freeSubtotalMember = (doc.freeItems ?? [])
         .filter((fi) => fi.productItemName !== '解約手数料')
+        .reduce((sum, fi) => sum + fi.unitPriceGeneral * fi.qty, 0)
+    const freeSubtotalGeneral = (doc.freeItems ?? [])
+        .filter((fi) => fi.productItemName !== '解約手数料' && !isMaturityFreeItem(fi))
         .reduce((sum, fi) => sum + fi.unitPriceGeneral * fi.qty, 0)
     // 見積/請求書単位の任意セット扱い（adhocSetScope）。
     // 'BOTH' は一般・会員ともにセット、'MEMBER_ONLY' は会員のみ、'GENERAL_ONLY' は一般のみ。
@@ -406,7 +440,7 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
         if (isMultiRowItem(item)) return sum + multiRowAmount(item, item.unitPriceMember)
         return sum + (item.unitPriceMember * item.qty || 0)
     }, 0)
-    const memberSubtotal = itemsMemberSubtotal + freeSubtotal
+    const memberSubtotal = itemsMemberSubtotal + freeSubtotalMember
     const memberTax = Math.floor(memberSubtotal * 0.1) // 消費税は10%で固定、端数は切り捨て
     const memberTotal = memberSubtotal + memberTax
     // 一般価格（一般モード時に該当する行のみ除外）
@@ -415,7 +449,7 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
         if (isMultiRowItem(item)) return sum + multiRowAmount(item, item.unitPriceGeneral)
         return sum + (item.unitPriceGeneral * item.qty || 0)
     }, 0)
-    const generalSubtotal = itemsGeneralSubtotal + freeSubtotal
+    const generalSubtotal = itemsGeneralSubtotal + freeSubtotalGeneral
     const generalTax = Math.floor(generalSubtotal * 0.1)
     const generalTotal = generalSubtotal + generalTax
     // 差引合計: 解約手数料と値引（=解約手数料×-1）が相殺されるため、解約手数料分の影響は無い。
@@ -482,14 +516,23 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                     })()}
                 </td>
                 )}
-                {!row.isSecondaryRow && (
+                {(!row.isSecondaryRow || row.hasDescriptionLabelRow) && (
                 <td
-                    className="border border-l-0 border-black px-0.5 text-left align-top"
-                    rowSpan={row.multiRowGroupSize}
+                    className={`border border-l-0 border-black px-0.5 text-left align-top ${row.hasDescriptionLabelRow ? mergeCls : ''}`}
+                    rowSpan={row.hasDescriptionLabelRow ? 1 : row.multiRowGroupSize}
                 >
                     <div className="whitespace-pre-wrap break-words">
-                        {row.displayDescription ?? row.estimateItem?.description ?? ''}
+                        {!row.isSecondaryRow ? (row.displayDescription ?? row.estimateItem?.description ?? '') : ''}
+                        {/* 複数行構成商品: useForDescriptionLabel行(この行自体)の選択種類名を摘要欄に追記 */}
+                        {row.isDescriptionLabelRow ? (row.descriptionLabelOverride ?? '') : ''}
+                        {/* 商品マスタ設定: 摘要欄末尾に個数(+単位)を追記（種類も表示する場合は「種類　個数」の順） */}
+                        {row.isDescriptionLabelRow && row.showQtyInDescription && row.descriptionQtyOverride
+                            ? `　${row.descriptionQtyOverride.toLocaleString()}${row.descriptionUnitLabel ?? ''}`
+                            : !row.hasDescriptionLabelRow && !row.isSecondaryRow && row.showQtyInDescription && row.estimateItem?.qty
+                            ? `　${row.estimateItem.qty.toLocaleString()}${row.estimateItem?.productVariant?.unitLabel ?? ''}`
+                            : ''}
                     </div>
+                    {!row.isSecondaryRow && (
                     <div className="whitespace-pre-wrap">
                         {/* 複数行構成商品(単価×数量型)は「数量 × 単価」を表示。それ以外は数量が1より大きい場合のみ表示。親付きフリー行（満期サービス以外）は qty=1 でも常に数量を表示。 */}
                         {row.estimateItem && isMultiRowItem(row.estimateItem) && row.estimateItem.calcType === 'UNIT_PRICE_X_QTY'
@@ -507,12 +550,13 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                             ? `${row.estimateItem.qty > 1 ? '　' : ''}単価: ¥${fmtAmount(row.estimateItem.unitPriceGeneral)}`
                             : ''}
                     </div>
+                    )}
                 </td>
                 )}
                 <td
                     className={`border border-black px-1 text-right ${mergeCls}`}
                 >
-                    {row.estimateItem ? (
+                    {row.estimateItem && !row.isMaturity ? (
                         isServiceIncludedFor(row.estimateItem, false) ? (
                             <span style={{ color: '#8a7e5c', fontWeight: 600 }}>
                                 サービス

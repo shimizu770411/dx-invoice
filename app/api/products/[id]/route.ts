@@ -88,6 +88,8 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
             updateData.overwriteDescriptionOnVariantChange = Boolean(body.overwriteDescriptionOnVariantChange)
         if (body.showProductVariantName !== undefined)
             updateData.showProductVariantName = Boolean(body.showProductVariantName)
+        if (body.showQtyInDescription !== undefined)
+            updateData.showQtyInDescription = Boolean(body.showQtyInDescription)
         if (body.defaultDescription !== undefined)
             updateData.defaultDescription = body.defaultDescription || null
 
@@ -116,6 +118,7 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
                                 : 1,
                             hasReturn: Boolean(row.hasReturn),
                             useForVariantLabel: Boolean(row.useForVariantLabel),
+                            useForDescriptionLabel: Boolean(row.useForDescriptionLabel),
                             sortNo: rowIdx,
                             isActive: row.isActive !== false,
                             variants: {
@@ -125,6 +128,10 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
                                         abbreviatedName:
                                             typeof v.abbreviatedName === 'string' && v.abbreviatedName
                                                 ? v.abbreviatedName
+                                                : null,
+                                        unitLabel:
+                                            typeof v.unitLabel === 'string' && v.unitLabel
+                                                ? v.unitLabel
                                                 : null,
                                         imageUrl:
                                             typeof v.imageUrl === 'string' && v.imageUrl

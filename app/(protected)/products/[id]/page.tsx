@@ -23,6 +23,8 @@ import { CurrencyTextInput } from '@/components/form/CurrencyTextInput'
 
 /** 見積/請求書/PDFの括弧書き表示用略称の最大文字数 */
 const MAX_VARIANT_ABBREVIATION_LENGTH = 8
+/** 摘要欄の個数表示用単位の最大文字数 */
+const MAX_VARIANT_UNIT_LABEL_LENGTH = 8
 
 type ProductKind = 'NORMAL' | 'PARENT' | 'CHILD'
 
@@ -31,6 +33,8 @@ type VariantRow = {
     name: string
     /** 見積/請求書/PDFの括弧書き表示用の略称（8文字まで） */
     abbreviatedName: string
+    /** 摘要欄の個数表示用の単位（showQtyInDescription有効時に「個数+単位」で表示する。8文字まで） */
+    unitLabel: string
     imageUrl: string
     priceGeneral: number
     priceMember: number
@@ -92,6 +96,8 @@ export default function ProductEditPage() {
     const [overwriteDescriptionOnVariantChange, setOverwriteDescriptionOnVariantChange] = useState(false)
     // 見積/請求書/PDFの品名欄の下に、選択した種類名を括弧書きで表示するか
     const [showProductVariantName, setShowProductVariantName] = useState(false)
+    // 見積/請求書/領収書PDFの摘要欄に個数を表示するか（種類も表示する場合は「種類　個数」の順）
+    const [showQtyInDescription, setShowQtyInDescription] = useState(false)
     const [childIds, setChildIds] = useState<string[]>([])
     const [variants, setVariants] = useState<VariantRow[]>([])
     // 複数行構成商品
@@ -110,6 +116,8 @@ export default function ProductEditPage() {
         label: string
         /** 見積/請求書/PDFの括弧書き表示用の略称（8文字まで） */
         abbreviatedName: string
+        /** 摘要欄の個数表示用の単位（8文字まで） */
+        unitLabel: string
         imageUrl: string
         unitPrice: number
         isDefault: boolean
@@ -122,6 +130,8 @@ export default function ProductEditPage() {
         hasReturn: boolean
         /** showProductVariantName有効時、この行の選択種類名を括弧書き表示に使うか（1商品につき1行のみtrue） */
         useForVariantLabel: boolean
+        /** showQtyInDescription有効時、この行の選択種類名を摘要欄に使うか（1商品につき1行のみtrue） */
+        useForDescriptionLabel: boolean
         variants: MultiRowVariant[]
     }
     const [multiRows, setMultiRows] = useState<MultiRow[]>([])
@@ -226,6 +236,7 @@ export default function ProductEditPage() {
             {
                 name: '',
                 abbreviatedName: '',
+                unitLabel: '',
                 imageUrl: '',
                 priceGeneral: 0,
                 priceMember: 0,
@@ -260,6 +271,7 @@ export default function ProductEditPage() {
         setDefaultDescription(product.defaultDescription ?? '')
         setOverwriteDescriptionOnVariantChange((product as any).overwriteDescriptionOnVariantChange ?? false)
         setShowProductVariantName((product as any).showProductVariantName ?? false)
+        setShowQtyInDescription((product as any).showQtyInDescription ?? false)
         setChildIds((product.children || []).map((c: any) => String(c.id)))
         setIsMultiRow((product as any).isMultiRow ?? false)
         setCanAddFreeRow((product as any).canAddFreeRow ?? false)
@@ -285,10 +297,12 @@ export default function ProductEditPage() {
                 defaultQty: typeof r.defaultQty === 'number' ? r.defaultQty : 1,
                 hasReturn: Boolean(r.hasReturn),
                 useForVariantLabel: Boolean(r.useForVariantLabel),
+                useForDescriptionLabel: Boolean(r.useForDescriptionLabel),
                 variants: (r.variants || []).map((v: any) => ({
                     localId: String(v.id),
                     label: v.label ?? '',
                     abbreviatedName: v.abbreviatedName ?? '',
+                    unitLabel: v.unitLabel ?? '',
                     imageUrl: v.imageUrl ?? '',
                     unitPrice: Number(v.unitPrice) || 0,
                     isDefault: Boolean(v.isDefault),
@@ -300,6 +314,7 @@ export default function ProductEditPage() {
                 id: v.id,
                 name: v.name,
                 abbreviatedName: v.abbreviatedName ?? '',
+                unitLabel: v.unitLabel ?? '',
                 imageUrl: v.imageUrl || '',
                 priceGeneral: v.priceGeneral,
                 priceMember: v.priceMember,
@@ -317,6 +332,7 @@ export default function ProductEditPage() {
                     id: v.id,
                     name: v.name,
                     abbreviatedName: v.abbreviatedName ?? '',
+                    unitLabel: v.unitLabel ?? '',
                     imageUrl: v.imageUrl || '',
                     priceGeneral: v.priceGeneral,
                     priceMember: v.priceMember,
@@ -369,6 +385,7 @@ export default function ProductEditPage() {
                 defaultDescription: defaultDescription.trim() || null,
                 overwriteDescriptionOnVariantChange,
                 showProductVariantName,
+                showQtyInDescription,
                 isMultiRow,
                 canAddFreeRow,
                 isMultiSelect,
@@ -390,9 +407,11 @@ export default function ProductEditPage() {
                           defaultQty: r.defaultQty,
                           hasReturn: r.hasReturn,
                           useForVariantLabel: r.useForVariantLabel,
+                          useForDescriptionLabel: r.useForDescriptionLabel,
                           variants: r.variants.map((v) => ({
                               label: v.label,
                               abbreviatedName: v.abbreviatedName || null,
+                              unitLabel: v.unitLabel || null,
                               imageUrl: v.imageUrl || null,
                               unitPrice: v.unitPrice,
                               isDefault: v.isDefault,
@@ -441,6 +460,7 @@ export default function ProductEditPage() {
                     const created = await createVariant(productId, {
                         name: v.name,
                         abbreviatedName: v.abbreviatedName || null,
+                        unitLabel: v.unitLabel || null,
                         storeId: v.storeId || null,
                         groupId,
                         imageUrl: v.imageUrl || null,
@@ -461,6 +481,7 @@ export default function ProductEditPage() {
                     await updateVariant(productId, v.id, {
                         name: v.name,
                         abbreviatedName: v.abbreviatedName || null,
+                        unitLabel: v.unitLabel || null,
                         storeId: v.storeId || null,
                         groupId,
                         imageUrl: v.imageUrl || null,
@@ -544,6 +565,7 @@ export default function ProductEditPage() {
             {
                 name: '',
                 abbreviatedName: '',
+                unitLabel: '',
                 imageUrl: '',
                 priceGeneral: 0,
                 priceMember: 0,
@@ -638,6 +660,7 @@ export default function ProductEditPage() {
                 const created = await createVariant(productId, {
                     name: v.name,
                     abbreviatedName: v.abbreviatedName || null,
+                    unitLabel: v.unitLabel || null,
                     storeId: v.storeId || null,
                     imageUrl: v.imageUrl || null,
                     priceGeneral: v.priceGeneral,
@@ -662,6 +685,7 @@ export default function ProductEditPage() {
                 await updateVariant(productId, v.id, {
                     name: v.name,
                     abbreviatedName: v.abbreviatedName || null,
+                    unitLabel: v.unitLabel || null,
                     storeId: v.storeId || null,
                     imageUrl: v.imageUrl || null,
                     priceGeneral: v.priceGeneral,
@@ -902,6 +926,17 @@ export default function ProductEditPage() {
                             onChange={(e) => setOverwriteDescriptionOnVariantChange(e.target.checked)}
                         />
                         種類を選択した場合は、摘要に商品名を反映する
+                    </label>
+                    <label
+                        className="flex items-center gap-2 font-mincho"
+                        style={{ marginTop: '10px', fontSize: '14px', color: 'var(--brand-text)', letterSpacing: '0.1em' }}
+                    >
+                        <input
+                            type="checkbox"
+                            checked={showQtyInDescription}
+                            onChange={(e) => setShowQtyInDescription(e.target.checked)}
+                        />
+                        個数を摘要欄に表示する（種類も表示する場合は「種類　個数」の順）
                     </label>
                     <label
                         className="flex items-center gap-2 font-mincho"
@@ -1407,6 +1442,7 @@ export default function ProductEditPage() {
                                         defaultQty: 1,
                                         hasReturn: false,
                                         useForVariantLabel: false,
+                                        useForDescriptionLabel: false,
                                         variants: [],
                                     },
                                 ])
@@ -1611,6 +1647,30 @@ export default function ProductEditPage() {
                                         </label>
                                     )}
 
+                                    {showQtyInDescription && (
+                                        <label
+                                            className="flex items-center gap-2 mb-3"
+                                            style={{ fontSize: 13, cursor: 'pointer' }}
+                                            title="見積/請求書/領収書の摘要欄に、この行で選択した種類名を表示する"
+                                        >
+                                            <input
+                                                type="radio"
+                                                name="useForDescriptionLabel"
+                                                checked={row.useForDescriptionLabel}
+                                                onChange={() =>
+                                                    setMultiRows((prev) =>
+                                                        prev.map((r, i) => ({
+                                                            ...r,
+                                                            useForDescriptionLabel: i === rIdx,
+                                                        }))
+                                                    )
+                                                }
+                                                className="h-4 w-4"
+                                            />
+                                            <span>この行の種類名を摘要表示に使う</span>
+                                        </label>
+                                    )}
+
                                     {/* 行内の種類リスト */}
                                     <div
                                         className="mt-2 pt-2"
@@ -1637,6 +1697,7 @@ export default function ProductEditPage() {
                                                                               localId: genLocalId(),
                                                                               label: '',
                                                                               abbreviatedName: '',
+                                                                              unitLabel: '',
                                                                               imageUrl: '',
                                                                               unitPrice: 0,
                                                                               isDefault:
@@ -1844,27 +1905,54 @@ export default function ProductEditPage() {
                                                                     }
                                                                     style={inputStyle}
                                                                 />
-                                                                {showProductVariantName && (
-                                                                    <div className="mt-2">
-                                                                        <label
-                                                                            className="brand-label"
-                                                                            style={{ fontSize: 12 }}
-                                                                        >
-                                                                            表示用略称（見積/請求書/PDFの括弧書きに表示・{MAX_VARIANT_ABBREVIATION_LENGTH}文字まで）
-                                                                        </label>
-                                                                        <input
-                                                                            type="text"
-                                                                            className="w-full"
-                                                                            maxLength={MAX_VARIANT_ABBREVIATION_LENGTH}
-                                                                            placeholder="例: マイクロ"
-                                                                            value={v.abbreviatedName}
-                                                                            onChange={(e) =>
-                                                                                updateRowVariant(rIdx, vIdx, {
-                                                                                    abbreviatedName: e.target.value,
-                                                                                })
-                                                                            }
-                                                                            style={inputStyle}
-                                                                        />
+                                                                {(showProductVariantName || showQtyInDescription) && (
+                                                                    <div className="mt-2 grid grid-cols-2 gap-3">
+                                                                        {showProductVariantName && (
+                                                                            <div>
+                                                                                <label
+                                                                                    className="brand-label"
+                                                                                    style={{ fontSize: 12 }}
+                                                                                >
+                                                                                    表示用略称（見積/請求書/PDFの括弧書きに表示・{MAX_VARIANT_ABBREVIATION_LENGTH}文字まで）
+                                                                                </label>
+                                                                                <input
+                                                                                    type="text"
+                                                                                    className="w-full"
+                                                                                    maxLength={MAX_VARIANT_ABBREVIATION_LENGTH}
+                                                                                    placeholder="例: マイクロ"
+                                                                                    value={v.abbreviatedName}
+                                                                                    onChange={(e) =>
+                                                                                        updateRowVariant(rIdx, vIdx, {
+                                                                                            abbreviatedName: e.target.value,
+                                                                                        })
+                                                                                    }
+                                                                                    style={inputStyle}
+                                                                                />
+                                                                            </div>
+                                                                        )}
+                                                                        {showQtyInDescription && (
+                                                                            <div>
+                                                                                <label
+                                                                                    className="brand-label"
+                                                                                    style={{ fontSize: 12 }}
+                                                                                >
+                                                                                    個数の単位（見積/請求書/領収書の摘要欄に「個数+単位」で表示・{MAX_VARIANT_UNIT_LABEL_LENGTH}文字まで）
+                                                                                </label>
+                                                                                <input
+                                                                                    type="text"
+                                                                                    className="w-full"
+                                                                                    maxLength={MAX_VARIANT_UNIT_LABEL_LENGTH}
+                                                                                    placeholder="例: 枚"
+                                                                                    value={v.unitLabel}
+                                                                                    onChange={(e) =>
+                                                                                        updateRowVariant(rIdx, vIdx, {
+                                                                                            unitLabel: e.target.value,
+                                                                                        })
+                                                                                    }
+                                                                                    style={inputStyle}
+                                                                                />
+                                                                            </div>
+                                                                        )}
                                                                     </div>
                                                                 )}
                                                             </div>
@@ -2308,6 +2396,7 @@ export default function ProductEditPage() {
                                                     index={i}
                                                     kind={kind}
                                                     showProductVariantName={showProductVariantName}
+                                                    showQtyInDescription={showQtyInDescription}
                                                     stores={stores}
                                                     uploadingId={uploadingId}
                                                     dragEnabled={false}
@@ -2405,6 +2494,7 @@ export default function ProductEditPage() {
                                 index={i}
                                 kind={kind}
                                 showProductVariantName={showProductVariantName}
+                                showQtyInDescription={showQtyInDescription}
                                 stores={stores}
                                 uploadingId={uploadingId}
                                 dragEnabled
@@ -2565,6 +2655,7 @@ type VariantCardProps = {
     index: number
     kind: ProductKind
     showProductVariantName: boolean
+    showQtyInDescription: boolean
     stores: { id: string; name: string }[]
     uploadingId: string | null
     dragEnabled: boolean
@@ -2592,6 +2683,7 @@ function VariantCard({
     index: i,
     kind,
     showProductVariantName,
+    showQtyInDescription,
     stores,
     uploadingId,
     dragEnabled,
@@ -2755,6 +2847,21 @@ function VariantCard({
 
             {/* フォーム */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                    <label className="brand-label">取扱店舗</label>
+                    <select
+                        value={v.storeId}
+                        onChange={(e) => onSetVariant(i, { storeId: e.target.value })}
+                        style={{ ...inputStyle, cursor: 'pointer' }}
+                    >
+                        <option value="">全店舗共通</option>
+                        {stores.map((s) => (
+                            <option key={s.id} value={s.id}>
+                                {s.name}
+                            </option>
+                        ))}
+                    </select>
+                </div>
                 <div>
                     <label className="brand-label">
                         種類名<span className="brand-label-required">*</span>
@@ -2782,21 +2889,21 @@ function VariantCard({
                         />
                     </div>
                 )}
-                <div>
-                    <label className="brand-label">取扱店舗</label>
-                    <select
-                        value={v.storeId}
-                        onChange={(e) => onSetVariant(i, { storeId: e.target.value })}
-                        style={{ ...inputStyle, cursor: 'pointer' }}
-                    >
-                        <option value="">全店舗共通</option>
-                        {stores.map((s) => (
-                            <option key={s.id} value={s.id}>
-                                {s.name}
-                            </option>
-                        ))}
-                    </select>
-                </div>
+                {showQtyInDescription && (
+                    <div>
+                        <label className="brand-label">
+                            個数の単位（見積/請求書/領収書の摘要欄に「個数+単位」で表示・{MAX_VARIANT_UNIT_LABEL_LENGTH}文字まで）
+                        </label>
+                        <input
+                            type="text"
+                            value={v.unitLabel}
+                            maxLength={MAX_VARIANT_UNIT_LABEL_LENGTH}
+                            onChange={(e) => onSetVariant(i, { unitLabel: e.target.value })}
+                            placeholder="例: 個"
+                            style={inputStyle}
+                        />
+                    </div>
+                )}
                 <div>
                     <label className="brand-label">一般価格（円）</label>
                     <CurrencyTextInput

@@ -234,6 +234,7 @@ model ProductItem {
   hasVariantGroups      Boolean   @default(false) @map("has_variant_groups")
   overwriteDescriptionOnVariantChange Boolean @default(false) @map("overwrite_description_on_variant_change")
   showProductVariantName Boolean @default(false) @map("show_product_variant_name")
+  showQtyInDescription Boolean @default(false) @map("show_qty_in_description")
   isActive              Boolean   @default(true) @map("is_active")
   createdAt     DateTime @default(now()) @db.Timestamptz(6) @map("created_at")
   updatedAt     DateTime @updatedAt @db.Timestamptz(6) @map("updated_at")
@@ -283,6 +284,8 @@ model ProductRow {
   hasReturn       Boolean      @default(false) @map("has_return")
   // showProductVariantName有効時、複数行構成商品のどの行の選択種類名を括弧書き表示に使うか（1商品につき1行のみtrue）
   useForVariantLabel Boolean   @default(false) @map("use_for_variant_label")
+  // showQtyInDescription有効時、複数行構成商品のどの行の選択種類名を摘要欄に使うか（1商品につき1行のみtrue）
+  useForDescriptionLabel Boolean @default(false) @map("use_for_description_label")
   sortNo          Int          @default(0) @map("sort_no")
   isActive        Boolean      @default(true) @map("is_active")
   createdAt       DateTime     @default(now()) @db.Timestamptz(6) @map("created_at")
@@ -303,6 +306,8 @@ model ProductRowVariant {
   label           String       @db.VarChar(100)
   // 見積/請求書/PDFの括弧書き表示用の略称（showProductVariantName有効時に label の代わりに使う）
   abbreviatedName String?      @db.VarChar(8) @map("abbreviated_name")
+  // 摘要欄の個数表示用の単位（showQtyInDescription有効時に「個数+単位」で表示する。例: 枚・部・個）
+  unitLabel       String?      @db.VarChar(8) @map("unit_label")
   imageUrl        String?      @db.VarChar(500) @map("image_url")
   unitPrice       Int          @default(0) @map("unit_price")
   isDefault       Boolean      @default(false) @map("is_default")
@@ -343,6 +348,8 @@ model ProductVariant {
   name          String   @db.VarChar(120)
   // 見積/請求書/PDFの括弧書き表示用の略称（showProductVariantName有効時に name の代わりに使う）
   abbreviatedName String? @db.VarChar(8) @map("abbreviated_name")
+  // 摘要欄の個数表示用の単位（showQtyInDescription有効時に「個数+単位」で表示する。例: 個・本・枚）
+  unitLabel     String?  @db.VarChar(8) @map("unit_label")
   imageUrl      String?  @db.VarChar(500) @map("image_url")
   priceGeneral  Int      @map("price_general")
   priceMember   Int      @map("price_member")

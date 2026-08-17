@@ -15,6 +15,11 @@ type DisplayRow = {
     hideDescription?: boolean
     isSecondaryRow?: boolean
     variantLabelOverride?: string // 複数行構成商品(isMultiRow)の括弧書き用。useForVariantLabel行の選択種類名
+    showQtyInDescription?: boolean // 商品マスタ設定: 摘要欄の末尾に個数を追記表示する（種類も表示する場合は「種類　個数」の順）
+    descriptionLabelOverride?: string // useForDescriptionLabel行（isDescriptionLabelRowがtrueの行）自身の選択種類名
+    descriptionUnitLabel?: string // 同、選択種類の単位
+    descriptionQtyOverride?: number // 同、その行自体の数量
+    isDescriptionLabelRow?: boolean // この行自体がuseForDescriptionLabel行か（hideDescriptionを解除して摘要を表示する）
 }
 
 function buildDisplayRows(
@@ -53,6 +58,10 @@ function buildDisplayRows(
             })
         } else {
             // 複数行構成商品（同じ productItemId の複数行）は、1行目のみ品名と摘要を表示
+            // ただし useForDescriptionLabel=true の行は、実際にその種類が選ばれた行自体に摘要を表示する
+            const hasDescriptionLabelRow =
+                itemsForProduct.length > 1 &&
+                itemsForProduct.some((it) => it.productRow?.useForDescriptionLabel && it.sign !== -1)
             itemsForProduct.forEach((estimateItem, idx) => {
                 const isFirstRow = idx === 0
                 // 商品マスタ側で useForVariantLabel=true とした行の選択種類名を、1行目の括弧書きに使う
@@ -64,13 +73,26 @@ function buildDisplayRows(
                         labelSourceItem?.productRowVariant?.abbreviatedName ??
                         undefined
                 }
+                const isDescriptionLabelRow =
+                    hasDescriptionLabelRow &&
+                    !!estimateItem.productRow?.useForDescriptionLabel &&
+                    estimateItem.sign !== -1
                 rows.push({
                     label: isFirstRow ? product.name : '',
                     estimateItem,
                     showProductVariantName: isFirstRow && !!product.showProductVariantName,
-                    hideDescription: !isFirstRow,
+                    hideDescription: !isFirstRow && !isDescriptionLabelRow,
                     isSecondaryRow: !isFirstRow,
                     variantLabelOverride,
+                    showQtyInDescription: product.showQtyInDescription,
+                    isDescriptionLabelRow,
+                    descriptionLabelOverride: isDescriptionLabelRow
+                        ? estimateItem.productRowVariant?.label ?? undefined
+                        : undefined,
+                    descriptionUnitLabel: isDescriptionLabelRow
+                        ? estimateItem.productRowVariant?.unitLabel ?? undefined
+                        : undefined,
+                    descriptionQtyOverride: isDescriptionLabelRow ? estimateItem.qty : undefined,
                 })
             })
         }
@@ -223,6 +245,14 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
                 >
                     <div className="whitespace-pre-wrap break-words">
                         {row.hideDescription ? '' : (row.estimateItem?.description ?? '')}
+                        {/* 複数行構成商品: useForDescriptionLabel行の選択種類名を摘要欄に追記 */}
+                        {!row.hideDescription ? (row.descriptionLabelOverride ?? '') : ''}
+                        {/* 商品マスタ設定: 摘要欄末尾に個数(+単位)を追記（種類も表示する場合は「種類　個数」の順） */}
+                        {!row.hideDescription &&
+                        row.showQtyInDescription &&
+                        (row.descriptionQtyOverride ?? row.estimateItem?.qty)
+                            ? `　${(row.descriptionQtyOverride ?? row.estimateItem!.qty).toLocaleString()}${row.descriptionUnitLabel ?? row.estimateItem?.productVariant?.unitLabel ?? ''}`
+                            : ''}
                     </div>
                     {row.isFreeItem && !row.isFixedRow && row.estimateItem && (
                         <div>

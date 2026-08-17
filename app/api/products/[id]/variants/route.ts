@@ -63,6 +63,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
                     groupId,
                     name: body.name,
                     abbreviatedName: body.abbreviatedName || null,
+                    unitLabel: body.unitLabel || null,
                     imageUrl: body.imageUrl || null,
                     priceGeneral: Number(body.priceGeneral) || 0,
                     priceMember: Number(body.priceMember) || 0,

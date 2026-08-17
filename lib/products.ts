@@ -9,6 +9,8 @@ export interface ProductVariant {
     name: string
     /** 見積/請求書/PDFの括弧書き表示用の略称（showProductVariantName有効時に name の代わりに使う） */
     abbreviatedName?: string | null
+    /** 摘要欄の個数表示用の単位（showQtyInDescription有効時に「個数+単位」で表示する。例: 個・本・枚） */
+    unitLabel?: string | null
     imageUrl?: string | null
     priceGeneral: number
     priceMember: number
@@ -58,6 +60,8 @@ export interface ProductRowVariant {
     label: string
     /** 見積/請求書/PDFの括弧書き表示用の略称（showProductVariantName有効時に label の代わりに使う） */
     abbreviatedName?: string | null
+    /** 摘要欄の個数表示用の単位（showQtyInDescription有効時に「個数+単位」で表示する。例: 枚・部・個） */
+    unitLabel?: string | null
     imageUrl?: string | null
     unitPrice: number
     isDefault?: boolean
@@ -76,6 +80,8 @@ export interface ProductRow {
     hasReturn: boolean
     /** showProductVariantName有効時、この行の選択種類名を括弧書き表示に使うか（1商品につき1行のみtrue） */
     useForVariantLabel?: boolean
+    /** showQtyInDescription有効時、この行の選択種類名を摘要欄に使うか（1商品につき1行のみtrue） */
+    useForDescriptionLabel?: boolean
     sortNo?: number
     isActive?: boolean
     variants: ProductRowVariant[]
@@ -98,6 +104,7 @@ export interface ProductItem {
     hasVariantGroups?: boolean
     overwriteDescriptionOnVariantChange?: boolean
     showProductVariantName?: boolean
+    showQtyInDescription?: boolean
     isActive: boolean
     variants: ProductVariant[]
     rows?: ProductRow[]
@@ -132,6 +139,7 @@ export interface ProductItemInput {
     hasVariantGroups?: boolean
     overwriteDescriptionOnVariantChange?: boolean
     showProductVariantName?: boolean
+    showQtyInDescription?: boolean
     groups?: ProductVariantGroupInput[]
 }
 
@@ -146,6 +154,7 @@ export async function setProductChildren(parentId: string, childIds: string[]): 
 export interface ProductVariantInput {
     name: string
     abbreviatedName?: string | null
+    unitLabel?: string | null
     storeId?: string | null
     groupId?: string | null
     imageUrl?: string | null
