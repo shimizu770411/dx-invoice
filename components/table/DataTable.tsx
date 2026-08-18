@@ -28,6 +28,8 @@ export interface DataTableProps<T> {
     onRowClick?: (item: T) => void
     emptyMessage?: string
     rowKey: (item: T, index: number) => string | number
+    // この値が変化するたびに1ページ目へリセットする（検索・フィルター実行時など）
+    resetKey?: unknown
 }
 
 export function DataTable<T>({
@@ -39,6 +41,7 @@ export function DataTable<T>({
     onRowClick,
     emptyMessage = 'データがありません',
     rowKey,
+    resetKey,
 }: DataTableProps<T>) {
     const [sortKey, setSortKey] = useState<string | null>(null)
     const [sortDir, setSortDir] = useState<SortDirection>('asc')
@@ -72,6 +75,7 @@ export function DataTable<T>({
     const { currentPage, totalPages, paginatedItems, goToPage, prevPage, nextPage } = usePagination({
         items: sortedData,
         itemsPerPage,
+        resetKey,
     })
 
     const headerStyle: React.CSSProperties = {

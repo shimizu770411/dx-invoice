@@ -1,8 +1,10 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 
 export interface UsePaginationOptions {
     items: any[]
     itemsPerPage: number
+    // この値が変化するたびに1ページ目へリセットする（検索・フィルター実行時など）
+    resetKey?: unknown
 }
 
 export interface UsePaginationReturn {
@@ -17,8 +19,13 @@ export interface UsePaginationReturn {
 /**
  * ページング処理用のカスタムhook
  */
-export function usePagination({ items, itemsPerPage }: UsePaginationOptions): UsePaginationReturn {
+export function usePagination({ items, itemsPerPage, resetKey }: UsePaginationOptions): UsePaginationReturn {
     const [currentPage, setCurrentPage] = useState(1)
+
+    useEffect(() => {
+        setCurrentPage(1)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [resetKey])
 
     const { totalPages, paginatedItems } = useMemo(() => {
         const total = Math.ceil(items.length / itemsPerPage)
