@@ -1,8 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { getMe } from '@/lib/auth'
 import { getOperationLogReportExcelUrl } from '@/lib/operationLogs'
 import { useOperationLogReportQuery } from './hooks/useOperationLogReport'
 import { OperationLogTable } from './components/OperationLogTable'
@@ -24,9 +22,7 @@ export default function OperationLogReportPage() {
     const [to, setTo] = useState(today)
     const [appliedRange, setAppliedRange] = useState<{ from: string; to: string }>({ from: today, to: today })
 
-    const { data: currentUser, isLoading: isLoadingMe } = useQuery({ queryKey: ['me'], queryFn: getMe })
-    const isAdmin = !!currentUser?.isAdmin
-    const { data: rows = [], isFetching } = useOperationLogReportQuery(appliedRange.from, appliedRange.to, isAdmin)
+    const { data: rows = [], isFetching } = useOperationLogReportQuery(appliedRange.from, appliedRange.to, true)
 
     const handleSearch = () => {
         setAppliedRange({ from, to })
@@ -40,36 +36,6 @@ export default function OperationLogReportPage() {
 
     const handleDownloadExcel = () => {
         window.open(getOperationLogReportExcelUrl(appliedRange.from, appliedRange.to), '_blank')
-    }
-
-    if (isLoadingMe) {
-        return (
-            <div
-                className="p-10"
-                style={{
-                    fontFamily: 'var(--font-mincho)',
-                    color: 'var(--brand-text-muted)',
-                    letterSpacing: '0.15em',
-                }}
-            >
-                読み込み中…
-            </div>
-        )
-    }
-
-    if (!isAdmin) {
-        return (
-            <div
-                className="p-10"
-                style={{
-                    fontFamily: 'var(--font-mincho)',
-                    color: 'var(--brand-red, #c0392b)',
-                    letterSpacing: '0.15em',
-                }}
-            >
-                このページを閲覧する権限がありません
-            </div>
-        )
     }
 
     return (

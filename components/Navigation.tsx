@@ -14,15 +14,17 @@ export default function Navigation() {
     const navItems = [
         { href: '/cases', label: '案件一覧' },
         ...(currentUser?.isAdmin ? [{ href: '/products', label: '商品管理' }] : []),
+        ...(currentUser?.isAdmin ? [{ href: '/plans', label: 'プラン別商品設定' }] : []),
         ...(currentUser?.isAdmin ? [{ href: '/stores', label: '店舗管理' }] : []),
         { href: '/users', label: '社員管理' },
         ...(currentUser?.isAdmin ? [{ href: '/company', label: '自社情報' }] : []),
-        ...(currentUser?.isAdmin ? [{ href: '/reports/operations', label: '操作ログレポート' }] : []),
+        { href: '/reports/operations', label: '操作ログレポート' },
     ]
 
     const isActive = (href: string) => {
         if (href === '/cases') return pathname === '/cases' || pathname?.startsWith('/cases/')
         if (href === '/products') return pathname === '/products' || pathname?.startsWith('/products/')
+        if (href === '/plans') return pathname === '/plans' || pathname?.startsWith('/plans/')
         if (href === '/stores') return pathname === '/stores' || pathname?.startsWith('/stores/')
         if (href === '/users') return pathname === '/users' || pathname?.startsWith('/users/')
         if (href === '/company') return pathname === '/company' || pathname?.startsWith('/company/')

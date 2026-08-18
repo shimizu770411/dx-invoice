@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import ExcelJS from 'exceljs'
-import { requireAdmin } from '@/lib/auth-middleware'
+import { requireAuth } from '@/lib/auth-middleware'
 import { getOperationLogReport, parseReportDateRange, OperationLogReportRow } from '@/lib/operationLogReport'
 
 const ENTITY_TYPE_LABELS: Record<string, string> = {
@@ -33,7 +33,7 @@ const UNKNOWN_USER_LABEL = '(不明)'
 
 export async function GET(request: NextRequest) {
     try {
-        const authResult = await requireAdmin(request)
+        const authResult = await requireAuth(request)
         if (authResult instanceof NextResponse) {
             return authResult
         }
