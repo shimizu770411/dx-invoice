@@ -119,17 +119,15 @@ export default function OperationLogReportPage() {
                     padding: '22px 28px',
                 }}
             >
-                <div className="grid grid-cols-[1fr_1fr_auto] items-end gap-4">
+                <div className="grid grid-cols-2 items-end gap-4 lg:grid-cols-[1fr_1fr_auto]">
                     <div>
                         <label className="brand-label">開始日</label>
                         <input
                             type="date"
                             value={from}
                             onChange={(e) => setFrom(e.target.value)}
-                            className="w-full focus:outline-none transition-colors"
+                            className="w-full py-2 px-2.5 text-sm focus:outline-none transition-colors lg:py-3 lg:px-3.5 lg:text-base"
                             style={{
-                                padding: '12px 14px',
-                                fontSize: '16px',
                                 border: '1px solid var(--brand-input-border)',
                                 backgroundColor: 'var(--brand-ivory-light)',
                                 fontFamily: 'var(--font-mincho)',
@@ -143,10 +141,8 @@ export default function OperationLogReportPage() {
                             type="date"
                             value={to}
                             onChange={(e) => setTo(e.target.value)}
-                            className="w-full focus:outline-none transition-colors"
+                            className="w-full py-2 px-2.5 text-sm focus:outline-none transition-colors lg:py-3 lg:px-3.5 lg:text-base"
                             style={{
-                                padding: '12px 14px',
-                                fontSize: '16px',
                                 border: '1px solid var(--brand-input-border)',
                                 backgroundColor: 'var(--brand-ivory-light)',
                                 fontFamily: 'var(--font-mincho)',
@@ -154,7 +150,7 @@ export default function OperationLogReportPage() {
                             }}
                         />
                     </div>
-                    <div className="flex gap-2">
+                    <div className="col-span-2 flex gap-2 lg:col-span-1">
                         <ResetButton onClick={handleReset} />
                         <SearchButton onClick={handleSearch} isLoading={isFetching} />
                     </div>
