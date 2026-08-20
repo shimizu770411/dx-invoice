@@ -62,6 +62,8 @@ export async function PUT(request: NextRequest) {
             bank4Account: body.bank4Account ?? null,
             bank4Holder: body.bank4Holder ?? null,
             dateFormat: body.dateFormat === 'JAPANESE' ? 'JAPANESE' : 'WESTERN',
+            pdfShowOptionImages: body.pdfShowOptionImages === true,
+            pdfPromptOnExport: body.pdfPromptOnExport !== false,
             estimateRemarksDefault: body.estimateRemarksDefault ?? null,
             invoiceRemarksDefault: body.invoiceRemarksDefault ?? null,
         }

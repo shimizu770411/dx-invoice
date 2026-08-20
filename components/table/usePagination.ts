@@ -27,14 +27,23 @@ export function usePagination({ items, itemsPerPage, resetKey }: UsePaginationOp
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [resetKey])
 
-    const { totalPages, paginatedItems } = useMemo(() => {
+    const { totalPages, paginatedItems, effectivePage } = useMemo(() => {
         const total = Math.ceil(items.length / itemsPerPage)
-        const start = (currentPage - 1) * itemsPerPage
+        // itemsが減ってcurrentPageが範囲外になった場合、表示上は最終ページにクランプする
+        const effective = total > 0 ? Math.min(currentPage, total) : 1
+        const start = (effective - 1) * itemsPerPage
         const end = start + itemsPerPage
         const paginated = items.slice(start, end)
 
-        return { totalPages: total, paginatedItems: paginated }
+        return { totalPages: total, paginatedItems: paginated, effectivePage: effective }
     }, [items, itemsPerPage, currentPage])
+
+    // 表示に使ったページと実際のstateがずれていたら同期する（範囲外ページへの滞留防止）
+    useEffect(() => {
+        if (effectivePage !== currentPage) {
+            setCurrentPage(effectivePage)
+        }
+    }, [effectivePage, currentPage])
 
     const goToPage = (page: number) => {
         const pageNum = Math.max(1, Math.min(page, totalPages || 1))
@@ -50,7 +59,7 @@ export function usePagination({ items, itemsPerPage, resetKey }: UsePaginationOp
     }
 
     return {
-        currentPage,
+        currentPage: effectivePage,
         totalPages,
         paginatedItems,
         goToPage,

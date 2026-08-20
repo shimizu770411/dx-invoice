@@ -16,7 +16,8 @@ import { ProductVariant } from '@/lib/products'
 import { resolveUnitPriceMember } from '@/lib/itemPricing'
 import { confirmEstimate } from '@/lib/estimates'
 import { toast } from '@/hooks/use-toast'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import { PdfExportDialog } from '@/components/document/PdfExportDialog'
+import { usePdfExportTrigger } from '@/hooks/usePdfExportTrigger'
 
 interface Estimate {
     id: string
@@ -65,7 +66,9 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
     const [itemsViewMode, setItemsViewMode] = useState<'list' | 'card'>('list')
     const [isConfirmed, setIsConfirmed] = useState(false)
     const [isConfirming, setIsConfirming] = useState(false)
-    const [pdfDialogOpen, setPdfDialogOpen] = useState(false)
+    const { pdfDialogOpen, setPdfDialogOpen, handlePdfClick } = usePdfExportTrigger(
+        estimate ? `/api/pdf/estimate/${estimate.id}` : null
+    )
 
     // 画面下部固定フッターの高さぶんコンテンツに余白を確保する（タブレット幅ではボタンが折り返してフッターが高くなるため、固定値ではなく実測値を使う）
     const footerRef = useRef<HTMLDivElement>(null)
@@ -604,77 +607,16 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                                     <button
                                         type="button"
                                         disabled={isDirty}
-                                        onClick={() => setPdfDialogOpen(true)}
+                                        onClick={handlePdfClick}
                                         className={`font-mincho rounded px-10 py-3 text-[15px] ${isDirty ? 'cursor-not-allowed border border-transparent bg-gray-300 text-white' : 'cursor-pointer border border-[var(--brand-gold)] bg-[var(--brand-gold)] text-[var(--brand-navy-dark)]'}`}
                                     >
                                         PDF
                                     </button>
-                                    <Dialog open={pdfDialogOpen} onOpenChange={setPdfDialogOpen}>
-                                        <DialogContent className="max-w-md" style={{ borderColor: 'var(--brand-border)', borderRadius: '16px' }}>
-                                            <DialogHeader>
-                                                <DialogTitle
-                                                    className="font-mincho"
-                                                    style={{ color: 'var(--brand-navy)', fontSize: '19px', letterSpacing: '0.08em', fontWeight: 600 }}
-                                                >
-                                                    PDF出力設定
-                                                </DialogTitle>
-                                                <DialogDescription
-                                                    className="font-mincho"
-                                                    style={{ color: 'var(--brand-text-muted)', fontSize: '13px', letterSpacing: '0.03em', lineHeight: 1.8 }}
-                                                >
-                                                    各明細で選択した種類の画像を、PDF末尾に一覧ページとして含めますか？
-                                                </DialogDescription>
-                                            </DialogHeader>
-                                            <DialogFooter className="!grid !grid-cols-2 gap-3 sm:space-x-0">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        const params = new URLSearchParams({ _t: Date.now().toString(), showOptions: 'false' })
-                                                        window.open(`/api/pdf/estimate/${estimate.id}?${params.toString()}`, '_blank')
-                                                        setPdfDialogOpen(false)
-                                                    }}
-                                                    className="font-mincho cursor-pointer"
-                                                    style={{
-                                                        padding: '14px 12px',
-                                                        backgroundColor: '#ffffff',
-                                                        color: 'var(--brand-text-muted)',
-                                                        border: '1px solid var(--brand-border)',
-                                                        borderRadius: '10px',
-                                                        fontSize: '14px',
-                                                        letterSpacing: '0.1em',
-                                                        lineHeight: 1.6,
-                                                    }}
-                                                >
-                                                    含めない
-                                                    <br />
-                                                    （非表示）
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        const params = new URLSearchParams({ _t: Date.now().toString() })
-                                                        window.open(`/api/pdf/estimate/${estimate.id}?${params.toString()}`, '_blank')
-                                                        setPdfDialogOpen(false)
-                                                    }}
-                                                    className="font-mincho cursor-pointer"
-                                                    style={{
-                                                        padding: '14px 12px',
-                                                        backgroundColor: 'var(--brand-navy)',
-                                                        color: '#ffffff',
-                                                        border: 'none',
-                                                        borderRadius: '10px',
-                                                        fontSize: '14px',
-                                                        letterSpacing: '0.1em',
-                                                        lineHeight: 1.6,
-                                                    }}
-                                                >
-                                                    含めて出力
-                                                    <br />
-                                                    （表示）
-                                                </button>
-                                            </DialogFooter>
-                                        </DialogContent>
-                                    </Dialog>
+                                    <PdfExportDialog
+                                        open={pdfDialogOpen}
+                                        onOpenChange={setPdfDialogOpen}
+                                        pdfEndpoint={`/api/pdf/estimate/${estimate.id}`}
+                                    />
                                 </>
                             )}
                             {closeButton}

@@ -311,6 +311,71 @@ export function RemarksDefaultSection() {
     )
 }
 
+const BINARY_CHOICE_LABEL_STYLE = (isSelected: boolean): React.CSSProperties => ({
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    cursor: 'pointer',
+    padding: '12px 20px',
+    border: `2px solid ${isSelected ? 'var(--brand-gold)' : 'var(--brand-border)'}`,
+    backgroundColor: isSelected ? '#fffdf5' : '#ffffff',
+    fontFamily: 'var(--font-mincho)',
+    fontSize: '15px',
+    fontWeight: isSelected ? 600 : 400,
+    color: isSelected ? 'var(--brand-navy)' : 'var(--brand-text-muted)',
+    letterSpacing: '0.15em',
+    transition: 'all 0.15s ease',
+})
+
+interface BinaryChoiceOption {
+    value: boolean
+    label: string
+    sublabel?: string
+}
+
+function BinaryChoiceField({
+    name,
+    options,
+}: {
+    name: 'pdfPromptOnExport' | 'pdfShowOptionImages'
+    options: [BinaryChoiceOption, BinaryChoiceOption]
+}) {
+    const { control } = useFormContext<CompanyFormData>()
+
+    return (
+        <Controller
+            name={name}
+            control={control}
+            render={({ field }) => (
+                <div className="flex gap-6">
+                    {options.map((option) => {
+                        const isSelected = field.value === option.value
+                        return (
+                            <label key={String(option.value)} style={BINARY_CHOICE_LABEL_STYLE(isSelected)}>
+                                <input
+                                    type="radio"
+                                    checked={isSelected}
+                                    onChange={() => field.onChange(option.value)}
+                                    style={{ accentColor: 'var(--brand-gold)', width: '16px', height: '16px' }}
+                                />
+                                <span>
+                                    {option.label}
+                                    {option.sublabel && (
+                                        <>
+                                            <br />
+                                            {option.sublabel}
+                                        </>
+                                    )}
+                                </span>
+                            </label>
+                        )
+                    })}
+                </div>
+            )}
+        />
+    )
+}
+
 export function SystemSettingsSection() {
     const { control } = useFormContext<CompanyFormData>()
 
@@ -398,6 +463,107 @@ export function SystemSettingsSection() {
                         </div>
                     )}
                 />
+            </div>
+
+            <div style={subSectionStyle}>
+                <div style={subSectionHeaderStyle}>
+                    <span
+                        style={{
+                            fontFamily: 'var(--font-garamond)',
+                            fontSize: '11px',
+                            color: 'var(--brand-gold-soft)',
+                            letterSpacing: '0.3em',
+                            fontWeight: 500,
+                        }}
+                    >
+                        PDF EXPORT
+                    </span>
+                    <h3
+                        style={{
+                            fontFamily: 'var(--font-mincho)',
+                            fontSize: '15px',
+                            fontWeight: 600,
+                            color: 'var(--brand-navy)',
+                            letterSpacing: '0.15em',
+                        }}
+                    >
+                        見積書・請求書のPDF出力設定
+                    </h3>
+                </div>
+                <div className="mb-5">
+                    <p
+                        style={{
+                            fontFamily: 'var(--font-mincho)',
+                            fontSize: '13px',
+                            color: 'var(--brand-navy)',
+                            letterSpacing: '0.1em',
+                            marginBottom: '10px',
+                        }}
+                    >
+                        明細の画像一覧
+                    </p>
+                    <p
+                        style={{
+                            fontFamily: 'var(--font-mincho)',
+                            fontSize: '13px',
+                            color: 'var(--brand-text-muted)',
+                            letterSpacing: '0.1em',
+                            marginBottom: '10px',
+                        }}
+                    >
+                        各明細で選んだ画像を、PDFの最後に一覧ページとして含めるか選択してください。
+                    </p>
+                    <BinaryChoiceField
+                        name="pdfShowOptionImages"
+                        options={[
+                            { value: true, label: '含める' },
+                            { value: false, label: '含めない' },
+                        ]}
+                    />
+                </div>
+                <div>
+                    <p
+                        style={{
+                            fontFamily: 'var(--font-mincho)',
+                            fontSize: '13px',
+                            color: 'var(--brand-navy)',
+                            letterSpacing: '0.1em',
+                            marginBottom: '10px',
+                        }}
+                    >
+                        出力前の確認画面
+                    </p>
+                    <p
+                        style={{
+                            fontFamily: 'var(--font-mincho)',
+                            fontSize: '13px',
+                            color: 'var(--brand-text-muted)',
+                            letterSpacing: '0.1em',
+                            marginBottom: '10px',
+                        }}
+                    >
+                        毎回、上の選択を確認する画面を表示するか選択してください。
+                    </p>
+                    <BinaryChoiceField
+                        name="pdfPromptOnExport"
+                        options={[
+                            { value: true, label: '表示する', sublabel: '（毎回確認する）' },
+                            { value: false, label: '表示しない', sublabel: '（すぐPDFを開く）' },
+                        ]}
+                    />
+                    <p
+                        style={{
+                            fontFamily: 'var(--font-mincho)',
+                            fontSize: '12px',
+                            color: 'var(--brand-text-muted)',
+                            letterSpacing: '0.05em',
+                            marginTop: '10px',
+                            lineHeight: 1.7,
+                        }}
+                    >
+                        「表示する」の場合は毎回確認画面で選び、「表示しない」の場合は上の「明細の画像一覧」の設定がそのまま使われます。
+                    </p>
+                </div>
             </div>
         </section>
     )

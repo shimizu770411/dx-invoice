@@ -30,6 +30,8 @@ export interface CompanyProfile {
     bank4Account?: string
     bank4Holder?: string
     dateFormat?: string
+    pdfShowOptionImages?: boolean
+    pdfPromptOnExport?: boolean
     estimateRemarksDefault?: string
     invoiceRemarksDefault?: string
 }
@@ -63,6 +65,8 @@ export interface UpdateCompanyProfileData {
     bank4Account?: string
     bank4Holder?: string
     dateFormat?: string
+    pdfShowOptionImages?: boolean
+    pdfPromptOnExport?: boolean
     estimateRemarksDefault?: string
     invoiceRemarksDefault?: string
 }

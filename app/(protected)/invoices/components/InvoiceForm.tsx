@@ -15,7 +15,8 @@ import { ProductVariant } from '@/lib/products'
 import { resolveUnitPriceMember } from '@/lib/itemPricing'
 import { toast } from '@/hooks/use-toast'
 import type { InvoiceConfirmationFields } from '@/lib/invoices'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import { PdfExportDialog } from '@/components/document/PdfExportDialog'
+import { usePdfExportTrigger } from '@/hooks/usePdfExportTrigger'
 
 interface Invoice extends InvoiceConfirmationFields {
     id: string
@@ -61,7 +62,9 @@ function InvoiceFormContent({
     const { fields: freeItemFields } = useFieldArray({ control, name: 'freeItems' })
 
     const [activeTab, setActiveTab] = useState<'items' | 'other'>('items')
-    const [pdfDialogOpen, setPdfDialogOpen] = useState(false)
+    const { pdfDialogOpen, setPdfDialogOpen, handlePdfClick } = usePdfExportTrigger(
+        invoice ? `/api/pdf/invoice/${invoice.id}` : null
+    )
 
     // 画面下部固定フッターの高さぶんコンテンツに余白を確保する（タブレット幅ではボタンが折り返してフッターが高くなるため、固定値ではなく実測値を使う）
     const footerRef = useRef<HTMLDivElement>(null)
@@ -313,14 +316,13 @@ function InvoiceFormContent({
                             INVOICE · EDIT
                         </p>
                         <h1
-                            className="font-mincho"
+                            className="font-mincho whitespace-normal lg:whitespace-nowrap"
                             style={{
                                 fontSize: '26px',
                                 fontWeight: 600,
                                 color: 'var(--brand-navy)',
                                 letterSpacing: '0.2em',
                                 lineHeight: 1.2,
-                                whiteSpace: 'nowrap',
                             }}
                         >
                             請求書 編集
@@ -459,7 +461,7 @@ function InvoiceFormContent({
                             <button
                                 type="button"
                                 disabled={isDirty}
-                                onClick={() => setPdfDialogOpen(true)}
+                                onClick={handlePdfClick}
                                 className="font-mincho transition-colors"
                                 style={{
                                     padding: '12px 40px',
@@ -475,76 +477,11 @@ function InvoiceFormContent({
                             >
                                 PDF
                             </button>
-                            <Dialog open={pdfDialogOpen} onOpenChange={setPdfDialogOpen}>
-                                <DialogContent className="max-w-md" style={{ borderColor: 'var(--brand-border)', borderRadius: '16px' }}>
-                                    <DialogHeader>
-                                        <DialogTitle
-                                            className="font-mincho"
-                                            style={{ color: 'var(--brand-navy)', fontSize: '19px', letterSpacing: '0.08em', fontWeight: 600 }}
-                                        >
-                                            PDF出力設定
-                                        </DialogTitle>
-                                        <DialogDescription
-                                            className="font-mincho"
-                                            style={{ color: 'var(--brand-text-muted)', fontSize: '13px', letterSpacing: '0.03em', lineHeight: 1.8 }}
-                                        >
-                                            各明細で選択した種類の画像を、PDF末尾に一覧ページとして含めますか？
-                                        </DialogDescription>
-                                    </DialogHeader>
-                                    <DialogFooter className="!grid !grid-cols-2 gap-3 sm:space-x-0">
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                if (invoice) {
-                                                    const params = new URLSearchParams({ _t: Date.now().toString(), showOptions: 'false' })
-                                                    window.open(`/api/pdf/invoice/${invoice.id}?${params.toString()}`, '_blank')
-                                                }
-                                                setPdfDialogOpen(false)
-                                            }}
-                                            className="font-mincho cursor-pointer"
-                                            style={{
-                                                padding: '14px 12px',
-                                                backgroundColor: '#ffffff',
-                                                color: 'var(--brand-text-muted)',
-                                                border: '1px solid var(--brand-border)',
-                                                borderRadius: '10px',
-                                                fontSize: '14px',
-                                                letterSpacing: '0.1em',
-                                                lineHeight: 1.6,
-                                            }}
-                                        >
-                                            含めない
-                                            <br />
-                                            （非表示）
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                if (invoice) {
-                                                    const params = new URLSearchParams({ _t: Date.now().toString() })
-                                                    window.open(`/api/pdf/invoice/${invoice.id}?${params.toString()}`, '_blank')
-                                                }
-                                                setPdfDialogOpen(false)
-                                            }}
-                                            className="font-mincho cursor-pointer"
-                                            style={{
-                                                padding: '14px 12px',
-                                                backgroundColor: 'var(--brand-navy)',
-                                                color: '#ffffff',
-                                                border: 'none',
-                                                borderRadius: '10px',
-                                                fontSize: '14px',
-                                                letterSpacing: '0.1em',
-                                                lineHeight: 1.6,
-                                            }}
-                                        >
-                                            含めて出力
-                                            <br />
-                                            （表示）
-                                        </button>
-                                    </DialogFooter>
-                                </DialogContent>
-                            </Dialog>
+                            <PdfExportDialog
+                                open={pdfDialogOpen}
+                                onOpenChange={setPdfDialogOpen}
+                                pdfEndpoint={invoice ? `/api/pdf/invoice/${invoice.id}` : null}
+                            />
                             <button
                                 type="button"
                                 onClick={() => { router.push('/cases'); router.refresh() }}

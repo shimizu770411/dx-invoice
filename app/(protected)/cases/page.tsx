@@ -29,11 +29,23 @@ const CASE_ROW_LABEL_SHORT_MAP: Record<string, string> = {
     本見積編集: '本見積',
     請求書作成: '請求書',
     請求書編集: '請求書',
+    '作成中…': '作成中',
     入金登録: '入金',
+    入金取消: '取消',
     領収書発行: '領収書',
     供花登録: '供花',
 }
 const shortCaseRowLabel = (label: string) => CASE_ROW_LABEL_SHORT_MAP[label] ?? label
+
+// タブレット幅では短縮ラベル、PC(lg以上)ではフルラベルを表示
+function ResponsiveActionLabel({ label }: { label: string }) {
+    return (
+        <>
+            <span className="lg:hidden">{shortCaseRowLabel(label)}</span>
+            <span className="hidden lg:inline">{label}</span>
+        </>
+    )
+}
 
 // 操作ボタンのサイズ: タブレット幅ではコンパクトに、PC(lg以上)では現状のサイズを維持
 const CASE_ROW_BTN_SIZE_CLASSES = 'px-2.5 py-3 text-[13px] min-w-[80px] lg:px-[18px] lg:py-2 lg:text-sm lg:min-w-[110px]'
@@ -436,8 +448,7 @@ export default function CasesPage() {
                                         className={`font-mincho ${CASE_ROW_BTN_SIZE_CLASSES}`}
                                         title="事前相談見積を閲覧"
                                     >
-                                        <span className="lg:hidden">{shortCaseRowLabel('事前相談見積')}</span>
-                                        <span className="hidden lg:inline">事前相談見積</span>
+                                        <ResponsiveActionLabel label="事前相談見積" />
                                     </button>
                                 )}
                                 <button
@@ -448,8 +459,7 @@ export default function CasesPage() {
                                     style={btnStyle(estVariant)}
                                     className={`font-mincho ${CASE_ROW_BTN_SIZE_CLASSES}`}
                                 >
-                                    <span className="lg:hidden">{shortCaseRowLabel(estLabel)}</span>
-                                    <span className="hidden lg:inline">{estLabel}</span>
+                                    <ResponsiveActionLabel label={estLabel} />
                                 </button>
                                 <Arrow />
                                 <button
@@ -477,8 +487,7 @@ export default function CasesPage() {
                                     title={invDisabled ? '本見積作成後に使用できます' : undefined}
                                 >
                                     {invDisabled && <LockIcon />}
-                                    <span className="lg:hidden">{shortCaseRowLabel(invLabel)}</span>
-                                    <span className="hidden lg:inline">{invLabel}</span>
+                                    <ResponsiveActionLabel label={invLabel} />
                                 </button>
                                 <Arrow />
                                 <button
@@ -492,8 +501,7 @@ export default function CasesPage() {
                                     title={payDisabled ? '請求書作成後に使用できます' : undefined}
                                 >
                                     {payDisabled && <LockIcon />}
-                                    <span className="lg:hidden">{shortCaseRowLabel(payLabel)}</span>
-                                    <span className="hidden lg:inline">{payLabel}</span>
+                                    <ResponsiveActionLabel label={payLabel} />
                                 </button>
                                 <Arrow />
                                 <button
@@ -507,8 +515,7 @@ export default function CasesPage() {
                                     title={recDisabled ? '入金登録後に使用できます' : undefined}
                                 >
                                     {recDisabled && <LockIcon />}
-                                    <span className="lg:hidden">{shortCaseRowLabel('領収書発行')}</span>
-                                    <span className="hidden lg:inline">領収書発行</span>
+                                    <ResponsiveActionLabel label="領収書発行" />
                                 </button>
 
                                 {/* 区切り */}
@@ -526,8 +533,7 @@ export default function CasesPage() {
                                     style={btnStyle('accent')}
                                     className={`font-mincho ${CASE_ROW_BTN_SIZE_CLASSES}`}
                                 >
-                                    <span className="lg:hidden">{shortCaseRowLabel('供花登録')}</span>
-                                    <span className="hidden lg:inline">供花登録</span>
+                                    <ResponsiveActionLabel label="供花登録" />
                                 </button>
                             </div>
                         )

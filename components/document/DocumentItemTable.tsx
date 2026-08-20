@@ -15,7 +15,8 @@ import { scopeApplies } from '@/lib/productScope'
 import { computeMultiRowAmount } from '@/lib/expandMultiRow'
 import { EXECUTION_SURCHARGE_NAME } from '@/lib/documentUtils'
 
-// 種類列: 選択されたバリアント名を連結した文字列がこの文字数を超えたら集約表示にする
+// 種類列: 表示文字列（バリアント名連結+「（n種類）」）がこの文字数を超えたら集約表示にする
+// 列幅320px（左右padding24pxを除くと296px）で全角文字が折り返さず収まる目安の文字数
 const TYPE_COLUMN_COLLAPSE_THRESHOLD = 20
 
 /**
@@ -219,7 +220,7 @@ export function DocumentItemTable({
         if (names.length === 0) return '-'
         const joined = names.join('、')
         const label = `${joined}（${names.length}種類）`
-        if (joined.length <= TYPE_COLUMN_COLLAPSE_THRESHOLD) return label
+        if (label.length <= TYPE_COLUMN_COLLAPSE_THRESHOLD) return label
         const isExpanded = expandedTypeRows.has(index)
         return (
             <>
@@ -233,7 +234,7 @@ export function DocumentItemTable({
                             toggleTypeRow(index)
                         }
                     }}
-                    className="flex cursor-pointer items-center justify-between gap-2"
+                    className="flex cursor-pointer items-center gap-2"
                     style={{ color: 'var(--brand-navy)', fontWeight: 600 }}
                 >
                     <span
@@ -514,10 +515,10 @@ export function DocumentItemTable({
                 <thead>
                     <tr className="bg-gray-100">
                         <th className="w-16 min-w-[64px] border border-gray-300 p-1 text-center">有無</th>
-                        <th className="w-56 min-w-[224px] border border-gray-300 p-3 text-center">品目</th>
+                        <th className="w-56 min-w-[224px] lg:w-64 lg:min-w-[256px] border border-gray-300 p-3 text-center">品目</th>
                         <th className="w-16 min-w-[64px] border border-gray-300 p-3 text-center">操作</th>
                         <th className="w-32 min-w-[128px] border border-gray-300 p-3 text-center">数量</th>
-                        <th className="w-56 min-w-[224px] border border-gray-300 p-3 text-center">種類</th>
+                        <th className="w-80 min-w-[320px] border border-gray-300 p-3 text-center">種類</th>
                         <th className="min-w-[300px] border border-gray-300 p-3 text-center">摘要</th>
                     </tr>
                 </thead>
@@ -839,7 +840,7 @@ export function DocumentItemTable({
                                                 }}
                                             />
                                         </td>
-                                        <td className="border border-gray-300 p-3 text-right">
+                                        <td className="border border-gray-300 p-3">
                                             {isMultiRowItem ? (
                                                 <>
                                                     <div
@@ -991,7 +992,7 @@ export function DocumentItemTable({
                                                     }}
                                                 />
                                             </td>
-                                            <td className="border border-gray-300 p-3 text-right">
+                                            <td className="border border-gray-300 p-3">
                                                 <FormCurrencyInput
                                                     name={`freeItems.${linkedFreeIndex}.unitPriceGeneral`}
                                                     control={control}
@@ -1086,7 +1087,7 @@ export function DocumentItemTable({
                                                     固定
                                                 </td>
                                                 <td className="border border-gray-300 p-3" />
-                                                <td className="border border-gray-300 p-3 text-right">
+                                                <td className="border border-gray-300 p-3">
                                                     {isExecutionSurcharge ? (
                                                         <div className="text-md">¥{amount.toLocaleString()}</div>
                                                     ) : (
@@ -1128,7 +1129,7 @@ export function DocumentItemTable({
                                                         disabled={inputsDisabled}
                                                     />
                                                 </td>
-                                                <td className="border border-gray-300 p-3 text-right">
+                                                <td className="border border-gray-300 p-3">
                                                     <FormCurrencyInput
                                                         name={`freeItems.${index}.unitPriceGeneral`}
                                                         control={control}

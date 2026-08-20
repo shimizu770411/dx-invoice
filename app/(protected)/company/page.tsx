@@ -55,6 +55,8 @@ export default function CompanyPage() {
                 bank4Account: profile.bank4Account ?? '',
                 bank4Holder: profile.bank4Holder ?? '',
                 dateFormat: (profile.dateFormat === 'JAPANESE' ? 'JAPANESE' : 'WESTERN') as 'WESTERN' | 'JAPANESE',
+                pdfShowOptionImages: profile.pdfShowOptionImages ?? false,
+                pdfPromptOnExport: profile.pdfPromptOnExport ?? true,
                 estimateRemarksDefault: profile.estimateRemarksDefault ?? '',
                 invoiceRemarksDefault: profile.invoiceRemarksDefault ?? '',
             })
