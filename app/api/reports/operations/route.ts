@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAdmin } from '@/lib/auth-middleware'
+import { requireAuth } from '@/lib/auth-middleware'
 import { getOperationLogReport, parseReportDateRange } from '@/lib/operationLogReport'
 
 export async function GET(request: NextRequest) {
     try {
-        const authResult = await requireAdmin(request)
+        const authResult = await requireAuth(request)
         if (authResult instanceof NextResponse) {
             return authResult
         }
