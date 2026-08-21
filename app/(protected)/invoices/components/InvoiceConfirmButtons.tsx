@@ -61,12 +61,16 @@ export function InvoiceConfirmButtons({ invoiceId, confirmations, onConfirmed }:
                             letterSpacing: '0.1em',
                             fontWeight: 500,
                             cursor: clickable ? 'pointer' : 'not-allowed',
+                            flexShrink: 0,
                         }}
                     >
                         <div>{USER_ROLE_LABELS[role]}確認</div>
                         {isConfirmed && (
                             <div style={{ fontSize: '11px', letterSpacing: '0.05em', opacity: 0.85, marginTop: '2px' }}>
-                                {formatDate(at)} {by!.name}
+                                {formatDate(at)}
+                                <br className="lg:hidden" />
+                                <span className="hidden lg:inline"> </span>
+                                {by!.name}
                             </div>
                         )}
                     </button>

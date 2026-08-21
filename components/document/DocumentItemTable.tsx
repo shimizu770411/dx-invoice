@@ -15,6 +15,10 @@ import { scopeApplies } from '@/lib/productScope'
 import { computeMultiRowAmount } from '@/lib/expandMultiRow'
 import { EXECUTION_SURCHARGE_NAME } from '@/lib/documentUtils'
 
+// 種類列: 表示文字列（バリアント名連結+「（n種類）」）がこの文字数を超えたら集約表示にする
+// 列幅320px（左右padding24pxを除くと296px）で全角文字が折り返さず収まる目安の文字数
+const TYPE_COLUMN_COLLAPSE_THRESHOLD = 20
+
 /**
  * EstimateFormData と InvoiceFormData は構造が完全に一致するため、
  * 共通の DocumentFormData 型として表現できる。
@@ -201,6 +205,71 @@ export function DocumentItemTable({
     const [prevQtySignature, setPrevQtySignature] = useState('')
     const [freeCheckedItems, setFreeCheckedItems] = useState<boolean[]>([])
     const [prevFreeSignature, setPrevFreeSignature] = useState('')
+
+    // 種類列: 選択されたバリアント名を連結した文字列がこの文字数を超えたら集約表示にする
+    const [expandedTypeRows, setExpandedTypeRows] = useState<Set<number>>(new Set())
+    const toggleTypeRow = (index: number) => {
+        setExpandedTypeRows((prev) => {
+            const next = new Set(prev)
+            if (next.has(index)) next.delete(index)
+            else next.add(index)
+            return next
+        })
+    }
+    const renderTypeNames = (index: number, names: string[]): React.ReactNode => {
+        if (names.length === 0) return '-'
+        const joined = names.join('、')
+        const label = `${joined}（${names.length}種類）`
+        if (label.length <= TYPE_COLUMN_COLLAPSE_THRESHOLD) return label
+        const isExpanded = expandedTypeRows.has(index)
+        return (
+            <>
+                <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => toggleTypeRow(index)}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            toggleTypeRow(index)
+                        }
+                    }}
+                    className="flex cursor-pointer items-center gap-2"
+                    style={{ color: 'var(--brand-navy)', fontWeight: 600 }}
+                >
+                    <span
+                        className="font-mincho"
+                        style={{
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            padding: '2px 8px',
+                            borderRadius: '999px',
+                            backgroundColor: '#eef0fb',
+                            color: 'var(--brand-navy)',
+                            whiteSpace: 'nowrap',
+                        }}
+                    >
+                        {names.length}種類選択中
+                    </span>
+                    <span style={{ color: 'var(--brand-gold-soft)', fontSize: '11px', flexShrink: 0 }}>
+                        {isExpanded ? '▴ 閉じる' : '▾ 詳細'}
+                    </span>
+                </div>
+                {isExpanded && (
+                    <div
+                        style={{
+                            marginTop: '8px',
+                            paddingTop: '8px',
+                            borderTop: '1px dashed var(--brand-border)',
+                            color: 'var(--brand-text-muted)',
+                        }}
+                    >
+                        {joined}
+                    </div>
+                )}
+            </>
+        )
+    }
 
     const qtySignature = items.map((i) => i.qty ?? 0).join(',')
     if (qtySignature !== prevQtySignature) {
@@ -441,15 +510,16 @@ export function DocumentItemTable({
     return (
         <div className="mb-8">
             <h3 className="mb-4">明細</h3>
+            <div className="overflow-x-auto">
             <table className="w-full border-collapse bg-white">
                 <thead>
                     <tr className="bg-gray-100">
-                        <th className="w-16 border border-gray-300 p-1 text-center">有無</th>
-                        <th className="w-64 border border-gray-300 p-3 text-center">品目</th>
-                        <th className="w-16 border border-gray-300 p-3 text-center">操作</th>
-                        <th className="w-36 border border-gray-300 p-3 text-center">数量</th>
-                        <th className="w-56 border border-gray-300 p-3 text-center">種類</th>
-                        <th className="border border-gray-300 p-3 text-center">摘要</th>
+                        <th className="w-16 min-w-[64px] border border-gray-300 p-1 text-center">有無</th>
+                        <th className="w-56 min-w-[224px] lg:w-64 lg:min-w-[256px] border border-gray-300 p-3 text-center">品目</th>
+                        <th className="w-16 min-w-[64px] border border-gray-300 p-3 text-center">操作</th>
+                        <th className="w-32 min-w-[128px] border border-gray-300 p-3 text-center">数量</th>
+                        <th className="w-80 min-w-[320px] border border-gray-300 p-3 text-center">種類</th>
+                        <th className="min-w-[300px] border border-gray-300 p-3 text-center">摘要</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -770,7 +840,7 @@ export function DocumentItemTable({
                                                 }}
                                             />
                                         </td>
-                                        <td className="border border-gray-300 p-3 text-right">
+                                        <td className="border border-gray-300 p-3">
                                             {isMultiRowItem ? (
                                                 <>
                                                     <div
@@ -801,7 +871,7 @@ export function DocumentItemTable({
                                                                     const names = (item?.productItem?.variants || [])
                                                                         .filter((v: any) => ids.includes(String(v.id)))
                                                                         .map((v: any) => v.name)
-                                                                    return names.length > 0 ? `${names.join('、')}（${names.length}種類）` : '-'
+                                                                    return renderTypeNames(index, names)
                                                                 } catch { return '-' }
                                                               })()
                                                             : (item?.productItem?.hasVariantGroups && item?.multiSelectVariantIds)
@@ -814,7 +884,7 @@ export function DocumentItemTable({
                                                                     const names = allVariants
                                                                         .filter((v: any) => ids.includes(String(v.id)))
                                                                         .map((v: any) => v.name)
-                                                                    return names.length > 0 ? `${names.join('、')}（${names.length}種類）` : '-'
+                                                                    return renderTypeNames(index, names)
                                                                 } catch { return '-' }
                                                               })()
                                                             : (item?.productItem?.hasVariantGroups && item?.groupSelections)
@@ -830,7 +900,7 @@ export function DocumentItemTable({
                                                                                 .map((v: any) => v.name)
                                                                         )
                                                                     }
-                                                                    return names.length > 0 ? `${names.join('、')}（${names.length}種類）` : '-'
+                                                                    return renderTypeNames(index, names)
                                                                 } catch { return '-' }
                                                               })()
                                                             : item?.productVariant?.name ?? '-'}
@@ -922,7 +992,7 @@ export function DocumentItemTable({
                                                     }}
                                                 />
                                             </td>
-                                            <td className="border border-gray-300 p-3 text-right">
+                                            <td className="border border-gray-300 p-3">
                                                 <FormCurrencyInput
                                                     name={`freeItems.${linkedFreeIndex}.unitPriceGeneral`}
                                                     control={control}
@@ -1017,7 +1087,7 @@ export function DocumentItemTable({
                                                     固定
                                                 </td>
                                                 <td className="border border-gray-300 p-3" />
-                                                <td className="border border-gray-300 p-3 text-right">
+                                                <td className="border border-gray-300 p-3">
                                                     {isExecutionSurcharge ? (
                                                         <div className="text-md">¥{amount.toLocaleString()}</div>
                                                     ) : (
@@ -1059,7 +1129,7 @@ export function DocumentItemTable({
                                                         disabled={inputsDisabled}
                                                     />
                                                 </td>
-                                                <td className="border border-gray-300 p-3 text-right">
+                                                <td className="border border-gray-300 p-3">
                                                     <FormCurrencyInput
                                                         name={`freeItems.${index}.unitPriceGeneral`}
                                                         control={control}
@@ -1088,6 +1158,7 @@ export function DocumentItemTable({
                     )}
                 </tbody>
             </table>
+            </div>
 
             {/* 種類選択ダイアログ */}
             {enlargedImage &&

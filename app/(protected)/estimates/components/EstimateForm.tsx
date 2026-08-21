@@ -16,6 +16,8 @@ import { ProductVariant } from '@/lib/products'
 import { resolveUnitPriceMember } from '@/lib/itemPricing'
 import { confirmEstimate } from '@/lib/estimates'
 import { toast } from '@/hooks/use-toast'
+import { PdfExportDialog } from '@/components/document/PdfExportDialog'
+import { usePdfExportTrigger } from '@/hooks/usePdfExportTrigger'
 
 interface Estimate {
     id: string
@@ -64,7 +66,9 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
     const [itemsViewMode, setItemsViewMode] = useState<'list' | 'card'>('list')
     const [isConfirmed, setIsConfirmed] = useState(false)
     const [isConfirming, setIsConfirming] = useState(false)
-    const [showSelectedOptions, setShowSelectedOptions] = useState(false)
+    const { pdfDialogOpen, setPdfDialogOpen, handlePdfClick } = usePdfExportTrigger(
+        estimate ? `/api/pdf/estimate/${estimate.id}` : null
+    )
 
     // 画面下部固定フッターの高さぶんコンテンツに余白を確保する（タブレット幅ではボタンが折り返してフッターが高くなるため、固定値ではなく実測値を使う）
     const footerRef = useRef<HTMLDivElement>(null)
@@ -323,6 +327,26 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
         ? '見積書 作成'
         : estimate?.estimateType === 'FORMAL' ? '本見積 編集' : '事前相談見積 編集'
 
+    // 折り返し時にPDFプレビューボタンと切り離れないよう、まとめて配置する
+    const closeButton = (
+        <button
+            type="button"
+            onClick={() => { router.push('/cases'); router.refresh() }}
+            className="font-mincho transition-colors px-8 py-3"
+            style={{
+                backgroundColor: '#ffffff',
+                color: 'var(--brand-text-muted)',
+                border: '1px solid var(--brand-border)',
+                fontSize: '15px',
+                letterSpacing: '0.25em',
+                fontWeight: 500,
+                cursor: 'pointer',
+            }}
+        >
+            閉じる
+        </button>
+    )
+
     const showTotals = itemsViewMode === 'list' || isLocked
 
     return (
@@ -407,25 +431,28 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                                             MODE
                                         </span>
                                         {([
-                                            { value: 'list', label: '一覧から登録' },
-                                            { value: 'card', label: 'カード型で順番に選択' },
+                                            { value: 'list', label: '一覧から登録', disabled: false },
+                                            // カード型UIは実装方針検討中のため一時非活性（方針決定後に解除）
+                                            { value: 'card', label: 'カード型で順番に選択', disabled: true },
                                         ] as const).map((opt) => {
                                             const active = itemsViewMode === opt.value
                                             return (
                                                 <button
                                                     key={opt.value}
                                                     type="button"
+                                                    disabled={opt.disabled}
                                                     onClick={() => setItemsViewMode(opt.value)}
                                                     className="font-mincho transition-colors"
+                                                    title={opt.disabled ? '実装検討中のため現在使用できません' : undefined}
                                                     style={{
                                                         padding: '8px 20px',
                                                         fontSize: '13px',
                                                         fontWeight: active ? 600 : 500,
                                                         letterSpacing: '0.15em',
                                                         backgroundColor: active ? 'var(--brand-navy)' : '#ffffff',
-                                                        color: active ? '#ffffff' : 'var(--brand-text-muted)',
+                                                        color: opt.disabled ? 'var(--brand-border)' : active ? '#ffffff' : 'var(--brand-text-muted)',
                                                         border: active ? '1px solid var(--brand-navy)' : '1px solid var(--brand-border)',
-                                                        cursor: 'pointer',
+                                                        cursor: opt.disabled ? 'not-allowed' : 'pointer',
                                                     }}
                                                 >
                                                     {opt.label}
@@ -477,7 +504,7 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                 {/* 操作ボタン & 合計（画面下部固定） */}
                 <div
                     ref={footerRef}
-                    className="fixed bottom-0 left-0 right-0 flex items-center justify-between gap-6 px-10 py-3"
+                    className="fixed bottom-0 left-0 right-0 flex flex-wrap items-center justify-between gap-3 px-10 py-3 lg:gap-6"
                     style={{
                         backgroundColor: '#ffffff',
                         borderTop: '1px solid var(--brand-border)',
@@ -491,9 +518,9 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                             style={{ fontFamily: 'var(--font-mincho)', color: 'var(--brand-text)' }}
                         >
                             {[
-                                { label: '小　計', value: totals.subtotal, sign: '¥' },
+                                { label: '小計', value: totals.subtotal, sign: '¥' },
                                 { label: '消費税', value: totals.tax, sign: '¥' },
-                                { label: '合　計', value: totals.total, sign: '¥' },
+                                { label: '合計', value: totals.total, sign: '¥' },
                                 { label: '会費入金', value: totals.membershipPaidAmount, sign: totals.membershipPaidAmount > 0 ? '−¥' : '¥' },
                             ].map((t) => (
                                 <div key={t.label} className="flex items-baseline gap-2">
@@ -503,7 +530,8 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                                     </span>
                                 </div>
                             ))}
-                            <div className="flex items-baseline gap-2 pl-4" style={{ borderLeft: '1px solid var(--brand-border)' }}>
+                            <div className="basis-full lg:hidden" aria-hidden="true" />
+                            <div className="ml-auto flex items-baseline gap-2 pl-4 lg:ml-0" style={{ borderLeft: '1px solid var(--brand-border)' }}>
                                 <span style={{ fontSize: '13px', color: 'var(--brand-navy)', letterSpacing: '0.25em', fontWeight: 600 }}>差引合計</span>
                                 <span style={{ fontFamily: 'var(--font-garamond), var(--font-mincho)', fontSize: '24px', fontWeight: 600, color: 'var(--brand-navy)', fontVariantNumeric: 'tabular-nums' }}>
                                     ¥{totals.grandTotal.toLocaleString()}
@@ -514,13 +542,13 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                         <div />
                     )}
 
-                    <div className="flex flex-col items-end gap-1">
+                    <div className="ml-auto flex flex-col items-end gap-1">
                         {mode === 'edit' && isDirty && (
                             <span className="font-mincho" style={{ fontSize: '12px', color: 'var(--brand-red)', letterSpacing: '0.15em' }}>
                                 ※ 未保存の変更があります
                             </span>
                         )}
-                        <div className="flex items-center gap-3">
+                        <div className="flex min-w-0 items-center gap-2 overflow-x-auto">
                             {mode === 'create' ? (
                                 <button
                                     type="submit"
@@ -546,7 +574,7 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                                             <button
                                                 type="submit"
                                                 disabled={isSubmitting}
-                                                className={`rounded border-0 px-6 py-3 text-white ${isSubmitting ? 'cursor-not-allowed bg-gray-300' : 'cursor-pointer bg-green-600'}`}
+                                                className={`font-mincho rounded border border-transparent px-10 py-3 text-[15px] text-white ${isSubmitting ? 'cursor-not-allowed bg-gray-300' : 'cursor-pointer bg-[var(--brand-navy)]'}`}
                                             >
                                                 {isSubmitting ? '保存中...' : '更新'}
                                             </button>
@@ -554,7 +582,7 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                                                 type="button"
                                                 disabled={isConfirming || isDirty}
                                                 onClick={handleCreateFormal}
-                                                className={`rounded border-0 px-6 py-3 text-white ${isConfirming || isDirty ? 'cursor-not-allowed bg-gray-300' : 'cursor-pointer bg-blue-700'}`}
+                                                className={`font-mincho rounded border border-transparent px-8 py-3 text-[15px] text-white ${isConfirming || isDirty ? 'cursor-not-allowed bg-gray-300' : 'cursor-pointer bg-[var(--brand-navy-light)]'}`}
                                                 title={isDirty ? '先に「更新」で保存してください' : '事前相談見積から本見積を作成'}
                                             >
                                                 {isConfirming ? '作成中...' : '本見積を作成'}
@@ -562,7 +590,7 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                                         </>
                                     )}
                                     {isConfirmed && estimate.estimateType === 'PRE_CONSULTATION' && (
-                                        <span className="rounded bg-gray-200 px-4 py-2 text-sm text-gray-600">
+                                        <span className="inline-flex items-center whitespace-nowrap rounded border border-transparent bg-gray-200 px-4 py-3 text-[15px] text-gray-600">
                                             事前相談見積（本見積作成済み・閲覧のみ）
                                         </span>
                                     )}
@@ -571,52 +599,27 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                                             type="submit"
                                             disabled={isSubmitting || estimate.hasInvoice}
                                             title={estimate.hasInvoice ? '請求書作成済みのため更新できません' : undefined}
-                                            className={`rounded border-0 px-6 py-3 text-white ${isSubmitting || estimate.hasInvoice ? 'cursor-not-allowed bg-gray-300' : 'cursor-pointer bg-green-600'}`}
+                                            className={`font-mincho rounded border-0 px-5 py-3 text-[15px] text-white ${isSubmitting || estimate.hasInvoice ? 'cursor-not-allowed bg-gray-300' : 'cursor-pointer bg-[var(--brand-navy)]'}`}
                                         >
                                             {isSubmitting ? '保存中...' : estimate.hasInvoice ? '更新不可（請求書作成済み）' : '更新（本見積）'}
                                         </button>
                                     )}
-                                    <div className="flex items-center gap-3 text-sm">
-                                        <label className="flex items-center gap-1 cursor-pointer">
-                                            <input type="radio" name="showOptions-estimate" checked={showSelectedOptions} onChange={() => setShowSelectedOptions(true)} />
-                                            選択オプション表示
-                                        </label>
-                                        <label className="flex items-center gap-1 cursor-pointer">
-                                            <input type="radio" name="showOptions-estimate" checked={!showSelectedOptions} onChange={() => setShowSelectedOptions(false)} />
-                                            非表示
-                                        </label>
-                                    </div>
                                     <button
                                         type="button"
                                         disabled={isDirty}
-                                        onClick={() => {
-                                            const params = new URLSearchParams({ _t: Date.now().toString() })
-                                            if (!showSelectedOptions) params.set('showOptions', 'false')
-                                            window.open(`/api/pdf/estimate/${estimate.id}?${params.toString()}`, '_blank')
-                                        }}
-                                        className={`rounded border-0 px-6 py-3 text-white ${isDirty ? 'cursor-not-allowed bg-gray-300' : 'cursor-pointer bg-cyan-600'}`}
+                                        onClick={handlePdfClick}
+                                        className={`font-mincho rounded px-10 py-3 text-[15px] ${isDirty ? 'cursor-not-allowed border border-transparent bg-gray-300 text-white' : 'cursor-pointer border border-[var(--brand-gold)] bg-[var(--brand-gold)] text-[var(--brand-navy-dark)]'}`}
                                     >
-                                        PDFプレビュー
+                                        PDF
                                     </button>
+                                    <PdfExportDialog
+                                        open={pdfDialogOpen}
+                                        onOpenChange={setPdfDialogOpen}
+                                        pdfEndpoint={`/api/pdf/estimate/${estimate.id}`}
+                                    />
                                 </>
                             )}
-                            <button
-                                type="button"
-                                onClick={() => { router.push('/cases'); router.refresh() }}
-                                className="font-mincho transition-colors"
-                                style={{
-                                    padding: '12px 36px',
-                                    backgroundColor: '#ffffff',
-                                    color: 'var(--brand-text-muted)',
-                                    border: '1px solid var(--brand-border)',
-                                    fontSize: '15px',
-                                    letterSpacing: '0.25em',
-                                    fontWeight: 500,
-                                    cursor: 'pointer',
-                                }}
-                            >
-                                閉じる
-                            </button>
+                            {closeButton}
                         </div>
                     </div>
                 </div>

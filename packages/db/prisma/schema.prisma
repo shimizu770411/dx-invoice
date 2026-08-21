@@ -676,6 +676,8 @@ model CompanyProfile {
   bank4Account  String?  @db.VarChar(50) @map("bank4_account")
   bank4Holder   String?  @db.VarChar(100) @map("bank4_holder")
   dateFormat    String   @default("WESTERN") @db.VarChar(20) @map("date_format")
+  pdfShowOptionImages Boolean @default(false) @map("pdf_show_option_images")
+  pdfPromptOnExport   Boolean @default(true)  @map("pdf_prompt_on_export")
   estimateRemarksDefault String? @db.Text @map("estimate_remarks_default")
   invoiceRemarksDefault  String? @db.Text @map("invoice_remarks_default")
   createdAt     DateTime @default(now()) @db.Timestamptz(6) @map("created_at")

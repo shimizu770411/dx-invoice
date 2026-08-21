@@ -22,6 +22,34 @@ interface FormParams extends SearchCustomersParams {
     funeralToInput?: string
 }
 
+// タブレット幅（lg未満）でのみ適用する操作ボタンの短縮ラベル。PC表示は元のラベルのまま
+const CASE_ROW_LABEL_SHORT_MAP: Record<string, string> = {
+    見積書作成: '見積書',
+    事前相談見積: '事前見積',
+    本見積編集: '本見積',
+    請求書作成: '請求書',
+    請求書編集: '請求書',
+    '作成中…': '作成中',
+    入金登録: '入金',
+    入金取消: '取消',
+    領収書発行: '領収書',
+    供花登録: '供花',
+}
+const shortCaseRowLabel = (label: string) => CASE_ROW_LABEL_SHORT_MAP[label] ?? label
+
+// タブレット幅では短縮ラベル、PC(lg以上)ではフルラベルを表示
+function ResponsiveActionLabel({ label }: { label: string }) {
+    return (
+        <>
+            <span className="lg:hidden">{shortCaseRowLabel(label)}</span>
+            <span className="hidden lg:inline">{label}</span>
+        </>
+    )
+}
+
+// 操作ボタンのサイズ: タブレット幅ではコンパクトに、PC(lg以上)では現状のサイズを維持
+const CASE_ROW_BTN_SIZE_CLASSES = 'px-2.5 py-3 text-[13px] min-w-[80px] lg:px-[18px] lg:py-2 lg:text-sm lg:min-w-[110px]'
+
 export default function CasesPage() {
     const router = useRouter()
     // フォーム入力値（検索後も保持）
@@ -240,10 +268,10 @@ export default function CasesPage() {
                         {
                             key: 'receptionAt',
                             label: '受付日',
-                            width: '80px',
+                            width: '120px',
                             sortable: true,
                             sortValue: (item) => (item.receptionAt ? new Date(item.receptionAt).getTime() : null),
-                            render: (item) => formatDate(item.receptionAt),
+                            render: (item) => <span style={{ whiteSpace: 'nowrap' }}>{formatDate(item.receptionAt)}</span>,
                         },
                         {
                             key: 'deceasedName',
@@ -261,14 +289,11 @@ export default function CasesPage() {
 
                         const btnStyle = (variant: Variant, disabled = false): React.CSSProperties => {
                             const base: React.CSSProperties = {
-                                fontSize: '14px',
                                 letterSpacing: '0.12em',
                                 fontWeight: 500,
                                 border: '1px solid transparent',
-                                padding: '8px 18px',
                                 transition: 'all 0.15s ease',
                                 cursor: disabled ? 'not-allowed' : 'pointer',
-                                minWidth: '110px',
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
@@ -383,11 +408,9 @@ export default function CasesPage() {
                         // フロー矢印
                         const Arrow = () => (
                             <span
-                                className="flex items-center"
+                                className="flex items-center px-0 text-[13px] lg:px-0.5 lg:text-base"
                                 style={{
                                     color: 'var(--brand-gold-soft)',
-                                    fontSize: '16px',
-                                    padding: '0 2px',
                                     userSelect: 'none',
                                 }}
                             >
@@ -397,20 +420,20 @@ export default function CasesPage() {
 
                         return (
                             <div
-                                className="flex items-center gap-1 flex-wrap"
+                                className="flex items-center gap-0.5 flex-wrap lg:gap-1"
                                 onClick={(e) => e.stopPropagation()}
                             >
                                 {/* 案件編集（会員情報・故人情報など） */}
                                 <button
                                     onClick={() => router.push(`/cases/${item.id}`)}
                                     style={btnStyle('accent')}
-                                    className="font-mincho"
+                                    className={`font-mincho ${CASE_ROW_BTN_SIZE_CLASSES}`}
                                     title="案件詳細・会員情報を編集"
                                 >
                                     情報編集
                                 </button>
                                 <span
-                                    className="mx-2 self-stretch"
+                                    className="mx-1.5 self-stretch lg:mx-2"
                                     style={{
                                         width: '1px',
                                         backgroundColor: 'var(--brand-border)',
@@ -422,10 +445,10 @@ export default function CasesPage() {
                                     <button
                                         onClick={() => router.push(`/estimates/${item.preConsultEstimateId}`)}
                                         style={btnStyle('done')}
-                                        className="font-mincho"
+                                        className={`font-mincho ${CASE_ROW_BTN_SIZE_CLASSES}`}
                                         title="事前相談見積を閲覧"
                                     >
-                                        事前相談見積
+                                        <ResponsiveActionLabel label="事前相談見積" />
                                     </button>
                                 )}
                                 <button
@@ -434,9 +457,9 @@ export default function CasesPage() {
                                         else router.push(`/estimates/new?customerId=${item.id}`)
                                     }}
                                     style={btnStyle(estVariant)}
-                                    className="font-mincho"
+                                    className={`font-mincho ${CASE_ROW_BTN_SIZE_CLASSES}`}
                                 >
-                                    {estLabel}
+                                    <ResponsiveActionLabel label={estLabel} />
                                 </button>
                                 <Arrow />
                                 <button
@@ -460,11 +483,11 @@ export default function CasesPage() {
                                     }}
                                     disabled={invDisabled || isCreatingInvoice}
                                     style={btnStyle(invVariant, invDisabled || isCreatingInvoice)}
-                                    className="font-mincho"
+                                    className={`font-mincho ${CASE_ROW_BTN_SIZE_CLASSES}`}
                                     title={invDisabled ? '本見積作成後に使用できます' : undefined}
                                 >
                                     {invDisabled && <LockIcon />}
-                                    {invLabel}
+                                    <ResponsiveActionLabel label={invLabel} />
                                 </button>
                                 <Arrow />
                                 <button
@@ -474,11 +497,11 @@ export default function CasesPage() {
                                     }}
                                     disabled={payDisabled}
                                     style={btnStyle(payVariant, payDisabled)}
-                                    className="font-mincho"
+                                    className={`font-mincho ${CASE_ROW_BTN_SIZE_CLASSES}`}
                                     title={payDisabled ? '請求書作成後に使用できます' : undefined}
                                 >
                                     {payDisabled && <LockIcon />}
-                                    {payLabel}
+                                    <ResponsiveActionLabel label={payLabel} />
                                 </button>
                                 <Arrow />
                                 <button
@@ -488,16 +511,16 @@ export default function CasesPage() {
                                     }}
                                     disabled={recDisabled}
                                     style={btnStyle(recVariant, recDisabled)}
-                                    className="font-mincho"
+                                    className={`font-mincho ${CASE_ROW_BTN_SIZE_CLASSES}`}
                                     title={recDisabled ? '入金登録後に使用できます' : undefined}
                                 >
                                     {recDisabled && <LockIcon />}
-                                    領収書発行
+                                    <ResponsiveActionLabel label="領収書発行" />
                                 </button>
 
                                 {/* 区切り */}
                                 <span
-                                    className="mx-3 self-stretch"
+                                    className="mx-2.5 self-stretch lg:mx-3"
                                     style={{
                                         width: '1px',
                                         backgroundColor: 'var(--brand-border)',
@@ -508,9 +531,9 @@ export default function CasesPage() {
                                 <button
                                     onClick={() => router.push(`/flowers/customer/${item.id}`)}
                                     style={btnStyle('accent')}
-                                    className="font-mincho"
+                                    className={`font-mincho ${CASE_ROW_BTN_SIZE_CLASSES}`}
                                 >
-                                    供花登録
+                                    <ResponsiveActionLabel label="供花登録" />
                                 </button>
                             </div>
                         )
@@ -520,6 +543,7 @@ export default function CasesPage() {
                     onRowClick={(customer) => router.push(`/cases/${customer.id}`)}
                     emptyMessage="検索結果がありません"
                     rowKey={(item) => item.id}
+                    resetKey={searchParams}
                 />
             </div>
 

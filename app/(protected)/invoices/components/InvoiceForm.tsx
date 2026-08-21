@@ -15,6 +15,8 @@ import { ProductVariant } from '@/lib/products'
 import { resolveUnitPriceMember } from '@/lib/itemPricing'
 import { toast } from '@/hooks/use-toast'
 import type { InvoiceConfirmationFields } from '@/lib/invoices'
+import { PdfExportDialog } from '@/components/document/PdfExportDialog'
+import { usePdfExportTrigger } from '@/hooks/usePdfExportTrigger'
 
 interface Invoice extends InvoiceConfirmationFields {
     id: string
@@ -60,7 +62,9 @@ function InvoiceFormContent({
     const { fields: freeItemFields } = useFieldArray({ control, name: 'freeItems' })
 
     const [activeTab, setActiveTab] = useState<'items' | 'other'>('items')
-    const [showSelectedOptions, setShowSelectedOptions] = useState(false)
+    const { pdfDialogOpen, setPdfDialogOpen, handlePdfClick } = usePdfExportTrigger(
+        invoice ? `/api/pdf/invoice/${invoice.id}` : null
+    )
 
     // 画面下部固定フッターの高さぶんコンテンツに余白を確保する（タブレット幅ではボタンが折り返してフッターが高くなるため、固定値ではなく実測値を使う）
     const footerRef = useRef<HTMLDivElement>(null)
@@ -301,7 +305,7 @@ function InvoiceFormContent({
             >
                 {/* ページヘッダー */}
                 <div
-                    className="flex items-end justify-between mb-6 pb-5"
+                    className="flex flex-wrap items-end justify-between gap-y-3 mb-6 pb-5 lg:flex-nowrap"
                     style={{ borderBottom: '1px solid var(--brand-border)' }}
                 >
                     <div>
@@ -312,8 +316,14 @@ function InvoiceFormContent({
                             INVOICE · EDIT
                         </p>
                         <h1
-                            className="font-mincho"
-                            style={{ fontSize: '26px', fontWeight: 600, color: 'var(--brand-navy)', letterSpacing: '0.2em', lineHeight: 1.2 }}
+                            className="font-mincho whitespace-normal lg:whitespace-nowrap"
+                            style={{
+                                fontSize: '26px',
+                                fontWeight: 600,
+                                color: 'var(--brand-navy)',
+                                letterSpacing: '0.2em',
+                                lineHeight: 1.2,
+                            }}
                         >
                             請求書 編集
                             {invoice?.docNo && (
@@ -387,7 +397,7 @@ function InvoiceFormContent({
                 {/* 操作ボタン & 合計（画面下部固定） */}
                 <div
                     ref={footerRef}
-                    className="fixed bottom-0 left-0 right-0 flex items-center justify-between gap-6 px-10 py-3"
+                    className="fixed bottom-0 left-0 right-0 flex flex-wrap items-center justify-between gap-3 px-10 py-3 lg:gap-6"
                     style={{
                         backgroundColor: '#ffffff',
                         borderTop: '1px solid var(--brand-border)',
@@ -401,9 +411,9 @@ function InvoiceFormContent({
                         style={{ fontFamily: 'var(--font-mincho)', color: 'var(--brand-text)' }}
                     >
                         {[
-                            { label: '小　計', value: totals.subtotal, sign: '¥' },
+                            { label: '小計', value: totals.subtotal, sign: '¥' },
                             { label: '消費税', value: totals.tax, sign: '¥' },
-                            { label: '合　計', value: totals.total, sign: '¥' },
+                            { label: '合計', value: totals.total, sign: '¥' },
                             { label: '会費入金', value: totals.membershipPaidAmount, sign: totals.membershipPaidAmount > 0 ? '−¥' : '¥' },
                         ].map((t) => (
                             <div key={t.label} className="flex items-baseline gap-2">
@@ -413,7 +423,8 @@ function InvoiceFormContent({
                                 </span>
                             </div>
                         ))}
-                        <div className="flex items-baseline gap-2 pl-4" style={{ borderLeft: '1px solid var(--brand-border)' }}>
+                        <div className="basis-full lg:hidden" aria-hidden="true" />
+                        <div className="ml-auto flex items-baseline gap-2 pl-4 lg:ml-0" style={{ borderLeft: '1px solid var(--brand-border)' }}>
                             <span style={{ fontSize: '13px', color: 'var(--brand-navy)', letterSpacing: '0.25em', fontWeight: 600 }}>差引合計</span>
                             <span style={{ fontFamily: 'var(--font-garamond), var(--font-mincho)', fontSize: '24px', fontWeight: 600, color: 'var(--brand-navy)', fontVariantNumeric: 'tabular-nums' }}>
                                 ¥{totals.grandTotal.toLocaleString()}
@@ -422,13 +433,13 @@ function InvoiceFormContent({
                     </div>
 
                     {/* 右側ボタン群 */}
-                    <div className="flex flex-col items-end gap-1">
+                    <div className="ml-auto flex flex-col items-end gap-1">
                         {isDirty && (
                             <span className="font-mincho" style={{ fontSize: '12px', color: 'var(--brand-red)', letterSpacing: '0.15em' }}>
                                 ※ 未保存の変更があります
                             </span>
                         )}
-                        <div className="flex items-center gap-3">
+                        <div className="flex min-w-0 items-center gap-2 overflow-x-auto">
                             <button
                                 type="submit"
                                 disabled={isSubmitting || isLocked}
@@ -447,31 +458,16 @@ function InvoiceFormContent({
                             >
                                 {isSubmitting ? '保存中…' : isLocked ? '更新不可（入金済み）' : '更　新'}
                             </button>
-                            <div className="flex items-center gap-3 text-sm">
-                                <label className="flex items-center gap-1 cursor-pointer">
-                                    <input type="radio" name="showOptions-invoice" checked={showSelectedOptions} onChange={() => setShowSelectedOptions(true)} />
-                                    選択オプション表示
-                                </label>
-                                <label className="flex items-center gap-1 cursor-pointer">
-                                    <input type="radio" name="showOptions-invoice" checked={!showSelectedOptions} onChange={() => setShowSelectedOptions(false)} />
-                                    非表示
-                                </label>
-                            </div>
                             <button
                                 type="button"
                                 disabled={isDirty}
-                                onClick={() => {
-                                    if (!invoice) return
-                                    const params = new URLSearchParams({ _t: Date.now().toString() })
-                                    if (!showSelectedOptions) params.set('showOptions', 'false')
-                                    window.open(`/api/pdf/invoice/${invoice.id}?${params.toString()}`, '_blank')
-                                }}
+                                onClick={handlePdfClick}
                                 className="font-mincho transition-colors"
                                 style={{
-                                    padding: '12px 28px',
-                                    backgroundColor: '#ffffff',
-                                    color: isDirty ? '#c4bfb0' : 'var(--brand-gold-soft)',
-                                    border: isDirty ? '1px dashed var(--brand-border)' : '1px solid var(--brand-gold)',
+                                    padding: '12px 40px',
+                                    backgroundColor: isDirty ? '#d1d5db' : 'var(--brand-gold)',
+                                    color: isDirty ? '#ffffff' : 'var(--brand-navy-dark)',
+                                    border: isDirty ? '1px solid transparent' : '1px solid var(--brand-gold)',
                                     fontSize: '14px',
                                     letterSpacing: '0.25em',
                                     fontWeight: 500,
@@ -479,14 +475,18 @@ function InvoiceFormContent({
                                     boxShadow: isDirty ? 'none' : '0 1px 2px rgba(196, 174, 106, 0.2)',
                                 }}
                             >
-                                PDFプレビュー
+                                PDF
                             </button>
+                            <PdfExportDialog
+                                open={pdfDialogOpen}
+                                onOpenChange={setPdfDialogOpen}
+                                pdfEndpoint={invoice ? `/api/pdf/invoice/${invoice.id}` : null}
+                            />
                             <button
                                 type="button"
                                 onClick={() => { router.push('/cases'); router.refresh() }}
-                                className="font-mincho transition-colors"
+                                className="font-mincho transition-colors px-8 py-3"
                                 style={{
-                                    padding: '12px 28px',
                                     backgroundColor: '#ffffff',
                                     color: 'var(--brand-text-muted)',
                                     border: '1px solid var(--brand-border)',

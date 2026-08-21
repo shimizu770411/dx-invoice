@@ -30,6 +30,8 @@ export const companyFormSchema = z.object({
     bank4Account: z.string().optional(),
     bank4Holder: z.string().optional(),
     dateFormat: z.enum(['WESTERN', 'JAPANESE']),
+    pdfShowOptionImages: z.boolean(),
+    pdfPromptOnExport: z.boolean(),
     estimateRemarksDefault: z.string().max(MAX_REMARKS_LENGTH, `${MAX_REMARKS_LENGTH}文字以内で入力してください`).optional(),
     invoiceRemarksDefault: z.string().max(MAX_REMARKS_LENGTH, `${MAX_REMARKS_LENGTH}文字以内で入力してください`).optional(),
 })
@@ -65,6 +67,8 @@ export const DEFAULT_FORM_VALUES: CompanyFormData = {
     bank4Account: '',
     bank4Holder: '',
     dateFormat: 'WESTERN',
+    pdfShowOptionImages: false,
+    pdfPromptOnExport: true,
     estimateRemarksDefault: '',
     invoiceRemarksDefault: '',
 }
