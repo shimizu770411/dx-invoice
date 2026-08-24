@@ -358,6 +358,7 @@ export async function POST(request: NextRequest) {
             funeralTo: data.funeralTo ? new Date(data.funeralTo) : null,
             funeralPlace: toNullIfEmpty(data.funeralPlace),
             returnAt: data.returnAt ? new Date(data.returnAt) : null,
+            returnAtTimeUnspecified: Boolean(data.returnAtTimeUnspecified),
             returnPlace: toNullIfEmpty(data.returnPlace),
             // 会員証欄（memberCardNote）は案件編集画面の項目ではなく、
             // 見積・請求書の保存（PUT /api/estimates/[id] 等）でのみ更新する

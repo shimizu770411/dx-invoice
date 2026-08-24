@@ -4,6 +4,7 @@ import { CaseFormData } from '../schemas/CaseFormSchema'
 import { FormInput } from '@/components/form/FormInput'
 import { FormAutocomplete } from '@/components/form/FormAutocomplete'
 import { FormSelect } from '@/components/form/FormSelect'
+import { FormCheckbox } from '@/components/form/FormCheckbox'
 import { FUNERAL_PLACE_OPTIONS } from '../constants/casesOptions'
 import { getStores } from '@/lib/stores'
 
@@ -62,15 +63,24 @@ export function FuneralInfoTab() {
             />
 
             {/* 引上日時 */}
-            <FormInput<CaseFormData>
-                name="returnAt"
-                control={control}
-                label="引上日時"
-                type="datetime-local"
-                minYear={1950}
-                maxYear={new Date().getFullYear()}
-                error={errors.returnAt}
-            />
+            <div>
+                <FormInput<CaseFormData>
+                    name="returnAt"
+                    control={control}
+                    label="引上日時"
+                    type="datetime-local"
+                    minYear={1950}
+                    maxYear={new Date().getFullYear()}
+                    error={errors.returnAt}
+                />
+                <div style={{ marginTop: '0.5rem' }}>
+                    <FormCheckbox<CaseFormData>
+                        name={'returnAtTimeUnspecified' as any}
+                        control={control}
+                        label="時間を指定しない（見積/請求書PDFで時刻を表示しない）"
+                    />
+                </div>
+            </div>
 
             {/* 引上場所 */}
             <FormAutocomplete<CaseFormData>

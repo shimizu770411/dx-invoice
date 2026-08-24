@@ -55,7 +55,11 @@ export function PdfMembershipTable({ memberships = [], formatDate }: Props) {
                                       : ''}
                             </td>
                             <td className="border border-y-0 border-black px-2 text-left">
-                                {m.paymentAmount != null ? `¥ ${Number(m.paymentAmount).toLocaleString()}` : ''}
+                                {m.paymentTimes != null && m.paymentAmountOnce != null
+                                    ? `¥ ${(m.paymentTimes * Number(m.paymentAmountOnce)).toLocaleString()}`
+                                    : m.paymentAmount != null
+                                      ? `¥ ${Number(m.paymentAmount).toLocaleString()}`
+                                      : ''}
                             </td>
                             <td className="border border-y-0 border-black px-2 text-center">
                                 {m.salesStaffName ?? ''}

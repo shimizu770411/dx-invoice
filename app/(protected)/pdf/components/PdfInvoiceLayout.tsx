@@ -84,6 +84,7 @@ export type PdfDocumentCustomer = {
     funeralTo?: string | Date | null
     funeralPlace?: string | null
     returnAt?: string | Date | null
+    returnAtTimeUnspecified?: boolean | null
     returnPlace?: string | null
     religion?: string | null
     memberCardNote?: string | null
@@ -1018,7 +1019,9 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                             {
                                                 label: '引上日',
                                                 data: customer?.returnAt
-                                                    ? `${fmtDate(customer.returnAt)} ${fmtTime(customer.returnAt)}`
+                                                    ? customer?.returnAtTimeUnspecified
+                                                        ? `${fmtDate(customer.returnAt)}`
+                                                        : `${fmtDate(customer.returnAt)} ${fmtTime(customer.returnAt)}`
                                                     : '',
                                                 place: customer?.returnPlace,
                                             },

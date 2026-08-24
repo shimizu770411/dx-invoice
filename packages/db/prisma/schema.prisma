@@ -155,6 +155,7 @@ model Customer {
   funeralTo             DateTime? @db.Timestamptz(6) @map("funeral_to")
   funeralPlace          String?   @db.VarChar(255) @map("funeral_place")
   returnAt              DateTime? @db.Timestamptz(6) @map("return_at")
+  returnAtTimeUnspecified Boolean @default(false) @map("return_at_time_unspecified")
   returnPlace           String?   @db.VarChar(255) @map("return_place")
   memberCardNote        MemberCardStatus? @map("member_card_note")
   createdAt             DateTime  @default(now()) @db.Timestamptz(6) @map("created_at")

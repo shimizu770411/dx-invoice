@@ -88,6 +88,7 @@ export default function EditCustomerPage() {
                 departureAt: formatDateForInput(formData.departureAt),
                 funeralFrom: formatDateForInput(formData.funeralFrom),
                 funeralTo: formatDateForInput(formData.funeralTo),
+                returnAt: formatDateForInput(formData.returnAt),
                 sameAsChiefMourner: isSameAsMourner,
                 memberships:
                     formData.memberships && formData.memberships.length > 0

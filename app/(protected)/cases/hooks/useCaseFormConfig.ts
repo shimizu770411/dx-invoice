@@ -45,6 +45,9 @@ export function getFormDefaultValues(): CaseFormData {
         funeralFrom: undefined,
         funeralTo: undefined,
         funeralPlace: undefined,
+        returnAt: undefined,
+        returnAtTimeUnspecified: true,
+        returnPlace: undefined,
         memberships: [
             {
                 rowNo: 1,
@@ -123,6 +126,7 @@ export function transformSubmitData(data: CaseFormData, formatDateForISO: (val: 
         departureAt: formatDateForISO(data.departureAt),
         funeralFrom: formatDateForISO(data.funeralFrom),
         funeralTo: formatDateForISO(data.funeralTo),
+        returnAt: formatDateForISO(data.returnAt),
         memberships: data.memberships.map((m) => ({
             ...m,
             rowNo: m.rowNo,
