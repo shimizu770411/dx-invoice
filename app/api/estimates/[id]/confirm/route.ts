@@ -61,6 +61,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
                     transportStaff: source.transportStaff,
                     decorationStaff: source.decorationStaff,
                     returnStaff: source.returnStaff,
+                    remarks: source.remarks,
                     issuedAt: source.issuedAt,
                 },
             })
