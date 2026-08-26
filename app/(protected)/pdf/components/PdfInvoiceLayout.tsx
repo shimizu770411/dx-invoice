@@ -193,16 +193,11 @@ function buildDisplayRows(
     }
 
     // 商品マスタの並び順で表示。複数行構成商品は同一 product から複数行を出す。
-    // 未選択商品も品名のみ表示（金額は空欄）、ただし親セットは非表示。
+    // 未選択商品（金額が入っていない商品）は表示しない。
     for (const product of products) {
         const itemsForProduct = itemsByProductId.get(product.id) ?? []
         if (itemsForProduct.length === 0) {
-            if (product.isSetParent) continue
-            rows.push({
-                label: product.name,
-                estimateItem: null,
-                showProductVariantName: false,
-            })
+            continue
         } else {
             // 複数行構成商品（同じ productItemId の複数行）は、1行目のみ品名を表示し
             // 2行目以降は品名を空にしてセル結合風の見た目にする。
@@ -383,6 +378,29 @@ function getDeceasedNameFontSize(name?: string | null): string {
     return '0.875rem' // text-sm 相当
 }
 
+// 印刷後に手書きで書き込めるよう、明細の末尾（満期サービス等の直前）に常に空白行を追加する
+const HANDWRITTEN_BLANK_ROW_COUNT = 3
+
+// 明細テーブルの行間を、実際の行数（品目行＋手書き用3行）に応じて動的に計算する。
+// 品目が少ないときは通常の行間（1.5）のまま、1ページに収まらなくなる場合のみ
+// 下余白を上余白(16px)と揃えられる分だけ行間を詰める（実測値から校正した値）。
+const ITEM_TABLE_FONT_PX = 12
+const ITEM_TABLE_BORDER_PX = 1
+const ITEM_TABLE_DEFAULT_LEADING = 1.5
+const ITEM_TABLE_MIN_LEADING = 1.15
+// thead（品名見出し行）+ tfoot基本4行（小計・消費税・合計・差引合計額）の実測値。
+// 会員入金額行（0〜3行・会員数により変動）・解約手数料行（値引含む2行）は呼び出し側で加算する。
+const ITEM_TABLE_FIXED_ROWS = 5.3
+const ITEM_TABLE_PAGE1_BUDGET_PX = 886
+
+function getItemTableLineHeight(itemRowCount: number): number {
+    const totalRows = ITEM_TABLE_FIXED_ROWS + itemRowCount
+    const naturalHeightPx = totalRows * (ITEM_TABLE_FONT_PX * ITEM_TABLE_DEFAULT_LEADING + ITEM_TABLE_BORDER_PX)
+    if (naturalHeightPx <= ITEM_TABLE_PAGE1_BUDGET_PX) return ITEM_TABLE_DEFAULT_LEADING
+    const requiredLeading = (ITEM_TABLE_PAGE1_BUDGET_PX / totalRows - ITEM_TABLE_BORDER_PX) / ITEM_TABLE_FONT_PX
+    return Math.max(ITEM_TABLE_MIN_LEADING, requiredLeading)
+}
+
 export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc, products, hideSelectedOptions }: Props) {
     const { docNo, membershipPaidAmount, items } = doc
     const docAny = doc as any
@@ -472,8 +490,15 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
               returnStaff: docAny.returnStaff ?? null,
           }
         : undefined
-    const FIXED_ITEM_ROWS = 36
     const displayRows = buildDisplayRows(products, items, doc.freeItems)
+    // tfoot内の会員入金額行・解約手数料行（値引含む2行）は品目数に応じて増減するため、行間計算に加味する
+    const displayedMembershipCount = (customer?.memberships ?? []).filter((m, idx) =>
+        idx === 2 ? m.paymentAmount != null : m.paymentAmountOnce != null && m.paymentTimes != null
+    ).length
+    const itemTableFooterExtraRows = displayedMembershipCount + (showCancellationFee ? 2 : 0)
+    const itemTableLineHeight = getItemTableLineHeight(
+        displayRows.length + HANDWRITTEN_BLANK_ROW_COUNT + itemTableFooterExtraRows
+    )
     // 満期サービス行は商品行群の直後ではなく、明細欄の最終行（小計の直前）に固定表示する
     const normalRows = displayRows.filter((row) => !row.isMaturity)
     const maturityRows = displayRows.filter((row) => row.isMaturity)
@@ -705,7 +730,10 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                 <div className="flex justify-between gap-0">
                     {/* 明細ブロック */}
                     <div className="w-[60%] border-r-2 border-black">
-                        <table className="w-full border-collapse text-[0.75rem]">
+                        <table
+                            className="w-full border-collapse text-[0.75rem]"
+                            style={{ lineHeight: itemTableLineHeight }}
+                        >
                             <colgroup>
                                 <col style={{ width: '24%' }} />
                                 <col />
@@ -754,8 +782,8 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                             </thead>
                             <tbody>
                                 {normalRows.map((row, index) => renderItemRow(row, index, normalRows, 'normal'))}
-                                {Array.from({ length: Math.max(0, FIXED_ITEM_ROWS - displayRows.length) }).map((_, i) => (
-                                    <tr key={`pad-${i}`}>
+                                {Array.from({ length: HANDWRITTEN_BLANK_ROW_COUNT }).map((_, i) => (
+                                    <tr key={`blank-${i}`}>
                                         <td className="border border-l-0 border-black px-2">&nbsp;</td>
                                         <td className="border border-l-0 border-black px-0.5">&nbsp;</td>
                                         <td className="border border-black px-1">&nbsp;</td>
