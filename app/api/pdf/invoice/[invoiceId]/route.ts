@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth-middleware'
 import { getBrowser, createJstPage } from '@/lib/puppeteer'
+import { PDF_VIEWPORT_WIDTH_PX, PDF_VIEWPORT_HEIGHT_PX } from '@/app/(protected)/pdf/components/pdfLayoutConstants'
 
 /** Vercel Serverless 最大実行時間（秒） */
 export const maxDuration = 60
@@ -40,6 +41,11 @@ export async function GET(request: NextRequest, props: { params: Promise<{ invoi
     try {
         const page = await createJstPage(browser)
 
+        // ビューポート幅をA4実寸に固定する。プレビューページ側も同じ幅で表示しており、
+        // ここがズレるとテキストの折返し行数が変わり、内容依存の高さ（フッター等）が
+        // プレビューと本番PDFで食い違う。
+        await page.setViewport({ width: PDF_VIEWPORT_WIDTH_PX, height: PDF_VIEWPORT_HEIGHT_PX })
+
         // 認証クッキーをセット
         if (accessToken) {
             await page.setCookie({
@@ -53,6 +59,10 @@ export async function GET(request: NextRequest, props: { params: Promise<{ invoi
         // PDF ページに遷移しレンダリングを待つ
         await page.goto(pageUrl, { waitUntil: 'networkidle0', timeout: 60000 })
 
+        // Webフォントの読み込み完了を待つ（コールドスタート等でネットワークが遅い場合、
+        // フォールバックフォントのまま描画されて1文字ずつ均等配置のレイアウトが崩れることがあるため）
+        await page.evaluateHandle('document.fonts.ready')
+
         // ボタン類を非表示にし、PDF コンテンツ部分だけ body に残す
         await page.evaluate(() => {
             const content = document.getElementById('invoice-pdf-content')
@@ -62,10 +72,6 @@ export async function GET(request: NextRequest, props: { params: Promise<{ invoi
                 ;(document.body.style as CSSStyleDeclaration).padding = '16px'
             }
         })
-
-        // Webフォントの読み込み完了を待つ（コールドスタート等でネットワークが遅い場合、
-        // フォールバックフォントのまま描画されて1文字ずつ均等配置のレイアウトが崩れることがあるため）
-        await page.evaluateHandle('document.fonts.ready')
 
         const pdfBuffer = await page.pdf({
             format: 'A4',

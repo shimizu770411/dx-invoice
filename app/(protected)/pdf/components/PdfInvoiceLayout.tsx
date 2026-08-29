@@ -5,6 +5,15 @@ import { resolveProductImageUrl } from '@/lib/utils'
 import { scopeApplies } from '@/lib/productScope'
 import { computeMultiRowAmount } from '@/lib/expandMultiRow'
 import { useDateFormat } from '@/hooks/useDateFormat'
+import {
+    A4_HEIGHT_MM,
+    PX_PER_MM,
+    PAGE_BODY_PADDING_PX,
+    PDF_VIEWPORT_WIDTH_PX,
+    PDF_CONTENT_WIDTH_PX,
+} from './pdfLayoutConstants'
+
+export { PDF_VIEWPORT_WIDTH_PX, PDF_CONTENT_WIDTH_PX }
 
 export type PdfProductItem = {
     id: string
@@ -155,6 +164,7 @@ type DisplayRow = {
     isSecondaryRow?: boolean // 複数行構成商品の2行目以降（品名空・上罫線なし）
     multiRowGroupSize?: number // 複数行構成商品の先頭行のみ設定（rowSpan に使用）
     displayDescription?: string // MERGEDモード複数選択時: 種類名を「、」で連結した表示用文字列
+    displayDescriptionLines?: string[] // VARIANT_GROUPモード: 選択した種類名を行ごとに分けたもの。各行を個別にAutoFitOneLineTextで自動縮小・省略対象にする
     isMergedDescription?: boolean // displayDescriptionがMERGEDモード（1行結合、折り返り時は自動縮小対象）か、VARIANT_GROUPモード（意図した複数行）かの判別用
     variantLabelOverride?: string // 複数行構成商品(isMultiRow)の括弧書き用。useForVariantLabel行の選択種類名
     deductionItem?: PdfDocumentItem | null // 複数行構成商品(hasReturn)の返品行。1行目セルに「▲数量 × 単価」を追記表示する
@@ -164,6 +174,7 @@ type DisplayRow = {
     descriptionQtyOverride?: number // 同、その行自体の数量（1行目=固定行のqtyと異なるため）
     hasDescriptionLabelRow?: boolean // 商品全体でuseForDescriptionLabel行が存在するか（商品グループ内の全行で共通）。trueの間、摘要セルは1行目にrowSpanせず各行が個別に持つ
     isDescriptionLabelRow?: boolean // この行自体がuseForDescriptionLabel行か（実際に選ばれた種類名・個数をこの行の摘要欄に表示する）
+    needsDoubleHeight?: boolean // showProductVariantName有効かつ単一行の商品で、品名の下に種類名を表示する行。中途半端な高さにならないよう明示的に2行分の高さを持たせる
 }
 
 function buildDisplayRows(
@@ -232,11 +243,14 @@ function buildDisplayRows(
                             isMergedDescription = true
                         }
                     } catch { /* ignore */ }
-                } else if (isVariantGroupMode && isFirstRow && itemsForProduct.length > 1) {
-                    displayDescription = itemsForProduct
-                        .map((it) => it.description || '')
-                        .filter(Boolean)
-                        .join('\n')
+                }
+                // グループ商品(hasVariantGroups)は、各行の摘要（選択した種類名）を改行区切りで
+                // 1行目のセルにまとめて表示する。各行は個別にAutoFitOneLineTextで自動縮小・省略
+                // 対象にする（行に分けて表示する数・内容自体は商品ごとに決まっているため、
+                // 各行が1行の幅に収まらない場合のみ縮小・省略が発動する）。
+                let displayDescriptionLines: string[] | undefined
+                if (isVariantGroupMode && isFirstRow && itemsForProduct.length > 1) {
+                    displayDescriptionLines = itemsForProduct.map((it) => it.description || '').filter(Boolean)
                 }
                 // 複数行構成商品(isMultiRow)は、商品マスタ側で useForVariantLabel=true とした行の
                 // 選択種類名を、1行目セルの括弧書き表示に使う（どの行を出すか商品ごとに指定可能にするため）
@@ -259,6 +273,7 @@ function buildDisplayRows(
                     hideDescription: isEachMode ? false : !isFirstRow,
                     isSecondaryRow: !isFirstRow,
                     displayDescription,
+                    displayDescriptionLines,
                     isMergedDescription,
                     variantLabelOverride,
                     multiRowGroupSize: isFirstRow && itemsForProduct.length > 1 ? itemsForProduct.length : undefined,
@@ -275,6 +290,20 @@ function buildDisplayRows(
                     descriptionQtyOverride: isDescriptionLabelRow ? estimateItem.qty : undefined,
                 })
             })
+            // showProductVariantName有効な商品は品名の下に括弧書きの種類名を表示するため、
+            // 通常の1行の高さに収まらない。霊柩車のように元々複数行構成(itemsForProduct.length>1)
+            // の商品は既に2行分の高さがあるため問題ないが、単一行の商品(御供養等)で実際に
+            // 種類名が表示される場合は、行の高さが中途半端な値になってしまう。
+            // rowSpanで2行に分割すると、ブラウザが高さを均等配分せず1行目に寄せてしまうため、
+            // 行を分割せず、その1行自体に明示的に2行分の高さを持たせて統一する。
+            if (itemsForProduct.length === 1 && product.showProductVariantName) {
+                const onlyItem = itemsForProduct[0]
+                const resolvedVariantLabel =
+                    onlyItem.productVariant?.abbreviatedName ?? onlyItem.productRowVariant?.abbreviatedName
+                if (resolvedVariantLabel) {
+                    rows[rows.length - 1].needsDoubleHeight = true
+                }
+            }
         }
         // canAddFreeRow=ON の商品はフリー行を直下に追加表示（親商品が選択され、かつ自由入力に品目名または数量の入力がある場合のみ）
         if (product.canAddFreeRow && itemsForProduct.length > 0) {
@@ -428,28 +457,121 @@ function AutoFitOneLineText({ text, basePx }: { text: string; basePx: number }) 
     )
 }
 
-// 品目数に関わらず明細欄の行数は常に固定（印刷後の手書き記入用の余白も兼ねる）。
-// 品目行がこれに満たない分は空白行で埋め、超える場合は空白行なし（超過分は行間調整で吸収）。
+// 明細欄は常に「39行」固定とする（品目行がこれに満たない分は空白行で埋める。
+// 印刷後の手書き記入用の余白も兼ねる）。品目数に関わらずページ内の行数・行間は
+// 変えない（帳票として、書類ごとに明細欄のフォントサイズが違って見えるのはおかしいため）。
 const ITEM_TABLE_TARGET_BODY_ROWS = 39
 
-// 明細テーブルの行間を、固定行数（39行）に応じて動的に計算する。
-// 通常は行数が39行に収まり通常の行間（1.5）のまま、品目が多く39行を超える場合のみ
-// 下余白を上余白(16px)と揃えられる分だけ行間を詰める（実測値から校正した値）。
+// ヘッダー・フッターの位置を常に固定するため、明細テーブルが「使える高さ」ちょうどに
+// 収まるよう調整する。行の高さ(行間)は「起こりうる最大パターン」を基準に一度だけ
+// 計算し、全書類共通の固定値として使う（書類ごとに動的計算すると、同じ39行でも
+// 会員数によってフォントサイズが違って見えてしまうため）。
 const ITEM_TABLE_FONT_PX = 12
 const ITEM_TABLE_BORDER_PX = 1
 const ITEM_TABLE_DEFAULT_LEADING = 1.5
 const ITEM_TABLE_MIN_LEADING = 1.15
-// thead（品名見出し行）+ tfoot基本4行（小計・消費税・合計・差引合計額）の実測値。
+// thead（品名見出し行）+ tfoot基本3行（小計・消費税・合計）は本文行と同じ12pxフォント。
+// 差引合計額のみ calc(0.75rem + 2pt) の大きいフォントで、他行と別枠で計算する。
+// いずれもテーブル全体の line-height 倍率で本文行と同じ比率で伸縮するため、
+// 「本文行N行相当」という近似ではなく実フォントサイズから正確に高さを算出する。
 // 会員入金額行（0〜3行・会員数により変動）・解約手数料行（値引含む2行）は呼び出し側で加算する。
-const ITEM_TABLE_FIXED_ROWS = 5.3
-const ITEM_TABLE_PAGE1_BUDGET_PX = 886
+const ITEM_TABLE_UNIFORM_FIXED_ROW_COUNT = 4 // thead + 小計 + 消費税 + 合計
+const ITEM_TABLE_GRAND_TOTAL_FONT_PX = 12 + 2 * (96 / 72) // 差引合計額の calc(0.75rem + 2pt) と一致させる
 
-function getItemTableLineHeight(itemRowCount: number): number {
-    const totalRows = ITEM_TABLE_FIXED_ROWS + itemRowCount
-    const naturalHeightPx = totalRows * (ITEM_TABLE_FONT_PX * ITEM_TABLE_DEFAULT_LEADING + ITEM_TABLE_BORDER_PX)
-    if (naturalHeightPx <= ITEM_TABLE_PAGE1_BUDGET_PX) return ITEM_TABLE_DEFAULT_LEADING
-    const requiredLeading = (ITEM_TABLE_PAGE1_BUDGET_PX / totalRows - ITEM_TABLE_BORDER_PX) / ITEM_TABLE_FONT_PX
+// 1ページに使える実際の高さ(px)。幅の共有定数は pdfLayoutConstants.ts を参照。
+// 外枠(border-2)の上下 = 2px×2辺 = 4px
+const OUTER_FRAME_BORDER_PX = 4
+const PAGE_CONTENT_HEIGHT_PX = A4_HEIGHT_MM * PX_PER_MM - PAGE_BODY_PADDING_PX - OUTER_FRAME_BORDER_PX
+
+// ヘッダー（タイトル・故人情報）とフッター（互助会テーブル）は内容によらずほぼ一定のサイズになるため、
+// 実測から校正した固定値として扱う。JSでの動的測定（ref計測）はWebフォント読み込みの
+// タイミングに結果が左右されてしまう（フォールバックフォントで測定してしまうことがある）ため使わない。
+// 明細テーブルに使える高さは、この固定値をページ高さから差し引いた残りとする。
+const HEADER_HEIGHT_PX = 112.796875
+const FOOTER_HEIGHT_PX = 86
+// 品名の下に種類名を表示する行（showProductVariantName、needsDoubleHeight）による
+// 高さのブレは解消済みのため、残る誤差はブラウザの端数丸め（後述のborder-collapse分）
+// 程度。念のための小さな安全マージンは「行間（フォントサイズ）」を決める際の
+// 最大パターン(行数最多)の判定にだけ効かせる。書類ごとの空白行数・端数吸収
+// （差引合計額の高さ）は、マージンを引かない本来の予算をフルに使う
+// （そうしないと、実際には余裕があるのに使われない余白が残ってしまうため）。
+const ITEM_TABLE_SAFETY_MARGIN_PX = 5
+const ITEM_TABLE_FULL_BUDGET_PX = PAGE_CONTENT_HEIGHT_PX - HEADER_HEIGHT_PX - FOOTER_HEIGHT_PX
+const ITEM_TABLE_BUDGET_PX = ITEM_TABLE_FULL_BUDGET_PX - ITEM_TABLE_SAFETY_MARGIN_PX
+
+// 固定行（thead + 小計 + 消費税 + 合計 + 差引合計額）の合計高さを line-height から正確に算出する。
+// theadはテーブル最初の行のため border-t-0（上罫線なし）で、border-collapse により
+// 他の行より実測で0.5px分だけ低くなる（実測: 通常行18.03pxに対しthead17.53px）。
+const ITEM_TABLE_THEAD_BORDER_DEFICIT_PX = 0.5
+// border-collapseでは、N行のテーブルは境界線が(N+1)本になる（各行の境界を共有し合い、
+// 最初と最後にもう1本ずつ)が、「1行あたり+ITEM_TABLE_BORDER_PX」という積み上げ式の
+// 計算はN本分（N×1px）にしかならず、テーブル全体で共有される最後の1本分(1px)が
+// 常に不足する。単純なN行テーブル(5/10/20/40行)で実測し、傾き=行の高さ通り・
+// 切片=1px（行数によらず一定）であることを検証済み。
+const ITEM_TABLE_BORDER_COLLAPSE_EXTRA_PX = 1
+function fixedRowsHeightPx(leading: number): number {
+    const uniformRowHeight = ITEM_TABLE_FONT_PX * leading + ITEM_TABLE_BORDER_PX
+    const grandTotalRowHeight = ITEM_TABLE_GRAND_TOTAL_FONT_PX * leading + ITEM_TABLE_BORDER_PX
+    return (
+        ITEM_TABLE_UNIFORM_FIXED_ROW_COUNT * uniformRowHeight -
+        ITEM_TABLE_THEAD_BORDER_DEFICIT_PX +
+        grandTotalRowHeight +
+        ITEM_TABLE_BORDER_COLLAPSE_EXTRA_PX
+    )
+}
+
+// フッター変動行（会費入金額・解約手数料）の起こりうる最大行数。
+// 互助会は最大3件（Membership3Tab）+ 解約手数料(値引含む2行)。
+const MAX_MEMBERSHIP_ROWS = 3
+const MAX_CANCELLATION_EXTRA_ROWS = 2
+const MAX_FOOTER_EXTRA_ROWS = MAX_MEMBERSHIP_ROWS + MAX_CANCELLATION_EXTRA_ROWS
+
+// 明細テーブルの行間を「起こりうる最大パターン（フッター変動行が最大の場合）」を基準に
+// 一度だけ決定する。書類ごとの実際のフッター変動行数で毎回計算し直すと、同じ39行でも
+// 会員数によってフォントサイズが違って見えてしまうため、全書類で共通の固定値として扱う。
+// 1) 通常の行間(1.5)のまま最大パターンでも収まるなら、行間は1.5のまま
+// 2) 最大パターンで収まらない場合のみ、39行を死守しつつ行間を詰める(下限1.15)
+function computeItemTableLineHeight(budgetPx: number): number {
+    const rowUnitAtDefaultPx = ITEM_TABLE_FONT_PX * ITEM_TABLE_DEFAULT_LEADING + ITEM_TABLE_BORDER_PX
+    const usedAtDefaultLeading =
+        fixedRowsHeightPx(ITEM_TABLE_DEFAULT_LEADING) +
+        (ITEM_TABLE_TARGET_BODY_ROWS + MAX_FOOTER_EXTRA_ROWS) * rowUnitAtDefaultPx
+    if (usedAtDefaultLeading <= budgetPx) {
+        return ITEM_TABLE_DEFAULT_LEADING
+    }
+    // 固定行・本文行(39行)・フッター変動行(最大)のすべてが同じ line-height 倍率で伸縮する前提で
+    // budgetPx = fixedRowsHeightPx(L) + (39+MAX_FOOTER_EXTRA_ROWS) * (FONT*L + BORDER) を L について解く。
+    const variableRows = ITEM_TABLE_TARGET_BODY_ROWS + MAX_FOOTER_EXTRA_ROWS
+    const fixedFontSum = ITEM_TABLE_UNIFORM_FIXED_ROW_COUNT * ITEM_TABLE_FONT_PX + ITEM_TABLE_GRAND_TOTAL_FONT_PX
+    const fixedBorderSum =
+        (ITEM_TABLE_UNIFORM_FIXED_ROW_COUNT + 1) * ITEM_TABLE_BORDER_PX -
+        ITEM_TABLE_THEAD_BORDER_DEFICIT_PX +
+        ITEM_TABLE_BORDER_COLLAPSE_EXTRA_PX
+    const requiredLeading =
+        (budgetPx - fixedBorderSum - variableRows * ITEM_TABLE_BORDER_PX) /
+        (fixedFontSum + variableRows * ITEM_TABLE_FONT_PX)
     return Math.max(ITEM_TABLE_MIN_LEADING, requiredLeading)
+}
+
+// 明細テーブルの行間は全書類共通の固定値（起こりうる最大パターンから一度だけ算出）。
+const ITEM_TABLE_LINE_HEIGHT = computeItemTableLineHeight(ITEM_TABLE_BUDGET_PX)
+
+// 書類ごとの実際のフッター変動行数（最大パターンより少ない分）で余った高さは、
+// 1行あたりの高さが固定(ITEM_TABLE_LINE_HEIGHT)なので、通常サイズの空白行を
+// 追加するだけで（行間を変えずに）ほぼ埋まる。整数行に割り切れない端数だけは、
+// 表の途中に不自然に大きい空白行を作らず、差引合計額の行の高さで吸収する。
+function computeItemTableRowPlan(
+    footerExtraRows: number,
+    budgetPx: number
+): { targetBodyRows: number; grandTotalExtraPx: number } {
+    const rowUnit = ITEM_TABLE_FONT_PX * ITEM_TABLE_LINE_HEIGHT + ITEM_TABLE_BORDER_PX
+    const availableForBodyRows = budgetPx - fixedRowsHeightPx(ITEM_TABLE_LINE_HEIGHT) - footerExtraRows * rowUnit
+    const targetBodyRows = Math.max(ITEM_TABLE_TARGET_BODY_ROWS, Math.floor(availableForBodyRows / rowUnit))
+    const usedPx = fixedRowsHeightPx(ITEM_TABLE_LINE_HEIGHT) + (targetBodyRows + footerExtraRows) * rowUnit
+    // 計算上はほぼ0まで詰められるが、実測で89番・84番とも同じだけ小さな隙間が残るため、
+    // 差引合計額の高さに一律+3pxする（実測に基づく最終調整）。
+    const FINAL_ADJUSTMENT_PX = 3
+    return { targetBodyRows, grandTotalExtraPx: Math.max(0, budgetPx - usedPx) + FINAL_ADJUSTMENT_PX }
 }
 
 export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc, products, hideSelectedOptions }: Props) {
@@ -457,6 +579,9 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
     const docAny = doc as any
     const formatDate = useDateFormat()
     const isMember = doc.isMember === true
+    // ローカル開発環境でのみ、PDF生成日時をページ左下に薄く表示する（レイアウト崩れ・
+    // キャッシュ切り分けの目視確認用。顧客向けの本番PDFには出さない）
+    const [renderedAt] = useState(() => new Date())
     // DB保存値ではなく実際のitems/freeItemsから合計を再計算
     // 解約手数料: qty>0 で登録されていれば、合計欄に「解約手数料」「値引」の2行を表示。
     // 解約手数料は小計に含めない（消費税対象外）。値引で相殺するため差引合計にも影響しない。
@@ -542,25 +667,38 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
           }
         : undefined
     const displayRows = buildDisplayRows(products, items, doc.freeItems)
-    // tfoot内の会員入金額行・解約手数料行（値引含む2行）は品目数に応じて増減するため、行間計算に加味する
+    // tfoot内の会員入金額行・解約手数料行（値引含む2行）は品目数に応じて増減する。
+    // 行間(ITEM_TABLE_LINE_HEIGHT)は全書類共通の固定値。フッター変動行数が
+    // 最大パターンより少ない書類は、その分だけ通常サイズの空白行が増える
+    // （39行が最低保証、それ以上は書類ごとの余裕次第）。
     const displayedMembershipCount = (customer?.memberships ?? []).filter((m, idx) =>
         idx === 2 ? m.paymentAmount != null : m.paymentAmountOnce != null && m.paymentTimes != null
     ).length
     const itemTableFooterExtraRows = displayedMembershipCount + (showCancellationFee ? 2 : 0)
-    // 品目行が39行に満たない分だけ空白行で埋め、39行を超える場合は空白行を追加しない
-    const blankRowCount = Math.max(0, ITEM_TABLE_TARGET_BODY_ROWS - displayRows.length)
-    const itemTableLineHeight = getItemTableLineHeight(
-        displayRows.length + blankRowCount + itemTableFooterExtraRows
+    const itemTableLineHeight = ITEM_TABLE_LINE_HEIGHT
+    const { targetBodyRows, grandTotalExtraPx } = computeItemTableRowPlan(
+        itemTableFooterExtraRows,
+        ITEM_TABLE_FULL_BUDGET_PX
     )
+    // needsDoubleHeight行は見た目上1行(DisplayRow1件)だが、実際は2行分の高さを占有するため、
+    // 空白行の計算でも2行分としてカウントする。
+    const doubleHeightRowCount = displayRows.filter((row) => row.needsDoubleHeight).length
+    // 品目行が目標行数(最低39行、余裕があればそれ以上)に満たない分だけ空白行で埋める
+    const blankRowCount = Math.max(0, targetBodyRows - displayRows.length - doubleHeightRowCount)
     // 満期サービス行は商品行群の直後ではなく、明細欄の最終行（小計の直前）に固定表示する
     const normalRows = displayRows.filter((row) => !row.isMaturity)
     const maturityRows = displayRows.filter((row) => row.isMaturity)
     const renderItemRow = (row: DisplayRow, index: number, rows: DisplayRow[], keyPrefix: string) => {
         const isNextSecondary = rows[index + 1]?.isSecondaryRow
         const mergeCls = `${row.isSecondaryRow ? 'border-t-0' : ''} ${isNextSecondary ? 'border-b-0' : ''}`
+        // needsDoubleHeight行は、品名の下に表示する種類名の分だけ本来2行分の高さが必要。
+        // rowSpanで2行に分割すると高さが均等配分されないため、1行のまま明示的に高さを2倍にする。
+        const rowStyle = row.needsDoubleHeight
+            ? { height: `${2 * (ITEM_TABLE_FONT_PX * itemTableLineHeight + ITEM_TABLE_BORDER_PX) - ITEM_TABLE_BORDER_PX}px` }
+            : undefined
         return (
         <Fragment key={`${keyPrefix}-${index}`}>
-            <tr key={`${keyPrefix}-main-${index}`}>
+            <tr key={`${keyPrefix}-main-${index}`} style={rowStyle}>
                 {!row.isSecondaryRow && (
                 <td
                     className="border border-l-0 border-black px-2 align-top"
@@ -600,7 +738,20 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                     className={`border border-l-0 border-black px-0.5 text-left align-top ${row.hasDescriptionLabelRow ? mergeCls : ''}`}
                     rowSpan={row.hasDescriptionLabelRow ? 1 : row.multiRowGroupSize}
                 >
-                    {row.isMergedDescription && !row.isSecondaryRow ? (
+                    {row.displayDescriptionLines && !row.isSecondaryRow ? (
+                        row.displayDescriptionLines.map((line, i) => (
+                            <div
+                                key={i}
+                                style={{
+                                    height: `${ITEM_TABLE_FONT_PX * itemTableLineHeight + ITEM_TABLE_BORDER_PX}px`,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                }}
+                            >
+                                <AutoFitOneLineText text={line} basePx={ITEM_TABLE_FONT_PX} />
+                            </div>
+                        ))
+                    ) : row.isMergedDescription && !row.isSecondaryRow ? (
                         <AutoFitOneLineText
                             text={`${row.displayDescription ?? ''}${
                                 row.showQtyInDescription && row.estimateItem?.qty
@@ -703,10 +854,45 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
             id={contentId}
             ref={containerRef}
             className="bg-white text-black"
-            style={{ fontFamily: '"Noto Serif JP", serif' }}
+            style={{ fontFamily: '"Noto Serif JP", serif', fontSize: '16px' }}
         >
-            {/* 外枠 */}
-            <div className="border-2 border-black">
+            {/* ローカル開発環境のみ: PDF生成日時（キャッシュ・レイアウト崩れの目視確認用、本番の顧客向け書類には出さない）。
+                position:fixedでレイアウト計算（明細行数・行間）には一切影響しない */}
+            {process.env.NEXT_PUBLIC_IS_LOCAL === 'true' && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        bottom: '2px',
+                        left: '4px',
+                        fontSize: '7px',
+                        color: '#bbb',
+                        fontFamily: 'monospace',
+                    }}
+                >
+                    生成: {renderedAt.getFullYear()}-{String(renderedAt.getMonth() + 1).padStart(2, '0')}-
+                    {String(renderedAt.getDate()).padStart(2, '0')} {String(renderedAt.getHours()).padStart(2, '0')}:
+                    {String(renderedAt.getMinutes()).padStart(2, '0')}:{String(renderedAt.getSeconds()).padStart(2, '0')}
+                </div>
+            )}
+            {/* ページ1（見積書本体）だけをこのFlexboxで囲み、高さを固定する。
+                「選択オプション画像ページ」はこの外側にあるため、複数ページに自由に伸びる。
+                ヘッダー・フッターは自然な高さのまま、明細部分(外枠)だけがflex:1で残り高さを埋める。
+                JSでの高さ測定・計算に頼らず、ブラウザのレイアウトエンジンにヘッダー・フッターの
+                位置決めを任せることで、上下の余白を常に正確に一致させる。 */}
+            <div
+                style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    height: `${A4_HEIGHT_MM * PX_PER_MM - PAGE_BODY_PADDING_PX}px`,
+                }}
+            >
+            {/* 外枠: flex:1で「ヘッダー・フッターを除いた残り高さ」を占める */}
+            <div
+                className="border-2 border-black"
+                style={{ display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0, overflow: 'hidden' }}
+            >
+                {/* ヘッダー（タイトル・故人情報）: 実際の高さを測定し、明細テーブルの行間計算に使う */}
+                <div>
                 {/* タイトル */}
                 <div className="grid grid-cols-[1fr_2fr_171.5px] items-end border-b-2 border-black px-2 py-1">
                     <div>&nbsp;</div>
@@ -790,10 +976,14 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                         </div>
                     </div>
                 </div>
+                </div>
 
-                <div className="flex justify-between gap-0">
+                <div
+                    className="flex justify-between gap-0"
+                    style={{ flex: '1 1 auto', minHeight: 0, overflow: 'hidden' }}
+                >
                     {/* 明細ブロック */}
-                    <div className="w-[60%] border-r-2 border-black">
+                    <div className="w-[60%] border-r-2 border-black" style={{ overflow: 'hidden' }}>
                         <table
                             className="w-full border-collapse text-[0.75rem]"
                             style={{ lineHeight: itemTableLineHeight, tableLayout: 'fixed' }}
@@ -995,7 +1185,19 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                         </tr>
                                     </>
                                 )}
-                                <tr style={{ fontSize: 'calc(0.75rem + 2pt)' }}>
+                                <tr
+                                    style={{
+                                        fontSize: 'calc(0.75rem + 2pt)',
+                                        // 空白行は整数単位でしか追加できず割り切れない端数が残るため、
+                                        // 表の途中に不自然に大きい空白行を作る代わりに、最終行である
+                                        // 差引合計額の高さだけをこの端数分伸ばして吸収する。
+                                        ...(grandTotalExtraPx > 0
+                                            ? {
+                                                  height: `${ITEM_TABLE_GRAND_TOTAL_FONT_PX * itemTableLineHeight + ITEM_TABLE_BORDER_PX + grandTotalExtraPx}px`,
+                                              }
+                                            : {}),
+                                    }}
+                                >
                                     <th className="border border-t-2 border-l-0 border-black text-center font-bold bg-black text-white">
                                         <div className="mx-auto flex w-[6rem] justify-between">
                                             {'差引合計額'.split('').map((char, i) => (
@@ -1018,7 +1220,7 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                     </div>
 
                     {/* 右ブロック */}
-                    <div className="flex w-[40%] flex-col text-sm">
+                    <div className="flex w-[40%] flex-col text-sm" style={{ overflow: 'hidden' }}>
                         {/* 故人・関係者情報ブロック */}
                         <table className="w-full border-collapse border-b border-black text-xs">
                             <tbody>
@@ -1282,8 +1484,11 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                     </div>
                 </div>
             </div>
-            {/* 互助会テーブル（差引合計の下・全幅・独立枠） */}
-            <PdfMembershipTable memberships={customer?.memberships} formatDate={formatDate} />
+            {/* 互助会テーブル（差引合計の下・全幅・独立枠）: 自然な高さのまま、flexShrink:0で縮められないようにする */}
+            <div style={{ flexShrink: 0 }}>
+                <PdfMembershipTable memberships={customer?.memberships} formatDate={formatDate} />
+            </div>
+            </div>
 
             {/* 選択オプション画像ページ */}
             {(() => {

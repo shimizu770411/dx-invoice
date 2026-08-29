@@ -7,7 +7,7 @@ import { getProducts } from '@/lib/products'
 import { CreateButton } from '@/components/button/CreateButton'
 import { ResetButton } from '@/components/button/ResetButton'
 import { toast } from '@/hooks/use-toast'
-import { PdfInvoiceLayout } from '@/app/(protected)/pdf/components/PdfInvoiceLayout'
+import { PdfInvoiceLayout, PDF_VIEWPORT_WIDTH_PX } from '@/app/(protected)/pdf/components/PdfInvoiceLayout'
 
 export default function InvoicePdfPage() {
     const router = useRouter()
@@ -66,7 +66,10 @@ export default function InvoicePdfPage() {
     }
 
     return (
-        <div className="mx-auto max-w-3xl p-8">
+        // 幅・パディングは実際のPDF生成時(Puppeteerビューポート+API側のbody padding)と
+        // 完全に一致させる。ここがズレるとテキストの折返しが変わり、プレビューと
+        // 本番PDFでヘッダー・フッターの高さが食い違う。
+        <div className="mx-auto" style={{ width: `${PDF_VIEWPORT_WIDTH_PX}px`, padding: '16px' }}>
             {generating && (
                 <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-white/80 backdrop-blur-sm">
                     <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-300 border-t-gray-700" />
