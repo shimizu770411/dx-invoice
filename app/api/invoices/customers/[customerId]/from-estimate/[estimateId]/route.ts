@@ -95,6 +95,7 @@ export async function POST(
                     create: estimate.items.map((item: any) => ({
                         productItemId: item.productItemId,
                         productVariantId: item.productVariantId,
+                        productVariantGroupId: item.productVariantGroupId,
                         productRowId: item.productRowId,
                         productRowVariantId: item.productRowVariantId,
                         calcType: item.calcType,

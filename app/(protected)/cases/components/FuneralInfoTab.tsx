@@ -18,6 +18,8 @@ export function FuneralInfoTab() {
         queryKey: ['stores'],
         queryFn: () => getStores(),
     })
+    // 葬儀・告別式会場の候補: 有効な店舗（表示順）＋最後に自宅を追加。直接入力も可能。
+    const funeralPlaceOptions = [...stores.map((s) => s.name), '自宅']
 
     return (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
@@ -36,7 +38,7 @@ export function FuneralInfoTab() {
                 name="funeralPlace"
                 control={control}
                 label="葬儀・告別式会場"
-                options={[...FUNERAL_PLACE_OPTIONS]}
+                options={funeralPlaceOptions}
                 error={errors.funeralPlace}
             />
 

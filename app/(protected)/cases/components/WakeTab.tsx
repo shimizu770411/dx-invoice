@@ -1,15 +1,24 @@
 import { useFormContext } from 'react-hook-form'
+import { useQuery } from '@tanstack/react-query'
 import { CaseFormData } from '../schemas/CaseFormSchema'
 import { FormInput } from '@/components/form/FormInput'
 import { FormCheckbox } from '@/components/form/FormCheckbox'
 import { FormAutocomplete } from '@/components/form/FormAutocomplete'
 import { PICKUP_PLACE_OPTIONS } from '../constants/casesOptions'
+import { getStores } from '@/lib/stores'
 
 export function WakeTab() {
     const {
         control,
         formState: { errors },
     } = useFormContext<CaseFormData>()
+
+    // 通夜場所の候補: 有効な店舗（表示順）＋最後に自宅を追加。直接入力も可能。
+    const { data: stores = [] } = useQuery({
+        queryKey: ['stores'],
+        queryFn: () => getStores(),
+    })
+    const wakePlaceOptions = [...stores.map((s) => s.name), '自宅']
 
     return (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
@@ -45,7 +54,13 @@ export function WakeTab() {
             </div>
 
             {/* 通夜場所 */}
-            <FormInput<CaseFormData> name="wakePlace" control={control} label="通夜場所" error={errors.wakePlace} />
+            <FormAutocomplete<CaseFormData>
+                name="wakePlace"
+                control={control}
+                label="通夜場所"
+                options={wakePlaceOptions}
+                error={errors.wakePlace}
+            />
 
             {/* 出棺日時 */}
             <div>

@@ -9,18 +9,16 @@ interface AgeCalculatorDialogProps {
     baseDate?: string // 計算基準日の初期値（ISO形式など）。省略時は本日
 }
 
+// 行年は数え年（その人が生きて経験した暦年の総数）で算出する。
+// 数え年 = 計算基準日の年 - 生年 + 1（誕生日が来ているかどうかは問わない）
 function calcAge(birthISO: string, baseISO: string): number | null {
     if (!birthISO) return null
     const birth = new Date(birthISO)
     const base = new Date(baseISO)
     if (isNaN(birth.getTime()) || isNaN(base.getTime())) return null
     if (birth > base) return null
-    let age = base.getFullYear() - birth.getFullYear()
-    const m = base.getMonth() - birth.getMonth()
-    if (m < 0 || (m === 0 && base.getDate() < birth.getDate())) {
-        age--
-    }
-    return age < 0 ? null : age
+    const age = base.getFullYear() - birth.getFullYear() + 1
+    return age < 1 ? null : age
 }
 
 function todayISO() {
@@ -236,7 +234,6 @@ export function AgeCalculatorDialog({ open, onClose, onConfirm, baseDate }: AgeC
                             className="font-mincho"
                             style={{ fontSize: '28px', fontWeight: 600, color: 'var(--brand-navy)', letterSpacing: '0.1em' }}
                         >
-                            満
                             <span
                                 style={{
                                     fontSize: '44px',
@@ -246,7 +243,7 @@ export function AgeCalculatorDialog({ open, onClose, onConfirm, baseDate }: AgeC
                             >
                                 {age}
                             </span>
-                            歳
+                            歳（数え）
                         </div>
                     ) : (
                         <p

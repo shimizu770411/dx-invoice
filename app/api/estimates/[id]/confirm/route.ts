@@ -73,6 +73,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
                         estimateId: created.id,
                         productItemId: item.productItemId,
                         productVariantId: item.productVariantId,
+                        productVariantGroupId: item.productVariantGroupId,
                         productRowId: item.productRowId,
                         productRowVariantId: item.productRowVariantId,
                         calcType: item.calcType,

@@ -103,6 +103,9 @@ export async function POST(request: NextRequest, props: { params: Promise<{ cust
                     create: (data.items || []).map((item: any, index: number) => ({
                         productItemId: item.productItemId ? BigInt(item.productItemId) : null,
                         productVariantId: item.productVariantId ? BigInt(item.productVariantId) : null,
+                        productVariantGroupId: item.productVariantGroupId
+                            ? BigInt(item.productVariantGroupId)
+                            : null,
                         productRowId: item.productRowId ? BigInt(item.productRowId) : null,
                         productRowVariantId: item.productRowVariantId
                             ? BigInt(item.productRowVariantId)

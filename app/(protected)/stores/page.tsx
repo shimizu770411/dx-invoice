@@ -16,10 +16,15 @@ type Row = {
     isNew?: boolean
 }
 
+// useQueryのdataが未確定の間のフォールバック値。インラインで[]を書くと
+// レンダリングのたびに新しい配列参照になり、これを依存配列に持つuseEffectが
+// 無限に再実行されてしまうため、モジュールレベルの固定参照にする。
+const EMPTY_STORES: Store[] = []
+
 export default function StoresPage() {
     const router = useRouter()
     const queryClient = useQueryClient()
-    const { data: storesData = [], isLoading } = useQuery({
+    const { data: storesData = EMPTY_STORES, isLoading } = useQuery({
         queryKey: ['stores', 'all'],
         queryFn: () => getAllStores(),
     })
