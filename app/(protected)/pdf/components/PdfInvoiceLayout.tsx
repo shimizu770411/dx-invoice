@@ -1,6 +1,7 @@
-import { Fragment, RefObject, useLayoutEffect, useRef, useState } from 'react'
+import { Fragment, RefObject, useState } from 'react'
 import { PdfCompanyAd } from './PdfCompanyAd'
 import { PdfMembershipTable } from './PdfMembershipTable'
+import { AutoFitOneLineText } from './AutoFitOneLineText'
 import { resolveProductImageUrl } from '@/lib/utils'
 import { scopeApplies } from '@/lib/productScope'
 import { computeMultiRowAmount } from '@/lib/expandMultiRow'
@@ -413,49 +414,6 @@ function getDeceasedNameFontSize(name?: string | null): string {
     return '0.875rem' // text-sm 相当
 }
 
-// 複数選択商品の摘要欄（種類名を「、」連結した1行テキスト）が列幅に収まらず折り返す場合、
-// フォントサイズを段階的に縮小して1行に収める。最小サイズまで縮小しても収まらない場合のみ
-// 末尾を省略記号（…）で切り詰める（実運用上、同時に多数の種類を選択するケースは稀なため）。
-const MERGED_DESCRIPTION_MIN_FONT_PX = 8
-const MERGED_DESCRIPTION_FONT_STEP_PX = 0.5
-
-function AutoFitOneLineText({ text, basePx }: { text: string; basePx: number }) {
-    const containerRef = useRef<HTMLDivElement>(null)
-    const [fontPx, setFontPx] = useState(basePx)
-    const [truncate, setTruncate] = useState(false)
-
-    // text/basePxが変わったら（別の行・別の描画データ）測定をやり直す
-    useLayoutEffect(() => {
-        setFontPx(basePx)
-        setTruncate(false)
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [text, basePx])
-
-    useLayoutEffect(() => {
-        const el = containerRef.current
-        if (!el || el.scrollWidth <= el.clientWidth) return
-        if (fontPx > MERGED_DESCRIPTION_MIN_FONT_PX) {
-            setFontPx((prev) => Math.max(MERGED_DESCRIPTION_MIN_FONT_PX, prev - MERGED_DESCRIPTION_FONT_STEP_PX))
-        } else if (!truncate) {
-            setTruncate(true)
-        }
-    }, [fontPx, truncate])
-
-    return (
-        <div
-            ref={containerRef}
-            style={{
-                fontSize: `${fontPx}px`,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: truncate ? 'ellipsis' : 'clip',
-                maxWidth: '100%',
-            }}
-        >
-            {text}
-        </div>
-    )
-}
 
 // 明細欄は常に「39行」固定とする（品目行がこれに満たない分は空白行で埋める。
 // 印刷後の手書き記入用の余白も兼ねる）。品目数に関わらずページ内の行数・行間は

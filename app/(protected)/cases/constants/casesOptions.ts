@@ -1,5 +1,8 @@
 // 故人との関係
 export const RELATION_OPTIONS = ['父', '母', '夫', '妻', '長男', '長女', '義父', '義母'] as const
+// 互助会員との関係（故人自身が会員本人であるケースがあるため「本人」を先頭に追加）。
+// 支払者との関係(RELATION_OPTIONS)には「本人」を含めない（支払者は故人本人ではあり得ないため）。
+export const MEMBERSHIP_RELATION_OPTIONS = ['本人', ...RELATION_OPTIONS] as const
 // 性別
 export const GENDER_OPTIONS = [
     { value: 'MALE', label: '男性' },

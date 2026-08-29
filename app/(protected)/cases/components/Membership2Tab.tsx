@@ -4,7 +4,7 @@ import { CaseFormData } from '../schemas/CaseFormSchema'
 import { FormInput } from '@/components/form/FormInput'
 import { FormCurrencyInput } from '@/components/form/FormCurrencyInput'
 import { FormAutocomplete } from '@/components/form/FormAutocomplete'
-import { RELATION_OPTIONS } from '../constants/casesOptions'
+import { MEMBERSHIP_RELATION_OPTIONS } from '../constants/casesOptions'
 
 const INDEX = 1
 
@@ -116,7 +116,7 @@ export function Membership2Tab() {
                         name={`memberships.${INDEX}.relationToDeceased`}
                         control={control}
                         label="故人との関係"
-                        options={[...RELATION_OPTIONS]}
+                        options={[...MEMBERSHIP_RELATION_OPTIONS]}
                         error={errors.memberships?.[INDEX]?.relationToDeceased}
                     />
                 </div>
