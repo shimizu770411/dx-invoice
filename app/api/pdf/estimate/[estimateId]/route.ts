@@ -60,14 +60,8 @@ export async function GET(request: NextRequest, props: { params: Promise<{ estim
         await page.goto(pageUrl, { waitUntil: 'networkidle0', timeout: 60000 })
 
         // Webフォントの読み込み完了を待つ（コールドスタート等でネットワークが遅い場合、
-        // フォールバックフォントのまま描画されて1文字ずつ均等配置のレイアウトが崩れることがあるため）。
-        // AutoFitOneLineText（自動縮小テキスト）はフォント読み込み完了時に自身で再計測するが、
-        // その再描画がReact側で反映されるまで数フレームかかるため、ここでも少し待つ
-        // （待たないと、フォールバックフォントで計測・確定した縮小結果のまま出力されうる）。
-        await page.evaluate(async () => {
-            await document.fonts.ready
-            await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
-        })
+        // フォールバックフォントのまま描画されて1文字ずつ均等配置のレイアウトが崩れることがあるため）
+        await page.evaluateHandle('document.fonts.ready')
 
         // ボタン類を非表示にし、PDF コンテンツ部分だけ body に残す
         await page.evaluate(() => {
