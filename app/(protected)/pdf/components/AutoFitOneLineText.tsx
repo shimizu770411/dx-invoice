@@ -17,6 +17,23 @@ export function AutoFitOneLineText({ text, basePx }: { text: string; basePx: num
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [text, basePx])
 
+    // Webフォント読み込み完了前（フォールバックフォント）で計測・確定してしまうと、
+    // 後から本物のフォントに置き換わっても再計測されず、収まらなくなることがある
+    // （ローカルでは読み込みが速く再現しにくいが、本番のコールドスタート等で発生する）。
+    // フォント読み込み完了時に測定をやり直す。
+    useLayoutEffect(() => {
+        let cancelled = false
+        document.fonts.ready.then(() => {
+            if (cancelled) return
+            setFontPx(basePx)
+            setTruncate(false)
+        })
+        return () => {
+            cancelled = true
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [text, basePx])
+
     useLayoutEffect(() => {
         const el = containerRef.current
         if (!el || el.scrollWidth <= el.clientWidth) return
