@@ -1,4 +1,4 @@
-import { Fragment, RefObject } from 'react'
+import { Fragment, RefObject, useLayoutEffect, useRef, useState } from 'react'
 import { PdfCompanyAd } from './PdfCompanyAd'
 import { PdfMembershipTable } from './PdfMembershipTable'
 import { resolveProductImageUrl } from '@/lib/utils'
@@ -155,6 +155,7 @@ type DisplayRow = {
     isSecondaryRow?: boolean // 複数行構成商品の2行目以降（品名空・上罫線なし）
     multiRowGroupSize?: number // 複数行構成商品の先頭行のみ設定（rowSpan に使用）
     displayDescription?: string // MERGEDモード複数選択時: 種類名を「、」で連結した表示用文字列
+    isMergedDescription?: boolean // displayDescriptionがMERGEDモード（1行結合、折り返り時は自動縮小対象）か、VARIANT_GROUPモード（意図した複数行）かの判別用
     variantLabelOverride?: string // 複数行構成商品(isMultiRow)の括弧書き用。useForVariantLabel行の選択種類名
     deductionItem?: PdfDocumentItem | null // 複数行構成商品(hasReturn)の返品行。1行目セルに「▲数量 × 単価」を追記表示する
     showQtyInDescription?: boolean // 商品マスタ設定: 摘要欄の末尾に個数を追記表示する（種類も表示する場合は「種類　個数」の順）
@@ -219,13 +220,17 @@ function buildDisplayRows(
             itemsForProduct.forEach((estimateItem, idx) => {
                 const isFirstRow = idx === 0
                 let displayDescription: string | undefined
+                let isMergedDescription = false
                 if (isMergedMode && isFirstRow && estimateItem.multiSelectVariantIds) {
                     try {
                         const ids: string[] = JSON.parse(estimateItem.multiSelectVariantIds)
                         const names = (product.variants || [])
                             .filter((v) => ids.includes(String(v.id)))
                             .map((v) => v.name)
-                        if (names.length > 0) displayDescription = names.join('、')
+                        if (names.length > 0) {
+                            displayDescription = names.join('、')
+                            isMergedDescription = true
+                        }
                     } catch { /* ignore */ }
                 } else if (isVariantGroupMode && isFirstRow && itemsForProduct.length > 1) {
                     displayDescription = itemsForProduct
@@ -254,6 +259,7 @@ function buildDisplayRows(
                     hideDescription: isEachMode ? false : !isFirstRow,
                     isSecondaryRow: !isFirstRow,
                     displayDescription,
+                    isMergedDescription,
                     variantLabelOverride,
                     multiRowGroupSize: isFirstRow && itemsForProduct.length > 1 ? itemsForProduct.length : undefined,
                     deductionItem: isFirstRow ? itemsForProduct.find((it) => it.sign === -1) ?? undefined : undefined,
@@ -378,11 +384,56 @@ function getDeceasedNameFontSize(name?: string | null): string {
     return '0.875rem' // text-sm 相当
 }
 
-// 印刷後に手書きで書き込めるよう、明細の末尾（満期サービス等の直前）に常に空白行を追加する
-const HANDWRITTEN_BLANK_ROW_COUNT = 3
+// 複数選択商品の摘要欄（種類名を「、」連結した1行テキスト）が列幅に収まらず折り返す場合、
+// フォントサイズを段階的に縮小して1行に収める。最小サイズまで縮小しても収まらない場合のみ
+// 末尾を省略記号（…）で切り詰める（実運用上、同時に多数の種類を選択するケースは稀なため）。
+const MERGED_DESCRIPTION_MIN_FONT_PX = 8
+const MERGED_DESCRIPTION_FONT_STEP_PX = 0.5
 
-// 明細テーブルの行間を、実際の行数（品目行＋手書き用3行）に応じて動的に計算する。
-// 品目が少ないときは通常の行間（1.5）のまま、1ページに収まらなくなる場合のみ
+function AutoFitOneLineText({ text, basePx }: { text: string; basePx: number }) {
+    const containerRef = useRef<HTMLDivElement>(null)
+    const [fontPx, setFontPx] = useState(basePx)
+    const [truncate, setTruncate] = useState(false)
+
+    // text/basePxが変わったら（別の行・別の描画データ）測定をやり直す
+    useLayoutEffect(() => {
+        setFontPx(basePx)
+        setTruncate(false)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [text, basePx])
+
+    useLayoutEffect(() => {
+        const el = containerRef.current
+        if (!el || el.scrollWidth <= el.clientWidth) return
+        if (fontPx > MERGED_DESCRIPTION_MIN_FONT_PX) {
+            setFontPx((prev) => Math.max(MERGED_DESCRIPTION_MIN_FONT_PX, prev - MERGED_DESCRIPTION_FONT_STEP_PX))
+        } else if (!truncate) {
+            setTruncate(true)
+        }
+    }, [fontPx, truncate])
+
+    return (
+        <div
+            ref={containerRef}
+            style={{
+                fontSize: `${fontPx}px`,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: truncate ? 'ellipsis' : 'clip',
+                maxWidth: '100%',
+            }}
+        >
+            {text}
+        </div>
+    )
+}
+
+// 品目数に関わらず明細欄の行数は常に固定（印刷後の手書き記入用の余白も兼ねる）。
+// 品目行がこれに満たない分は空白行で埋め、超える場合は空白行なし（超過分は行間調整で吸収）。
+const ITEM_TABLE_TARGET_BODY_ROWS = 39
+
+// 明細テーブルの行間を、固定行数（39行）に応じて動的に計算する。
+// 通常は行数が39行に収まり通常の行間（1.5）のまま、品目が多く39行を超える場合のみ
 // 下余白を上余白(16px)と揃えられる分だけ行間を詰める（実測値から校正した値）。
 const ITEM_TABLE_FONT_PX = 12
 const ITEM_TABLE_BORDER_PX = 1
@@ -496,8 +547,10 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
         idx === 2 ? m.paymentAmount != null : m.paymentAmountOnce != null && m.paymentTimes != null
     ).length
     const itemTableFooterExtraRows = displayedMembershipCount + (showCancellationFee ? 2 : 0)
+    // 品目行が39行に満たない分だけ空白行で埋め、39行を超える場合は空白行を追加しない
+    const blankRowCount = Math.max(0, ITEM_TABLE_TARGET_BODY_ROWS - displayRows.length)
     const itemTableLineHeight = getItemTableLineHeight(
-        displayRows.length + HANDWRITTEN_BLANK_ROW_COUNT + itemTableFooterExtraRows
+        displayRows.length + blankRowCount + itemTableFooterExtraRows
     )
     // 満期サービス行は商品行群の直後ではなく、明細欄の最終行（小計の直前）に固定表示する
     const normalRows = displayRows.filter((row) => !row.isMaturity)
@@ -547,6 +600,16 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                     className={`border border-l-0 border-black px-0.5 text-left align-top ${row.hasDescriptionLabelRow ? mergeCls : ''}`}
                     rowSpan={row.hasDescriptionLabelRow ? 1 : row.multiRowGroupSize}
                 >
+                    {row.isMergedDescription && !row.isSecondaryRow ? (
+                        <AutoFitOneLineText
+                            text={`${row.displayDescription ?? ''}${
+                                row.showQtyInDescription && row.estimateItem?.qty
+                                    ? `　${row.estimateItem.qty.toLocaleString()}${row.estimateItem?.productVariant?.unitLabel ?? ''}`
+                                    : ''
+                            }`}
+                            basePx={ITEM_TABLE_FONT_PX}
+                        />
+                    ) : (
                     <div className="whitespace-pre-wrap break-words">
                         {!row.isSecondaryRow ? (row.displayDescription ?? row.estimateItem?.description ?? '') : ''}
                         {/* 複数行構成商品: useForDescriptionLabel行(この行自体)の選択種類名を摘要欄に追記 */}
@@ -558,6 +621,7 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                             ? `　${row.estimateItem.qty.toLocaleString()}${row.estimateItem?.productVariant?.unitLabel ?? ''}`
                             : ''}
                     </div>
+                    )}
                     {!row.isSecondaryRow && (
                     <div className="whitespace-pre-wrap">
                         {/* 複数行構成商品(単価×数量型)は「数量 × 単価」を表示。それ以外は数量が1より大きい場合のみ表示。親付きフリー行（満期サービス以外）は qty=1 でも常に数量を表示。showQtyInDescription有効時は摘要欄に個数を出しているため重複を避ける。 */}
@@ -732,7 +796,7 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                     <div className="w-[60%] border-r-2 border-black">
                         <table
                             className="w-full border-collapse text-[0.75rem]"
-                            style={{ lineHeight: itemTableLineHeight }}
+                            style={{ lineHeight: itemTableLineHeight, tableLayout: 'fixed' }}
                         >
                             <colgroup>
                                 <col style={{ width: '24%' }} />
@@ -782,7 +846,7 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                             </thead>
                             <tbody>
                                 {normalRows.map((row, index) => renderItemRow(row, index, normalRows, 'normal'))}
-                                {Array.from({ length: HANDWRITTEN_BLANK_ROW_COUNT }).map((_, i) => (
+                                {Array.from({ length: blankRowCount }).map((_, i) => (
                                     <tr key={`blank-${i}`}>
                                         <td className="border border-l-0 border-black px-2">&nbsp;</td>
                                         <td className="border border-l-0 border-black px-0.5">&nbsp;</td>
