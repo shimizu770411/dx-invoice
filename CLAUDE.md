@@ -86,6 +86,15 @@ import { handleLoadError, handleSaveError, handleOperationError } from '@/lib/er
 - `toast` だけ呼んでログを出さない
 - `console.error` だけ呼んでユーザーに通知しない
 
+新規 Hook 追加・catch 処理変更後は `check-error-handling` Skill で規約準拠を確認する。
+
+#### 見積・請求書フォームの同期確認
+
+見積(estimates)・請求書(invoices)は共通ロジックが多いが、フック内のロード時マージ処理と
+コンポーネントのイベントハンドラは共通化されておらず独立実装（コピペ）されている。
+`EstimateForm.tsx`/`InvoiceForm.tsx`、`useEstimateForm.ts`/`useInvoiceForm.ts` のいずれかを
+修正した際は `check-doc-form-sync` Skill で反対側への同期要否を確認する。
+
 #### APIレスポンス形式の規約（新規 route のみ適用）
 
 新規で作成する API route のレスポンス形式は以下に統一すること。既存 route は変更しない。
