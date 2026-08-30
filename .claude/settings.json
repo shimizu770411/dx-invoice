@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "deny": [
+      "Bash(git push origin:*)",
+      "Bash(*git push origin*)",
+      "PowerShell(*git push origin*)",
+      "Bash(npx vercel:*)",
+      "Bash(*npx vercel*)",
+      "PowerShell(*npx vercel*)",
+      "PowerShell(*vercel deploy*)",
+      "Bash(*prisma migrate deploy*)",
+      "PowerShell(*prisma migrate deploy*)",
+      "Bash(*pnpm*migrate:deploy*)",
+      "PowerShell(*pnpm*migrate:deploy*)"
+    ]
+  }
+}
