@@ -66,6 +66,7 @@ export async function PUT(request: NextRequest) {
             pdfPromptOnExport: body.pdfPromptOnExport !== false,
             estimateRemarksDefault: body.estimateRemarksDefault ?? null,
             invoiceRemarksDefault: body.invoiceRemarksDefault ?? null,
+            sealImageUrl: body.sealImageUrl ?? null,
         }
 
         // 会社プロフィールを更新

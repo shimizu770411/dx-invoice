@@ -1,7 +1,7 @@
 'use client'
 
-import { Control, useWatch } from 'react-hook-form'
-import { CREMATION_OPTIONS, ALTAR_OPTIONS, MEMBER_CARD_OPTIONS } from '@/app/(protected)/estimates/constants/estimateOptions'
+import { Control } from 'react-hook-form'
+import { CREMATION_OPTIONS, ALTAR_OPTIONS, ALTAR_TYPE_OPTIONS, MEMBER_CARD_OPTIONS } from '@/app/(protected)/estimates/constants/estimateOptions'
 import { FormInput } from '@/components/form/FormInput'
 import { FormSelect } from '@/components/form/FormSelect'
 import { FormTextarea } from '@/components/form/FormTextarea'
@@ -22,8 +22,6 @@ type Props = {
 }
 
 export function DocumentOtherFields({ control, disabled, estimateStaffLabel = '見積担当', preConsultStaffSlot }: Props) {
-    const altarPlaceType = useWatch({ control, name: 'altarPlaceType' })
-
     return (
         <div className="mb-8">
             <div className="grid grid-cols-2 gap-4">
@@ -43,19 +41,22 @@ export function DocumentOtherFields({ control, disabled, estimateStaffLabel = '�
                     placeholder="選択してください"
                     disabled={disabled}
                 />
-                <div className="flex flex-col gap-2">
-                    <FormSelect
-                        name="altarPlaceType"
-                        control={control}
-                        label="祭壇設置場所"
-                        options={ALTAR_OPTIONS}
-                        placeholder="選択してください"
-                        disabled={disabled}
-                    />
-                    {altarPlaceType === 'OTHER' && (
-                        <FormInput name="altarPlaceOther" control={control} placeholder="祭壇設置場所" />
-                    )}
-                </div>
+                <FormSelect
+                    name="altarPlaceType"
+                    control={control}
+                    label="祭壇設置場所"
+                    options={ALTAR_OPTIONS}
+                    placeholder="選択してください"
+                    disabled={disabled}
+                />
+                <FormSelect
+                    name="altarType"
+                    control={control}
+                    label="設置祭壇種類"
+                    options={ALTAR_TYPE_OPTIONS}
+                    placeholder="選択してください"
+                    disabled={disabled}
+                />
                 <FormInput name="ceilingHeight" control={control} label="天井高" suffix="尺" />
                 {preConsultStaffSlot}
                 <FormInput name="estimateStaff" control={control} label={estimateStaffLabel} />

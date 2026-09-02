@@ -54,6 +54,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
                     cremationProcessType: source.cremationProcessType,
                     altarPlaceType: source.altarPlaceType,
                     altarPlaceOther: source.altarPlaceOther,
+                    altarType: source.altarType,
                     ceilingHeight: source.ceilingHeight,
                     preConsultStaff: source.preConsultStaff,
                     estimateStaff: source.estimateStaff,

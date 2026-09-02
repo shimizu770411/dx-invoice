@@ -1,5 +1,18 @@
 import apiClient from './api'
 
+export interface FamilyNameSource {
+    estimateDisplayName: string | null
+    deceasedLastName: string | null
+    deceasedName: string
+}
+
+/** 喪家名を取得する。見積お名前が未入力の場合は故人の姓、それも未入力なら死亡者名をそのまま返す */
+export function getFamilyName(customer: FamilyNameSource): string {
+    if (customer.estimateDisplayName) return customer.estimateDisplayName
+    if (customer.deceasedLastName) return customer.deceasedLastName
+    return customer.deceasedName
+}
+
 export interface Flower {
     id: string
     customerId: string

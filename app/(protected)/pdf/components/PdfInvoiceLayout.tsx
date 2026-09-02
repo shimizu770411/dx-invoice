@@ -101,6 +101,7 @@ export type PdfDocumentCustomer = {
     cremationProcessType?: string | null
     altarPlaceType?: string | null
     altarPlaceOther?: string | null
+    altarType?: string | null
     ceilingHeight?: string | number | null
     preConsultStaff?: string | null
     estimateStaff?: string | null
@@ -375,6 +376,15 @@ const ALTAR_LABEL: Record<string, string> = {
     OTHER: 'その他',
 }
 
+const ALTAR_TYPE_LABEL: Record<string, string> = {
+    NONE: 'なし',
+    PAPER: '紙祭壇',
+    WOOD: '木祭壇',
+    ANNIVERSARY: '年忌祭壇',
+    BUTSUSHIKI_4SHAKU: '4尺仏式',
+    YOFU_4SHAKU: '4尺洋風',
+}
+
 const MEMBER_CARD_LABEL: Record<string, string> = {
     COLLECTED: '回収済',
     NOT_COLLECTED: '未回収',
@@ -615,6 +625,7 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
               cremationProcessType: docAny.cremationProcessType ?? null,
               altarPlaceType: docAny.altarPlaceType ?? null,
               altarPlaceOther: docAny.altarPlaceOther ?? null,
+              altarType: docAny.altarType ?? null,
               ceilingHeight: docAny.ceilingHeight ?? null,
               preConsultStaff: docAny.preConsultStaff ?? null,
               estimateStaff: docAny.estimateStaff ?? null,
@@ -1363,22 +1374,18 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                                         </div>
                                     </th>
                                     <td className="px-1" colSpan={3}>
-                                        <div className="flex items-baseline justify-between">
-                                            <div>
-                                                {(['HOME', 'FUNERAL_HALL'] as const).map((key, i) => (
-                                                    <Fragment key={key}>
-                                                        {i > 0 && '・'}
-                                                        <span className={customer?.altarPlaceType === key ? 'underline font-bold' : ''}>
-                                                            {ALTAR_LABEL[key]}
-                                                        </span>
-                                                    </Fragment>
-                                                ))}
-                                                {'・'}
-                                                <span className={customer?.altarPlaceType === 'OTHER' ? 'underline font-bold' : ''}>
-                                                    その他（{customer?.altarPlaceType === 'OTHER' ? (customer.altarPlaceOther ?? '') : ''}
-                                                </span>
-                                            </div>
-                                            <span>）</span>
+                                        <div className="flex items-baseline">
+                                            {(['HOME', 'FUNERAL_HALL', 'OTHER'] as const).map((key, i) => (
+                                                <Fragment key={key}>
+                                                    {i > 0 && '・'}
+                                                    <span className={customer?.altarPlaceType === key ? 'underline font-bold' : ''}>
+                                                        {ALTAR_LABEL[key]}
+                                                    </span>
+                                                </Fragment>
+                                            ))}
+                                            {'（'}
+                                            {customer?.altarType ? (ALTAR_TYPE_LABEL[customer.altarType] ?? '') : ''}
+                                            {'）'}
                                         </div>
                                     </td>
                                 </tr>

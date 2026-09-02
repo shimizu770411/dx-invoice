@@ -34,6 +34,7 @@ export const companyFormSchema = z.object({
     pdfPromptOnExport: z.boolean(),
     estimateRemarksDefault: z.string().max(MAX_REMARKS_LENGTH, `${MAX_REMARKS_LENGTH}文字以内で入力してください`).optional(),
     invoiceRemarksDefault: z.string().max(MAX_REMARKS_LENGTH, `${MAX_REMARKS_LENGTH}文字以内で入力してください`).optional(),
+    sealImageUrl: z.string().optional(),
 })
 
 export type CompanyFormData = z.infer<typeof companyFormSchema>
@@ -71,4 +72,5 @@ export const DEFAULT_FORM_VALUES: CompanyFormData = {
     pdfPromptOnExport: true,
     estimateRemarksDefault: '',
     invoiceRemarksDefault: '',
+    sealImageUrl: '',
 }

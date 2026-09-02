@@ -357,6 +357,7 @@ export function useEstimateEdit(estimateId: string, reset: UseFormReset<Estimate
                 cremationProcessType: (estimateData as any).cremationProcessType || '',
                 altarPlaceType: (estimateData as any).altarPlaceType || '',
                 altarPlaceOther: (estimateData as any).altarPlaceOther || '',
+                altarType: (estimateData as any).altarType || '',
                 ceilingHeight: (estimateData as any).ceilingHeight || '',
                 memberCardNote: customerData?.memberCardNote || '',
                 preConsultStaff: (estimateData as any).preConsultStaff || '',

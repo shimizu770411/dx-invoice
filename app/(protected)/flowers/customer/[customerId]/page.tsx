@@ -184,7 +184,7 @@ export default function FlowersListPage() {
                 actions={
                     <>
                         <button
-                            onClick={() => window.open(`/api/pdf/flower/${customerId}`, '_blank')}
+                            onClick={() => window.open(`/api/pdf/flower-invoice/${customerId}`, '_blank')}
                             style={{
                                 ...actionButtonStyle('accent'),
                                 padding: '10px 22px',
@@ -192,6 +192,16 @@ export default function FlowersListPage() {
                             }}
                         >
                             請求書一括印刷
+                        </button>
+                        <button
+                            onClick={() => window.open(`/api/pdf/flower/${customerId}`, '_blank')}
+                            style={{
+                                ...actionButtonStyle('gold'),
+                                padding: '10px 22px',
+                                fontSize: '15px',
+                            }}
+                        >
+                            領収書一括印刷
                         </button>
                         <button
                             onClick={() => setDialogState({ open: true, flower: null })}

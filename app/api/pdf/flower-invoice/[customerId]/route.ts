@@ -17,8 +17,8 @@ export async function GET(request: NextRequest, props: { params: Promise<{ custo
 
     return renderPdfFromPage({
         request,
-        pageUrl: `${request.nextUrl.origin}/pdf/flower/${customerId}`,
-        contentElementId: 'flower-pdf-content',
-        filename: `供花領収書_${customerId}_${dateStr}.pdf`,
+        pageUrl: `${request.nextUrl.origin}/pdf/flower-invoice/${customerId}`,
+        contentElementId: 'flower-invoice-pdf-content',
+        filename: `供花請求書_${customerId}_${dateStr}.pdf`,
     })
 }

@@ -34,6 +34,7 @@ export interface CompanyProfile {
     pdfPromptOnExport?: boolean
     estimateRemarksDefault?: string
     invoiceRemarksDefault?: string
+    sealImageUrl?: string
 }
 
 export interface UpdateCompanyProfileData {
@@ -69,14 +70,25 @@ export interface UpdateCompanyProfileData {
     pdfPromptOnExport?: boolean
     estimateRemarksDefault?: string
     invoiceRemarksDefault?: string
+    sealImageUrl?: string
 }
 
 export async function getCompanyProfile(): Promise<CompanyProfile> {
     const response = await apiClient.get<CompanyProfile>('/company-profile')
+    if (!response.data) throw new Error('会社情報が見つかりません')
     return response.data
 }
 
 export async function updateCompanyProfile(data: UpdateCompanyProfileData): Promise<CompanyProfile> {
     const response = await apiClient.put<CompanyProfile>('/company-profile', data)
     return response.data
+}
+
+export async function uploadCompanySealImage(file: File): Promise<string> {
+    const form = new FormData()
+    form.append('file', file)
+    const response = await apiClient.post<{ url: string }>('/upload/company-seal', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return response.data.url
 }

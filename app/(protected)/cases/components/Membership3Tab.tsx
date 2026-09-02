@@ -80,7 +80,7 @@ export function Membership3Tab() {
                     <FormCurrencyInput<CaseFormData>
                         name={`memberships.${INDEX}.paymentAmount`}
                         control={control}
-                        label="入金額"
+                        label="割引額"
                         suffix="円"
                         error={errors.memberships?.[INDEX]?.paymentAmount}
                     />

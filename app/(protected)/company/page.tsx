@@ -59,6 +59,7 @@ export default function CompanyPage() {
                 pdfPromptOnExport: profile.pdfPromptOnExport ?? true,
                 estimateRemarksDefault: profile.estimateRemarksDefault ?? '',
                 invoiceRemarksDefault: profile.invoiceRemarksDefault ?? '',
+                sealImageUrl: profile.sealImageUrl ?? '',
             })
         }
     }, [profile, reset])

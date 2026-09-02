@@ -29,6 +29,15 @@ enum AltarPlaceType {
   OTHER
 }
 
+enum AltarType {
+  NONE
+  PAPER
+  WOOD
+  ANNIVERSARY
+  BUTSUSHIKI_4SHAKU
+  YOFU_4SHAKU
+}
+
 enum MemberCardStatus {
   COLLECTED
   NOT_COLLECTED
@@ -403,6 +412,7 @@ model Estimate {
   cremationProcessType CremationProcessType? @map("cremation_process_type")
   altarPlaceType      AltarPlaceType?     @map("altar_place_type")
   altarPlaceOther     String?             @db.VarChar(100) @map("altar_place_other")
+  altarType           AltarType?          @map("altar_type")
   ceilingHeight       String?             @db.VarChar(30) @map("ceiling_height")
   preConsultStaff     String?             @db.VarChar(100) @map("pre_consult_staff")
   estimateStaff       String?             @db.VarChar(100) @map("estimate_staff")
@@ -489,6 +499,7 @@ model Invoice {
   cremationProcessType CremationProcessType? @map("cremation_process_type")
   altarPlaceType      AltarPlaceType?     @map("altar_place_type")
   altarPlaceOther     String?             @db.VarChar(100) @map("altar_place_other")
+  altarType           AltarType?          @map("altar_type")
   ceilingHeight       String?             @db.VarChar(30) @map("ceiling_height")
   estimateStaff       String?             @db.VarChar(100) @map("estimate_staff")
   ceremonyStaff       String?             @db.VarChar(100) @map("ceremony_staff")
@@ -681,6 +692,7 @@ model CompanyProfile {
   pdfPromptOnExport   Boolean @default(true)  @map("pdf_prompt_on_export")
   estimateRemarksDefault String? @db.Text @map("estimate_remarks_default")
   invoiceRemarksDefault  String? @db.Text @map("invoice_remarks_default")
+  sealImageUrl  String?  @db.VarChar(500) @map("seal_image_url")
   createdAt     DateTime @default(now()) @db.Timestamptz(6) @map("created_at")
   updatedAt     DateTime @updatedAt @db.Timestamptz(6) @map("updated_at")
 

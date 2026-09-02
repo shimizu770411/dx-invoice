@@ -9,6 +9,7 @@ const validBase = {
     cremationProcessType: '',
     altarPlaceType: '',
     altarPlaceOther: '',
+    altarType: '',
     ceilingHeight: '',
     estimateStaff: '',
     ceremonyStaff: '',

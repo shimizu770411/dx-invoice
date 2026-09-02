@@ -14,6 +14,8 @@ import {
 import { CompanyFormData } from '../schemas/CompanyFormSchema'
 import { BANK_TYPE_OPTIONS } from '../constants/companyOptions'
 import { BankBranchSelector } from './BankBranchSelector'
+import { uploadCompanySealImage } from '@/lib/company'
+import { handleOperationError } from '@/lib/errorHandler'
 
 const sectionStyle: React.CSSProperties = {
     backgroundColor: '#ffffff',
@@ -376,6 +378,100 @@ function BinaryChoiceField({
     )
 }
 
+function SealImageField() {
+    const { control } = useFormContext<CompanyFormData>()
+    const [uploading, setUploading] = useState(false)
+
+    return (
+        <Controller
+            name="sealImageUrl"
+            control={control}
+            render={({ field }) => (
+                <div className="flex items-center gap-4">
+                    <div
+                        className="relative flex items-center justify-center overflow-hidden"
+                        style={{ width: 96, height: 96, border: '1px solid var(--brand-border)', backgroundColor: '#ffffff' }}
+                    >
+                        {field.value ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                                src={field.value}
+                                alt="角印"
+                                style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 4 }}
+                            />
+                        ) : (
+                            <span
+                                className="material-symbols-outlined"
+                                style={{ fontSize: 32, color: 'var(--brand-gold-soft)', opacity: 0.5 }}
+                            >
+                                image
+                            </span>
+                        )}
+                        {uploading && (
+                            <div
+                                className="absolute inset-0 flex items-center justify-center"
+                                style={{ backgroundColor: 'rgba(255,255,255,0.85)', fontSize: 11 }}
+                            >
+                                アップロード中…
+                            </div>
+                        )}
+                    </div>
+                    <div className="flex flex-col gap-2">
+                        <label
+                            className="font-mincho cursor-pointer"
+                            style={{
+                                padding: '6px 12px',
+                                border: '1px solid var(--brand-gold)',
+                                color: 'var(--brand-gold-soft)',
+                                backgroundColor: '#ffffff',
+                                fontSize: 12,
+                                letterSpacing: '0.15em',
+                                textAlign: 'center',
+                            }}
+                        >
+                            画像をアップロード
+                            <input
+                                type="file"
+                                accept="image/png,image/webp"
+                                className="hidden"
+                                onChange={async (e) => {
+                                    const file = e.target.files?.[0]
+                                    e.target.value = ''
+                                    if (!file) return
+                                    try {
+                                        setUploading(true)
+                                        const url = await uploadCompanySealImage(file)
+                                        field.onChange(url)
+                                    } catch (error) {
+                                        handleOperationError(error, '角印画像のアップロードに失敗しました')
+                                    } finally {
+                                        setUploading(false)
+                                    }
+                                }}
+                            />
+                        </label>
+                        {field.value && (
+                            <button
+                                type="button"
+                                onClick={() => field.onChange('')}
+                                style={{
+                                    padding: '4px 8px',
+                                    fontSize: 11,
+                                    color: 'var(--brand-text-muted)',
+                                    border: '1px dashed var(--brand-border)',
+                                    backgroundColor: 'transparent',
+                                }}
+                            >
+                                画像をクリア
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
+        />
+    )
+}
+
 export function SystemSettingsSection() {
     const { control } = useFormContext<CompanyFormData>()
 
@@ -564,6 +660,45 @@ export function SystemSettingsSection() {
                         「表示する」の場合は毎回確認画面で選び、「表示しない」の場合は上の「明細の画像一覧」の設定がそのまま使われます。
                     </p>
                 </div>
+            </div>
+
+            <div style={subSectionStyle}>
+                <div style={subSectionHeaderStyle}>
+                    <span
+                        style={{
+                            fontFamily: 'var(--font-garamond)',
+                            fontSize: '11px',
+                            color: 'var(--brand-gold-soft)',
+                            letterSpacing: '0.3em',
+                            fontWeight: 500,
+                        }}
+                    >
+                        COMPANY SEAL
+                    </span>
+                    <h3
+                        style={{
+                            fontFamily: 'var(--font-mincho)',
+                            fontSize: '15px',
+                            fontWeight: 600,
+                            color: 'var(--brand-navy)',
+                            letterSpacing: '0.15em',
+                        }}
+                    >
+                        角印画像
+                    </h3>
+                </div>
+                <p
+                    style={{
+                        fontFamily: 'var(--font-mincho)',
+                        fontSize: '13px',
+                        color: 'var(--brand-text-muted)',
+                        letterSpacing: '0.1em',
+                        marginBottom: '16px',
+                    }}
+                >
+                    領収書・請求書PDFに印字する角印画像です。本物データが届くまでは仮画像のままで構いません。
+                </p>
+                <SealImageField />
             </div>
         </section>
     )

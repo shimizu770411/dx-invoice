@@ -2,14 +2,22 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { getBillingTargets, FlowerBillingTarget } from '@/lib/flowers'
+import { getBillingTargets, FlowerBillingTarget, getFamilyName } from '@/lib/flowers'
 import { getCompanyProfile, CompanyProfile } from '@/lib/company'
+import { getCustomer } from '@/lib/customers'
 import { CreateButton } from '@/components/button/CreateButton'
 import { ResetButton } from '@/components/button/ResetButton'
 import { SearchButton } from '@/components/button/SearchButton'
-import { toast } from '@/hooks/use-toast'
+import { handleLoadError, handleOperationError } from '@/lib/errorHandler'
 import { PdfCompanyProfile } from '@/app/(protected)/pdf/components/PdfCompanyProfile'
 import { useDateFormat } from '@/hooks/useDateFormat'
+
+interface CustomerInfo {
+    funeralFrom: string | null
+    estimateDisplayName: string | null
+    deceasedLastName: string | null
+    deceasedName: string
+}
 
 export default function FlowerPdfPage() {
     const router = useRouter()
@@ -18,6 +26,7 @@ export default function FlowerPdfPage() {
     const [loading, setLoading] = useState(true)
     const [targets, setTargets] = useState<FlowerBillingTarget[]>([])
     const [company, setCompany] = useState<CompanyProfile | null>(null)
+    const [customer, setCustomer] = useState<CustomerInfo | null>(null)
     const [pdfUrl, setPdfUrl] = useState<string | null>(null)
     const [generating, setGenerating] = useState(false)
     const formatDate = useDateFormat()
@@ -29,12 +38,17 @@ export default function FlowerPdfPage() {
 
     const loadData = async () => {
         try {
-            const [flowersData, companyData] = await Promise.all([getBillingTargets(customerId), getCompanyProfile()])
+            const [flowersData, companyData, customerData] = await Promise.all([
+                getBillingTargets(customerId),
+                getCompanyProfile(),
+                getCustomer(customerId),
+            ])
             // 依頼主が1件以上いる請求先のみ表示
             setTargets(flowersData.filter((t) => t.flowers.length > 0))
             setCompany(companyData)
+            setCustomer(customerData)
         } catch (error) {
-            console.error('Failed to load data:', error)
+            handleLoadError(error)
         } finally {
             setLoading(false)
         }
@@ -49,12 +63,11 @@ export default function FlowerPdfPage() {
             const url = URL.createObjectURL(blob)
             const a = document.createElement('a')
             a.href = url
-            a.download = `供花請求書_${customerId}_${new Date().toISOString().split('T')[0]}.pdf`
+            a.download = `供花領収書_${customerId}_${new Date().toISOString().split('T')[0]}.pdf`
             a.click()
             URL.revokeObjectURL(url)
         } catch (error) {
-            console.error('Failed to generate PDF:', error)
-            toast({ title: 'PDFの生成に失敗しました', variant: 'destructive', duration: 3000 })
+            handleOperationError(error, 'PDFの生成に失敗しました')
         } finally {
             setGenerating(false)
         }
@@ -69,8 +82,7 @@ export default function FlowerPdfPage() {
             const url = URL.createObjectURL(blob)
             setPdfUrl(url)
         } catch (error) {
-            console.error('Failed to preview PDF:', error)
-            toast({ title: 'PDFの生成に失敗しました', variant: 'destructive', duration: 3000 })
+            handleOperationError(error, 'PDFの生成に失敗しました')
         } finally {
             setGenerating(false)
         }
@@ -111,6 +123,8 @@ export default function FlowerPdfPage() {
         )
     }
 
+    const familyName = customer ? getFamilyName(customer) : ''
+
     return (
         <div className="mx-auto max-w-3xl p-8">
             {generating && (
@@ -139,7 +153,7 @@ export default function FlowerPdfPage() {
                     const total = target.flowers.reduce((sum: number, f) => sum + f.amount, 0)
                     const tax = Math.round(total * 0.1)
                     const totalWithTax = total + tax
-                    const docTitle = target.isPaid ? '領収証' : '請求書'
+                    const docTitle = '領収証'
                     return (
                         <div
                             key={target.id}
@@ -224,7 +238,7 @@ export default function FlowerPdfPage() {
                                                 {target.flowers.map((flower, index) => (
                                                     <tr key={index}>
                                                         <td className="border border-l-0 border-black px-2 py-1 text-left">
-                                                            {`${flower.requesterName} 様`}
+                                                            {`${familyName}家　供花代として`}
                                                         </td>
                                                         <td className="border border-l-0 border-black px-2 text-right">
                                                             {'1'}
@@ -303,9 +317,7 @@ export default function FlowerPdfPage() {
                                                 </tr>
                                                 <tr className="border border-black">
                                                     <td className="p-2 text-right tracking-[0.25em]">
-                                                        {target.isPaid && target.paidAt
-                                                            ? formatDate(target.paidAt)
-                                                            : '-'}
+                                                        {customer?.funeralFrom ? formatDate(customer.funeralFrom) : '-'}
                                                     </td>
                                                 </tr>
                                             </tbody>
@@ -322,7 +334,7 @@ export default function FlowerPdfPage() {
                                     </div>
                                 </div>
                                 <div className="mt-1 flex justify-start gap-0">
-                                    上記金額正に{target.isPaid ? '領収' : '入金'}致しました。
+                                    上記金額正にお引き渡しいたしました。
                                 </div>
                             </div>
                         </div>

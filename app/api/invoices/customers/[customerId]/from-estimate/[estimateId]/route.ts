@@ -84,6 +84,7 @@ export async function POST(
                 cremationProcessType: estimate.cremationProcessType,
                 altarPlaceType: estimate.altarPlaceType,
                 altarPlaceOther: estimate.altarPlaceOther,
+                altarType: estimate.altarType,
                 ceilingHeight: estimate.ceilingHeight,
                 estimateStaff: estimate.estimateStaff,
                 ceremonyStaff: estimate.ceremonyStaff,

@@ -6,6 +6,7 @@ import { calculateDocumentTotals } from '@/lib/documentTotals'
 import { buildDocNoPrefix, buildDocNo, isValidDocNo, pickLatestValidDocNo } from '@/lib/documentUtils'
 import { recordOperationLog } from '@/lib/operationLog'
 import { OperationAction, OperationEntityType } from '@phoenix-jpn/db'
+import { VALID_CREMATION_PROCESS_TYPES, VALID_ALTAR_PLACE_TYPES, VALID_ALTAR_TYPES } from '@/lib/documentEnums'
 
 export async function GET(request: NextRequest) {
     try {
@@ -143,17 +144,17 @@ export async function POST(request: NextRequest) {
         const totals = calculateDocumentTotals(data.items || [], membershipPaidAmount, data.freeItems || [])
 
         // enum型の値を検証・変換
-        const validCremationProcessTypes = ['FAMILY', 'NEIGHBORHOOD', 'COMPANY'] as const
         const cremationProcessType =
-            data.cremationProcessType && validCremationProcessTypes.includes(data.cremationProcessType as any)
+            data.cremationProcessType && VALID_CREMATION_PROCESS_TYPES.includes(data.cremationProcessType)
                 ? data.cremationProcessType
                 : null
 
-        const validAltarPlaceTypes = ['HOME', 'FUNERAL_HALL', 'OTHER'] as const
         const altarPlaceType =
-            data.altarPlaceType && validAltarPlaceTypes.includes(data.altarPlaceType as any)
+            data.altarPlaceType && VALID_ALTAR_PLACE_TYPES.includes(data.altarPlaceType)
                 ? data.altarPlaceType
                 : null
+
+        const altarType = data.altarType && VALID_ALTAR_TYPES.includes(data.altarType) ? data.altarType : null
 
         // docNo の自動採番: customers.reception_atの年月(yyyymm) + 同プレフィックスの最大連番+1(3桁)
         const prefix = buildDocNoPrefix(customer.receptionAt)
@@ -179,6 +180,7 @@ export async function POST(request: NextRequest) {
                 cremationProcessType,
                 altarPlaceType,
                 altarPlaceOther: data.altarPlaceOther || null,
+                altarType,
                 ceilingHeight: data.ceilingHeight || null,
                 preConsultStaff: data.preConsultStaff || null,
                 estimateStaff: data.estimateStaff || null,

@@ -31,6 +31,7 @@ export type DocumentFormData = {
     cremationProcessType: string
     altarPlaceType: string
     altarPlaceOther: string
+    altarType: string
     ceilingHeight: string
     memberCardNote: string
     estimateStaff: string

@@ -200,6 +200,7 @@ export function useInvoiceEdit(invoiceId: string, reset: UseFormReset<InvoiceFor
                 cremationProcessType: (invoiceData as any).cremationProcessType || '',
                 altarPlaceType: (invoiceData as any).altarPlaceType || '',
                 altarPlaceOther: (invoiceData as any).altarPlaceOther || '',
+                altarType: (invoiceData as any).altarType || '',
                 ceilingHeight: (invoiceData as any).ceilingHeight || '',
                 memberCardNote: customerData?.memberCardNote || '',
                 estimateStaff: (invoiceData as any).estimateStaff || '',
