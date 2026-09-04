@@ -3,6 +3,7 @@ import { CaseFormData } from '../schemas/CaseFormSchema'
 import { FormInput } from '@/components/form/FormInput'
 import { FormCurrencyInput } from '@/components/form/FormCurrencyInput'
 import { FormAutocomplete } from '@/components/form/FormAutocomplete'
+import { FormEraDateSelect } from '@/components/form/FormEraDateSelect'
 import { MEMBERSHIP_RELATION_OPTIONS } from '../constants/casesOptions'
 
 const INDEX = 2
@@ -26,11 +27,10 @@ export function Membership3Tab() {
                 />
 
                 {/* 加入日 */}
-                <FormInput<CaseFormData>
+                <FormEraDateSelect<CaseFormData>
                     name={`memberships.${INDEX}.joinedAt`}
                     control={control}
                     label="加入日"
-                    type="date"
                     minYear={1950}
                     maxYear={new Date().getFullYear()}
                     error={errors.memberships?.[INDEX]?.joinedAt}

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { getEraParts, buildEraOptions, formatEraYear } from '@/lib/era'
 
 interface AgeCalculatorDialogProps {
     open: boolean
@@ -41,24 +42,23 @@ function normalizeDate(value?: string): string {
     return `${yyyy}-${mm}-${dd}`
 }
 
-// 年から和暦を生成（例: 1945 → "昭和20年"）
-function toJapaneseEra(year: number): string {
-    if (year >= 2019) return `令和${year - 2018}年`
-    if (year >= 1989) return `平成${year - 1988}年`
-    if (year >= 1926) return `昭和${year - 1925}年`
-    if (year >= 1912) return `大正${year - 1911}年`
-    if (year >= 1868) return `明治${year - 1867}年`
-    return ''
-}
-
 function getDaysInMonth(year: number, month: number): number {
     if (!year || !month) return 31
     return new Date(year, month, 0).getDate()
 }
 
+const MIN_YEAR = 1900
 const CURRENT_YEAR = new Date().getFullYear()
-const YEARS = Array.from({ length: CURRENT_YEAR - 1899 }, (_, i) => CURRENT_YEAR - i)
+const YEARS = Array.from({ length: CURRENT_YEAR - MIN_YEAR + 1 }, (_, i) => CURRENT_YEAR - i)
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1)
+// 改元がある年は複数の元号にまたがるため、該当する元号をすべて列挙する（例: 1989年 → "昭和64年/平成元年"）
+const ERA_OPTIONS = buildEraOptions(MIN_YEAR, CURRENT_YEAR)
+
+function eraLabelForYear(year: number): string {
+    return ERA_OPTIONS.filter((o) => o.westernYear === year)
+        .map((o) => `${o.era}${formatEraYear(o.eraYear)}`)
+        .join('/')
+}
 
 export function AgeCalculatorDialog({ open, onClose, onConfirm, baseDate }: AgeCalculatorDialogProps) {
     const [birthYear, setBirthYear] = useState('')
@@ -91,7 +91,16 @@ export function AgeCalculatorDialog({ open, onClose, onConfirm, baseDate }: AgeC
             ? `${birthYear}-${birthMonth.padStart(2, '0')}-${effectiveDay.padStart(2, '0')}`
             : ''
 
-    const japaneseEra = yearNum ? toJapaneseEra(yearNum) : ''
+    // 年月日まで確定していれば正確な単一の元号を、年のみなら改元年を考慮した候補（複数の場合あり）を表示する
+    const japaneseEra = birthISO
+        ? (() => {
+              // new Date(文字列)はUTC解釈されるため、lib/era.tsと同じくnew Date(年,月-1,日)のローカル解釈で統一する
+              const { era, eraYear } = getEraParts(new Date(yearNum, monthNum - 1, dayNum))
+              return `${era}${formatEraYear(eraYear)}`
+          })()
+        : yearNum
+          ? eraLabelForYear(yearNum)
+          : ''
     const age = calcAge(birthISO, base)
 
     const selectStyle: React.CSSProperties = {
@@ -155,42 +164,44 @@ export function AgeCalculatorDialog({ open, onClose, onConfirm, baseDate }: AgeC
                 {/* 生年月日 — 年・月・日セレクト */}
                 <div className="mb-5">
                     <label className="brand-label">生年月日</label>
-                    <div className="flex items-center gap-2">
-                        {/* 年 */}
+                    <div className="flex flex-col gap-2">
+                        {/* 年（改元年は元号を併記するため単独行で幅を確保する） */}
                         <select
                             value={birthYear}
                             onChange={(e) => setBirthYear(e.target.value)}
-                            style={{ ...selectStyle, flex: '3' }}
+                            style={selectStyle}
                         >
-                            <option value="">年</option>
+                            <option value="">年を選択</option>
                             {YEARS.map((y) => (
                                 <option key={y} value={String(y)}>
-                                    {y}年（{toJapaneseEra(y)}）
+                                    {y}年（{eraLabelForYear(y)}）
                                 </option>
                             ))}
                         </select>
-                        {/* 月 */}
-                        <select
-                            value={birthMonth}
-                            onChange={(e) => setBirthMonth(e.target.value)}
-                            style={{ ...selectStyle, flex: '2' }}
-                        >
-                            <option value="">月</option>
-                            {MONTHS.map((m) => (
-                                <option key={m} value={String(m)}>{m}月</option>
-                            ))}
-                        </select>
-                        {/* 日 */}
-                        <select
-                            value={effectiveDay}
-                            onChange={(e) => setBirthDay(e.target.value)}
-                            style={{ ...selectStyle, flex: '2' }}
-                        >
-                            <option value="">日</option>
-                            {days.map((d) => (
-                                <option key={d} value={String(d)}>{d}日</option>
-                            ))}
-                        </select>
+                        <div className="flex items-center gap-2">
+                            {/* 月 */}
+                            <select
+                                value={birthMonth}
+                                onChange={(e) => setBirthMonth(e.target.value)}
+                                style={{ ...selectStyle, flex: '1' }}
+                            >
+                                <option value="">月</option>
+                                {MONTHS.map((m) => (
+                                    <option key={m} value={String(m)}>{m}月</option>
+                                ))}
+                            </select>
+                            {/* 日 */}
+                            <select
+                                value={effectiveDay}
+                                onChange={(e) => setBirthDay(e.target.value)}
+                                style={{ ...selectStyle, flex: '1' }}
+                            >
+                                <option value="">日</option>
+                                {days.map((d) => (
+                                    <option key={d} value={String(d)}>{d}日</option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
                     {/* 和暦表示 */}
                     {japaneseEra && (

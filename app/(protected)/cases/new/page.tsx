@@ -96,23 +96,38 @@ export default function NewCustomerPage() {
                         {activeTab === 'membership3' && <Membership3Tab />}
                     </div>
 
-                    {/* 操作ボタン: 登録=左、閉じる=右 */}
+                    {/* 操作ボタン: 登録=左、閉じる=右（見積書作成画面のデザインを踏襲） */}
                     <div className="sticky bottom-0 flex justify-between gap-4 border-t border-gray-300 bg-white px-8 py-6">
                         <button
                             type="submit"
                             disabled={createMutation.isPending}
-                            className={`rounded px-6 py-3 text-white ${
-                                createMutation.isPending
-                                    ? 'cursor-not-allowed bg-gray-300'
-                                    : 'cursor-pointer bg-green-600 hover:bg-green-700'
-                            }`}
+                            className="font-mincho text-white transition-colors"
+                            style={{
+                                padding: '12px 48px',
+                                backgroundColor: createMutation.isPending ? '#7a7a7a' : 'var(--brand-navy)',
+                                border: 'none',
+                                fontSize: '15px',
+                                letterSpacing: '0.4em',
+                                fontWeight: 500,
+                                cursor: createMutation.isPending ? 'not-allowed' : 'pointer',
+                                boxShadow: '0 2px 4px rgba(1, 8, 62, 0.15)',
+                            }}
                         >
-                            {createMutation.isPending ? '登録中...' : '登録'}
+                            {createMutation.isPending ? '登録中…' : '登　録'}
                         </button>
                         <button
                             type="button"
                             onClick={() => router.back()}
-                            className="cursor-pointer rounded bg-gray-500 px-6 py-3 text-white hover:bg-gray-600"
+                            className="font-mincho px-8 py-3 transition-colors"
+                            style={{
+                                backgroundColor: '#ffffff',
+                                color: 'var(--brand-text-muted)',
+                                border: '1px solid var(--brand-border)',
+                                fontSize: '15px',
+                                letterSpacing: '0.25em',
+                                fontWeight: 500,
+                                cursor: 'pointer',
+                            }}
                         >
                             閉じる
                         </button>

@@ -48,7 +48,8 @@ function ResponsiveActionLabel({ label }: { label: string }) {
 }
 
 // 操作ボタンのサイズ: タブレット幅ではコンパクトに、PC(lg以上)では現状のサイズを維持
-const CASE_ROW_BTN_SIZE_CLASSES = 'px-2.5 py-3 text-[13px] min-w-[80px] lg:px-[18px] lg:py-2 lg:text-sm lg:min-w-[110px]'
+const CASE_ROW_BTN_SIZE_CLASSES =
+    'px-2.5 py-3 text-[13px] min-w-[80px] lg:px-[18px] lg:py-2 lg:text-sm lg:min-w-[110px]'
 
 export default function CasesPage() {
     const router = useRouter()
@@ -103,7 +104,6 @@ export default function CasesPage() {
             }
         }
     }
-
 
     const handlePaymentClick = (customer: CustomerListItem) => {
         if (!customer.invoiceId) return
@@ -210,8 +210,7 @@ export default function CasesPage() {
                             activeQuickFilter === 'NONE'
                                 ? '1px solid var(--brand-text)'
                                 : '1px dashed var(--brand-border)',
-                        backgroundColor:
-                            activeQuickFilter === 'NONE' ? 'var(--brand-text)' : '#ffffff',
+                        backgroundColor: activeQuickFilter === 'NONE' ? 'var(--brand-text)' : '#ffffff',
                         color: activeQuickFilter === 'NONE' ? '#ffffff' : 'var(--brand-text-muted)',
                     }}
                 >
@@ -228,8 +227,7 @@ export default function CasesPage() {
                             activeQuickFilter === 'DRAFT'
                                 ? '1px solid var(--brand-navy)'
                                 : '1px solid var(--brand-navy-light)',
-                        backgroundColor:
-                            activeQuickFilter === 'DRAFT' ? 'var(--brand-navy)' : '#ffffff',
+                        backgroundColor: activeQuickFilter === 'DRAFT' ? 'var(--brand-navy)' : '#ffffff',
                         color: activeQuickFilter === 'DRAFT' ? '#ffffff' : 'var(--brand-navy)',
                     }}
                 >
@@ -246,10 +244,8 @@ export default function CasesPage() {
                             activeQuickFilter === 'CONFIRMED'
                                 ? '1px solid var(--brand-gold)'
                                 : '1px solid var(--brand-gold-light)',
-                        backgroundColor:
-                            activeQuickFilter === 'CONFIRMED' ? 'var(--brand-gold)' : '#ffffff',
-                        color:
-                            activeQuickFilter === 'CONFIRMED' ? 'var(--brand-navy-dark)' : 'var(--brand-gold-soft)',
+                        backgroundColor: activeQuickFilter === 'CONFIRMED' ? 'var(--brand-gold)' : '#ffffff',
+                        color: activeQuickFilter === 'CONFIRMED' ? 'var(--brand-navy-dark)' : 'var(--brand-gold-soft)',
                     }}
                 >
                     本見積
@@ -271,7 +267,9 @@ export default function CasesPage() {
                             width: '120px',
                             sortable: true,
                             sortValue: (item) => (item.receptionAt ? new Date(item.receptionAt).getTime() : null),
-                            render: (item) => <span style={{ whiteSpace: 'nowrap' }}>{formatDate(item.receptionAt)}</span>,
+                            render: (item) => (
+                                <span style={{ whiteSpace: 'nowrap' }}>{formatDate(item.receptionAt)}</span>
+                            ),
                         },
                         {
                             key: 'deceasedName',
@@ -291,7 +289,11 @@ export default function CasesPage() {
                             const base: React.CSSProperties = {
                                 letterSpacing: '0.12em',
                                 fontWeight: 500,
-                                border: '1px solid transparent',
+                                // variantごとにborderColor/borderStyleだけを上書きするため、
+                                // shorthand(border)とlonghandの混在を避けて個別プロパティで指定する
+                                borderWidth: '1px',
+                                borderStyle: 'solid',
+                                borderColor: 'transparent',
                                 transition: 'all 0.15s ease',
                                 cursor: disabled ? 'not-allowed' : 'pointer',
                                 display: 'inline-flex',
@@ -379,16 +381,8 @@ export default function CasesPage() {
 
                         // 見積書: 本見積あり → gold、事前相談見積のみ → done、未作成 → primary
                         const hasFormalEst = item.estimateType === 'FORMAL'
-                        const estVariant: Variant = !hasEst
-                            ? 'primary'
-                            : hasFormalEst
-                              ? 'gold'
-                              : 'done'
-                        const estLabel = !hasEst
-                            ? '見積書作成'
-                            : hasFormalEst
-                              ? '本見積編集'
-                              : '事前相談見積'
+                        const estVariant: Variant = !hasEst ? 'primary' : hasFormalEst ? 'gold' : 'done'
+                        const estLabel = !hasEst ? '見積書作成' : hasFormalEst ? '本見積編集' : '事前相談見積'
 
                         // 請求書: 本見積なし → disabled、請求書なし → primary(次ステップ)、あり → done
                         const invDisabled = !hasFormalEst
@@ -469,9 +463,18 @@ export default function CasesPage() {
                                             router.push(`/invoices/${item.invoiceId}`)
                                             return
                                         }
+                                        if (
+                                            !confirm(
+                                                '請求書を作成します。\n請求書を作成すると見積書が変更不可となります。\nよろしいですか？'
+                                            )
+                                        )
+                                            return
                                         setCreatingInvoiceForId(item.id)
                                         try {
-                                            const newInvoice = await createInvoiceFromEstimate(item.id, item.estimateId!)
+                                            const newInvoice = await createInvoiceFromEstimate(
+                                                item.id,
+                                                item.estimateId!
+                                            )
                                             toast({ title: '請求書を作成しました', variant: 'success', duration: 2000 })
                                             queryClient.invalidateQueries({ queryKey: ['customers'] })
                                             router.push(`/invoices/${newInvoice.id}`)
@@ -663,9 +666,7 @@ export default function CasesPage() {
                                 className="font-mincho transition-colors text-white"
                                 style={{
                                     padding: '12px 32px',
-                                    backgroundColor: paymentDialog.isPaid
-                                        ? 'var(--brand-red)'
-                                        : 'var(--brand-navy)',
+                                    backgroundColor: paymentDialog.isPaid ? 'var(--brand-red)' : 'var(--brand-navy)',
                                     border: 'none',
                                     fontSize: '15px',
                                     letterSpacing: '0.3em',
