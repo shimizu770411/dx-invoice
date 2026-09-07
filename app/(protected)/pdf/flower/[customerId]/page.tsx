@@ -296,6 +296,21 @@ export default function FlowerPdfPage() {
                                                         ¥{tax.toLocaleString()}
                                                     </td>
                                                 </tr>
+                                                <tr>
+                                                    <th className="border border-l-0 border-black py-1 text-center">
+                                                        <div className="mx-auto flex w-[6rem] justify-between">
+                                                            {'合計'.split('').map((char, i) => (
+                                                                <span key={i} className="text-center">
+                                                                    {char}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    </th>
+                                                    <td className="border border-black py-1 text-center">&nbsp;</td>
+                                                    <td className="border border-black px-2 py-1 text-right">
+                                                        ¥{totalWithTax.toLocaleString()}
+                                                    </td>
+                                                </tr>
                                             </tfoot>
                                         </table>
                                     </div>
