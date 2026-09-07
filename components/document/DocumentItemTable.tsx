@@ -77,6 +77,7 @@ type DocumentItem = {
         variants?: ProductVariant[]
         isSetParent?: boolean
         isSetChild?: boolean
+        isPlanForcedSet?: boolean
         serviceableScope?: 'NONE' | 'MEMBER_ONLY' | 'GENERAL_ONLY' | 'BOTH'
         setableScope?: 'NONE' | 'MEMBER_ONLY' | 'GENERAL_ONLY' | 'BOTH'
         isMaturityServiceable?: boolean
@@ -502,7 +503,8 @@ export function DocumentItemTable({
             return true
         }
         // 子セット品: 選択中親祭壇に紐づくもののみ表示
-        if (pi.isSetChild) {
+        // (プラン設定で疑似セット子化された一般商品(isPlanForcedSet)は親子セット関係を持たないため対象外)
+        if (pi.isSetChild && !pi.isPlanForcedSet) {
             return selectedParentChildIds.has(String(item.productItemId))
         }
         // 一般商品: 常に表示
@@ -559,13 +561,22 @@ export function DocumentItemTable({
                                         (adhocScope === 'MEMBER_ONLY' && isMember) ||
                                         (adhocScope === 'GENERAL_ONLY' && !isMember)
                                     )
+                                // 複数行構成商品(車種行+距離加算行等)は、固定料金の加算行のみセット対象とする
+                                const isMultiRowFixedSetIncluded =
+                                    !!(
+                                        isChild &&
+                                        item?.productRowId &&
+                                        item?.calcType === 'FIXED' &&
+                                        (item?.sign ?? 1) === 1 &&
+                                        scopeApplies(item?.productItem?.setableScope, isMember)
+                                    )
                                 // 子商品 + 初期セット種類 + setableScope が現在モードに適用: セット扱い
                                 const isSetIncluded =
                                     !!(
                                         isChild &&
                                         item?.productVariant?.isDefaultSet &&
                                         scopeApplies(item?.productItem?.setableScope, isMember)
-                                    ) || isAdhocSetIncluded
+                                    ) || isMultiRowFixedSetIncluded || isAdhocSetIncluded
                                 // サービス品フラグON + serviceableScope が現在モードに適用: サービス扱い
                                 const isServiceIncluded = !!(
                                     item?.isService &&
@@ -658,6 +669,7 @@ export function DocumentItemTable({
                                                                 items.forEach((it, i) => {
                                                                     if (
                                                                         it?.productItem?.isSetChild &&
+                                                                        !it?.productItem?.isPlanForcedSet &&
                                                                         childIds.has(String(it.productItemId))
                                                                     ) {
                                                                         childIndexes.push(i)

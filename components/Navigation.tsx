@@ -14,6 +14,7 @@ export default function Navigation() {
     const navItems = [
         { href: '/cases', label: '案件一覧' },
         ...(currentUser?.isAdmin ? [{ href: '/products', label: '商品' }] : []),
+        ...(currentUser?.isAdmin ? [{ href: '/plans', label: 'プラン' }] : []),
         ...(currentUser?.isAdmin ? [{ href: '/stores', label: '店舗' }] : []),
         { href: '/users', label: '社員' },
         ...(currentUser?.isAdmin ? [{ href: '/company', label: '設定' }] : []),
@@ -23,6 +24,7 @@ export default function Navigation() {
     const isActive = (href: string) => {
         if (href === '/cases') return pathname === '/cases' || pathname?.startsWith('/cases/')
         if (href === '/products') return pathname === '/products' || pathname?.startsWith('/products/')
+        if (href === '/plans') return pathname === '/plans' || pathname?.startsWith('/plans/')
         if (href === '/stores') return pathname === '/stores' || pathname?.startsWith('/stores/')
         if (href === '/users') return pathname === '/users' || pathname?.startsWith('/users/')
         if (href === '/company') return pathname === '/company' || pathname?.startsWith('/company/')

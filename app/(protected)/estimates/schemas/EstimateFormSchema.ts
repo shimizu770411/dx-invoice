@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { documentItemFieldSchema, documentFreeItemFieldSchema } from '@/lib/documentSchema'
 import { isValidDocNo } from '@/lib/documentUtils'
+import { BASE_PLAN_ID } from '@/lib/plans'
 
 export const estimateItemFieldSchema = documentItemFieldSchema
 export const estimateFreeItemFieldSchema = documentFreeItemFieldSchema
@@ -14,6 +15,7 @@ const docNoSchema = z
 
 export const estimateFormSchema = z.object({
     docNo: docNoSchema,
+    planId: z.string(),
     status: z.string(),
     isMember: z.string(),
     cremationProcessType: z.string(),
@@ -41,6 +43,7 @@ export type EstimateFormData = z.infer<typeof estimateFormSchema>
 
 export const DEFAULT_FORM_VALUES: EstimateFormData = {
     docNo: '',
+    planId: BASE_PLAN_ID,
     status: 'DRAFT',
     isMember: 'true',
     cremationProcessType: '',

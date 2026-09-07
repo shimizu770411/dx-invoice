@@ -38,7 +38,16 @@ export function calculateDocumentFormTotals(
         const qty = itemFields?.[i]?.qty ?? item.qty
         const pi = item?.productItem
         const pv = item?.productVariant
-        const isSetIncluded = pi?.isSetChild && pv?.isDefaultSet && scopeApplies(pi?.setableScope, isMember)
+        // 複数行構成商品(車種行+距離加算行等)は、固定料金の加算行のみセット対象とする
+        const isMultiRowFixedSetIncluded =
+            pi?.isSetChild &&
+            !!item?.productRowId &&
+            item?.calcType === 'FIXED' &&
+            (item?.sign ?? 1) === 1 &&
+            scopeApplies(pi?.setableScope, isMember)
+        const isSetIncluded =
+            (pi?.isSetChild && pv?.isDefaultSet && scopeApplies(pi?.setableScope, isMember)) ||
+            isMultiRowFixedSetIncluded
         const isServiceIncluded = item?.isService && scopeApplies(pi?.serviceableScope, isMember)
         const isMaturityServiceIncluded = item?.isMaturityService && pi?.isMaturityServiceable
         const adhocScope = item?.adhocSetScope

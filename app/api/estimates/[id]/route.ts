@@ -195,6 +195,7 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
             const savedEstimate = await tx.estimate.update({
                 where: { id: BigInt(id) },
                 data: {
+                    planId: data.planId ? BigInt(data.planId) : undefined,
                     docNo: data.docNo || null,
                     status: data.status,
                     isMember: data.isMember === true || data.isMember === 'true',

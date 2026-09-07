@@ -49,6 +49,7 @@ export interface InvoiceItem {
 export interface Invoice {
     id: string
     customerId: string
+    planId: string
     docNo?: string
     status: string
     subtotal: number

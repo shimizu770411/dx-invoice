@@ -42,6 +42,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
             const created = await tx.estimate.create({
                 data: {
                     customerId: source.customerId,
+                    planId: source.planId,
                     docNo: null, // 本見積の docNo は別途採番
                     status: 'DRAFT',
                     estimateType: 'FORMAL',

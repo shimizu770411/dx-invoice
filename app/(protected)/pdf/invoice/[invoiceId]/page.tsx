@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { getInvoice } from '@/lib/invoices'
 import { getProducts } from '@/lib/products'
+import { getProductPlanSettings, applyPlanOverrides, BASE_PLAN_ID } from '@/lib/plans'
 import { CreateButton } from '@/components/button/CreateButton'
 import { ResetButton } from '@/components/button/ResetButton'
 import { toast } from '@/hooks/use-toast'
@@ -28,8 +29,38 @@ export default function InvoicePdfPage() {
     const loadData = async () => {
         try {
             const [invoiceData, productsData] = await Promise.all([getInvoice(invoiceId), getProducts()])
-            setInvoice(invoiceData)
-            setProducts(productsData)
+
+            // プラン別商品設定の内容を商品情報に反映する。取得に失敗しても
+            // PDF自体は元データのまま表示できるよう、ここだけ個別にフォールバックする。
+            let overriddenProducts = productsData
+            try {
+                const planId = (invoiceData as any).planId || BASE_PLAN_ID
+                const planSettings = await getProductPlanSettings(planId)
+                overriddenProducts = applyPlanOverrides(productsData, planSettings)
+            } catch (planError) {
+                console.error('Failed to apply plan overrides:', planError)
+            }
+
+            const overriddenProductMap = new Map(overriddenProducts.map((p) => [p.id, p]))
+            const patchedInvoice = {
+                ...invoiceData,
+                items: (invoiceData.items || []).map((item: any) => {
+                    const overridden = item.productItemId ? overriddenProductMap.get(item.productItemId) : undefined
+                    if (!overridden) return item
+                    // productItem.variants内のisDefaultSet上書きは、明細行が選択中の productVariant 自体にも反映する必要がある
+                    const overriddenVariant = item.productVariantId
+                        ? overridden.variants?.find((v: any) => v.id === item.productVariantId)
+                        : undefined
+                    return {
+                        ...item,
+                        productItem: overridden,
+                        productVariant: overriddenVariant ?? item.productVariant,
+                    }
+                }),
+            }
+
+            setInvoice(patchedInvoice)
+            setProducts(overriddenProducts)
         } catch (error) {
             console.error('Failed to load data:', error)
         } finally {

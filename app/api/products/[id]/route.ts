@@ -94,9 +94,22 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
             updateData.defaultDescription = body.defaultDescription || null
 
         // ProductItem 自体の更新（明細行のリレーション処理は別途）
-        await prisma.productItem.update({
-            where: { id: BigInt(params.id) },
-            data: updateData,
+        // セット親/セット子から一般商品に変更された場合、この商品が関わる親子紐付けは無効になるため合わせて削除する
+        await prisma.$transaction(async (tx) => {
+            await tx.productItem.update({
+                where: { id: BigInt(params.id) },
+                data: updateData,
+            })
+            if (body.isSetChild !== undefined && !Boolean(body.isSetChild)) {
+                await tx.productSet.deleteMany({
+                    where: { childId: BigInt(params.id) },
+                })
+            }
+            if (body.isSetParent !== undefined && !Boolean(body.isSetParent)) {
+                await tx.productSet.deleteMany({
+                    where: { parentId: BigInt(params.id) },
+                })
+            }
         })
 
         // 明細行構成（複数行構成商品時のみ）: body.rows があれば全置換

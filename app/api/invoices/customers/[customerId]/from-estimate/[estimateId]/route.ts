@@ -72,6 +72,7 @@ export async function POST(
         const invoice = await prisma.invoice.create({
             data: {
                 customerId: estimate.customerId,
+                planId: estimate.planId,
                 docNo: autoDocNo,
                 status: 'DRAFT',
                 isMember: estimate.isMember,

@@ -43,6 +43,7 @@ export interface EstimateItem {
 export interface Estimate {
     id: string
     customerId: string
+    planId: string
     docNo?: string
     status: string
     estimateType: 'PRE_CONSULTATION' | 'FORMAL'

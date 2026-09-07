@@ -258,11 +258,50 @@ model ProductItem {
   setChildLinks  ProductSet[] @relation("SetChild")
   estimateFreeRows EstimateItemFree[] @relation("EstimateFreeRowOfProduct")
   invoiceFreeRows  InvoiceItemFree[]  @relation("InvoiceFreeRowOfProduct")
+  planSettings     ProductPlanSetting[]
 
   @@index([sortNo])
   @@index([isSetParent])
   @@index([isSetChild])
   @@map("product_items")
+}
+
+model Plan {
+  id        BigInt   @id @default(autoincrement())
+  name      String   @db.VarChar(120)
+  sortNo    Int      @default(0) @map("sort_no")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @db.Timestamptz(6) @map("created_at")
+  updatedAt DateTime @updatedAt @db.Timestamptz(6) @map("updated_at")
+
+  productSettings ProductPlanSetting[]
+  estimates       Estimate[]
+  invoices        Invoice[]
+
+  @@index([sortNo])
+  @@map("plans")
+}
+
+// 商品×プランの上書き設定。レコードが無い組み合わせは ProductItem 本来の値を継承する。
+model ProductPlanSetting {
+  id            BigInt     @id @default(autoincrement())
+  planId        BigInt     @map("plan_id")
+  productItemId BigInt     @map("product_item_id")
+  isVisible     Boolean    @default(true) @map("is_visible")
+  // このプランでの「セット可否（初期セット品の0円扱いの適用範囲）」上書き。null=商品マスタ本来のsetableScopeを継承
+  setableScope  AppliesTo? @map("setable_scope")
+  // 一般商品専用: このプランで「初期セット品（0円になる種類）」として扱うバリアントの指定（1商品につき1件のみ）。
+  // null=商品マスタ本来のisDefaultSet設定のまま（セット子商品は元々ここで設定済みのため対象外）
+  overrideDefaultVariantId BigInt? @map("override_default_variant_id")
+  createdAt     DateTime   @default(now()) @db.Timestamptz(6) @map("created_at")
+  updatedAt     DateTime   @updatedAt @db.Timestamptz(6) @map("updated_at")
+
+  plan                   Plan            @relation(fields: [planId], references: [id], onDelete: Cascade)
+  productItem            ProductItem     @relation(fields: [productItemId], references: [id], onDelete: Cascade)
+  overrideDefaultVariant ProductVariant? @relation(fields: [overrideDefaultVariantId], references: [id], onDelete: SetNull)
+
+  @@unique([planId, productItemId])
+  @@map("product_plan_settings")
 }
 
 model ProductVariantGroup {
@@ -375,6 +414,7 @@ model ProductVariant {
   group        ProductVariantGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
   estimateItems EstimateItem[]
   invoiceItems  InvoiceItem[]
+  planSettingsAsDefault ProductPlanSetting[]
 
   @@index([storeId])
   @@index([productItemId, isDefaultSet])
@@ -400,6 +440,7 @@ model Store {
 model Estimate {
   id                  BigInt              @id @default(autoincrement())
   customerId          BigInt              @map("customer_id")
+  planId              BigInt              @default(1) @map("plan_id")
   docNo               String?              @unique @db.VarChar(30) @map("doc_no")
   status              DocumentStatus       @default(DRAFT)
   estimateType        EstimateType         @default(PRE_CONSULTATION) @map("estimate_type")
@@ -426,6 +467,7 @@ model Estimate {
   updatedAt           DateTime            @updatedAt @db.Timestamptz(6) @map("updated_at")
 
   customer            Customer            @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  plan                Plan                @relation(fields: [planId], references: [id])
   items               EstimateItem[]
   invoices            Invoice[]
 
@@ -487,6 +529,7 @@ model EstimateItemFree {
 model Invoice {
   id                  BigInt              @id @default(autoincrement())
   customerId          BigInt              @map("customer_id")
+  planId              BigInt              @default(1) @map("plan_id")
   docNo               String?              @unique @db.VarChar(30) @map("doc_no")
   status              DocumentStatus       @default(DRAFT)
   isMember            Boolean              @default(false) @map("is_member")
@@ -518,6 +561,7 @@ model Invoice {
   updatedAt           DateTime            @updatedAt @db.Timestamptz(6) @map("updated_at")
 
   customer            Customer            @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  plan                Plan                @relation(fields: [planId], references: [id])
   fromEstimate        Estimate?           @relation(fields: [fromEstimateId], references: [id])
   items               InvoiceItem[]
   payments            Payment[]

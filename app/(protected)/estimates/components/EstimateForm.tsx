@@ -7,8 +7,9 @@ import { useForm, FormProvider, useFieldArray, useWatch, UseFormReturn } from 'r
 import { zodResolver } from '@hookform/resolvers/zod'
 import { estimateFormSchema, EstimateFormData, DEFAULT_FORM_VALUES } from '../schemas/EstimateFormSchema'
 import { useEstimateCreate, useEstimateEdit, calculateTotals } from '../hooks/useEstimateForm'
+import { useQuery } from '@tanstack/react-query'
+import { getAllPlans } from '@/lib/plans'
 import { EstimateItemTable } from './EstimateItemTable'
-import { EstimateItemWizard } from './EstimateItemWizard'
 import { EstimateOtherFields } from './EstimateOtherFields'
 import { EstimateCustomerSummary } from './EstimateCustomerSummary'
 import { EstimateBasicInfo } from './EstimateBasicInfo'
@@ -16,8 +17,6 @@ import { ProductVariant } from '@/lib/products'
 import { resolveUnitPriceMember } from '@/lib/itemPricing'
 import { confirmEstimate } from '@/lib/estimates'
 import { toast } from '@/hooks/use-toast'
-import { PdfExportDialog } from '@/components/document/PdfExportDialog'
-import { usePdfExportTrigger } from '@/hooks/usePdfExportTrigger'
 
 interface Estimate {
     id: string
@@ -34,6 +33,12 @@ interface ContentProps {
     items: any[]
     setItems: React.Dispatch<React.SetStateAction<any[]>>
     freeItems: any[]
+    planId: string
+    handlePlanChange: (
+        newPlanId: string,
+        currentFormItems: { qty?: number; description?: string }[] | undefined,
+        isMember: boolean
+    ) => Promise<any[] | null>
     onSubmit: (data: EstimateFormData) => Promise<void>
     methods: UseFormReturn<EstimateFormData>
 }
@@ -49,26 +54,30 @@ function LoadingState() {
     )
 }
 
-function EstimateFormContent({ mode, customer, estimate, items, setItems, freeItems, onSubmit, methods }: ContentProps) {
+function EstimateFormContent({ mode, customer, estimate, items, setItems, freeItems, planId, handlePlanChange, onSubmit, methods }: ContentProps) {
     const router = useRouter()
     const queryClient = useQueryClient()
     const {
         control,
         handleSubmit,
         setValue,
+        getValues,
         formState: { isSubmitting, isDirty, errors },
     } = methods
 
-    const { fields: itemFields } = useFieldArray({ control, name: 'items' })
+    const { fields: itemFields, replace: replaceItemFields } = useFieldArray({ control, name: 'items' })
     const { fields: freeItemFields } = useFieldArray({ control, name: 'freeItems' })
 
+    const { data: allPlans = [] } = useQuery({ queryKey: ['plans', 'all'], queryFn: () => getAllPlans() })
+    // 選択肢は原則アクティブなプランのみ。ただし編集中の見積が既に非表示プランを参照している場合はそれも残す。
+    const plans = allPlans.filter((p) => p.isActive || p.id === planId)
+    const [planChanging, setPlanChanging] = useState(false)
+
     const [activeTab, setActiveTab] = useState<'items' | 'other'>('items')
-    const [itemsViewMode, setItemsViewMode] = useState<'list' | 'card'>('list')
+    const itemsViewMode: 'list' | 'card' = 'list'
     const [isConfirmed, setIsConfirmed] = useState(false)
     const [isConfirming, setIsConfirming] = useState(false)
-    const { pdfDialogOpen, setPdfDialogOpen, handlePdfClick } = usePdfExportTrigger(
-        estimate ? `/api/pdf/estimate/${estimate.id}` : null
-    )
+    const [showSelectedOptions, setShowSelectedOptions] = useState(false)
 
     // 画面下部固定フッターの高さぶんコンテンツに余白を確保する（タブレット幅ではボタンが折り返してフッターが高くなるため、固定値ではなく実測値を使う）
     const footerRef = useRef<HTMLDivElement>(null)
@@ -97,6 +106,22 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
     // 事前相談見積（本見積作成済み）、または請求書作成済みの本見積は編集不可にする
     const isLocked =
         mode === 'edit' && (isConfirmed || (estimate?.estimateType === 'FORMAL' && !!estimate?.hasInvoice))
+
+    const handlePlanSelectChange = async (newPlanId: string) => {
+        if (newPlanId === planId || planChanging) return
+        setPlanChanging(true)
+        try {
+            const rebuilt = await handlePlanChange(newPlanId, getValues('items'), watchedIsMember === 'true')
+            if (rebuilt) {
+                setValue('planId', newPlanId, { shouldDirty: true })
+                replaceItemFields(
+                    rebuilt.map((item: any) => ({ qty: item.qty, description: item.description || '' }))
+                )
+            }
+        } finally {
+            setPlanChanging(false)
+        }
+    }
 
     const handleVariantChange = (
         index: number,
@@ -327,28 +352,6 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
         ? '見積書 作成'
         : estimate?.estimateType === 'FORMAL' ? '本見積 編集' : '事前相談見積 編集'
 
-    // 折り返し時にPDFプレビューボタンと切り離れないよう、まとめて配置する
-    const closeButton = (
-        <button
-            type="button"
-            onClick={() => { router.push('/cases'); router.refresh() }}
-            className="font-mincho transition-colors px-8 py-3"
-            style={{
-                backgroundColor: '#ffffff',
-                color: 'var(--brand-text-muted)',
-                border: '1px solid var(--brand-border)',
-                fontSize: '15px',
-                letterSpacing: '0.25em',
-                fontWeight: 500,
-                cursor: 'pointer',
-            }}
-        >
-            閉じる
-        </button>
-    )
-
-    const showTotals = itemsViewMode === 'list' || isLocked
-
     return (
         <FormProvider {...methods}>
             <form
@@ -400,6 +403,43 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
 
                 <EstimateCustomerSummary customer={customer} />
 
+                {/* プラン選択 */}
+                <div className="mb-6 flex items-center gap-3">
+                    <span
+                        className="font-garamond"
+                        style={{ fontSize: '11px', color: 'var(--brand-gold-soft)', letterSpacing: '0.3em' }}
+                    >
+                        PLAN
+                    </span>
+                    <select
+                        value={planId}
+                        disabled={isLocked || planChanging}
+                        onChange={(e) => handlePlanSelectChange(e.target.value)}
+                        className="font-mincho"
+                        style={{
+                            padding: '10px 14px',
+                            border: '1px solid var(--brand-input-border)',
+                            backgroundColor: isLocked ? '#eee' : 'var(--brand-ivory-light)',
+                            fontSize: '14px',
+                            minWidth: '220px',
+                        }}
+                    >
+                        {plans.map((p) => (
+                            <option key={p.id} value={p.id}>
+                                {p.name}
+                            </option>
+                        ))}
+                    </select>
+                    {planChanging && (
+                        <span
+                            className="font-mincho"
+                            style={{ fontSize: '12px', color: 'var(--brand-text-muted)' }}
+                        >
+                            切替中…
+                        </span>
+                    )}
+                </div>
+
                 {/* タブ */}
                 <div className="flex" style={{ borderBottom: '2px solid var(--brand-border)', backgroundColor: '#fbfaf7' }}>
                     <button type="button" onClick={() => setActiveTab('items')} style={tabStyle(activeTab === 'items')}>明　細</button>
@@ -425,74 +465,20 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                                     </p>
                                 )}
 
-                                {!isLocked && (
-                                    <div className="mb-5 flex items-center gap-1">
-                                        <span className="font-garamond mr-3" style={{ fontSize: '11px', color: 'var(--brand-gold-soft)', letterSpacing: '0.3em' }}>
-                                            MODE
-                                        </span>
-                                        {([
-                                            { value: 'list', label: '一覧から登録', disabled: false },
-                                            // カード型UIは実装方針検討中のため一時非活性（方針決定後に解除）
-                                            { value: 'card', label: 'カード型で順番に選択', disabled: true },
-                                        ] as const).map((opt) => {
-                                            const active = itemsViewMode === opt.value
-                                            return (
-                                                <button
-                                                    key={opt.value}
-                                                    type="button"
-                                                    disabled={opt.disabled}
-                                                    onClick={() => setItemsViewMode(opt.value)}
-                                                    className="font-mincho transition-colors"
-                                                    title={opt.disabled ? '実装検討中のため現在使用できません' : undefined}
-                                                    style={{
-                                                        padding: '8px 20px',
-                                                        fontSize: '13px',
-                                                        fontWeight: active ? 600 : 500,
-                                                        letterSpacing: '0.15em',
-                                                        backgroundColor: active ? 'var(--brand-navy)' : '#ffffff',
-                                                        color: opt.disabled ? 'var(--brand-border)' : active ? '#ffffff' : 'var(--brand-text-muted)',
-                                                        border: active ? '1px solid var(--brand-navy)' : '1px solid var(--brand-border)',
-                                                        cursor: opt.disabled ? 'not-allowed' : 'pointer',
-                                                    }}
-                                                >
-                                                    {opt.label}
-                                                </button>
-                                            )
-                                        })}
-                                    </div>
-                                )}
-
-                                {itemsViewMode === 'list' || isLocked ? (
-                                    <EstimateItemTable
-                                        items={items}
-                                        fields={itemFields}
-                                        control={control}
-                                        isMember={watchedIsMember === 'true'}
-                                        freeItems={freeItems}
-                                        freeFields={freeItemFields}
-                                        onVariantChange={handleVariantChange}
-                                        onMultiSelectChange={handleMultiSelectChange}
-                                        onGroupVariantChange={handleGroupVariantChange}
-                                        setValue={setValue}
-                                        readOnly={isLocked}
-                                        currentStoreId={customer?.storeId ? String(customer.storeId) : null}
-                                    />
-                                ) : (
-                                    <EstimateItemWizard
-                                        items={items}
-                                        fields={itemFields}
-                                        control={control}
-                                        isMember={watchedIsMember === 'true'}
-                                        totals={totals}
-                                        onVariantChange={handleVariantChange}
-                                        onMultiSelectChange={handleMultiSelectChange}
-                                        onGroupVariantChange={handleGroupVariantChange}
-                                        setValue={setValue}
-                                        freeItems={freeItems}
-                                        freeFields={freeItemFields}
-                                        currentStoreId={customer?.storeId ? String(customer.storeId) : null}
-                                    />
-                                )}
+                                <EstimateItemTable
+                                    items={items}
+                                    fields={itemFields}
+                                    control={control}
+                                    isMember={watchedIsMember === 'true'}
+                                    freeItems={freeItems}
+                                    freeFields={freeItemFields}
+                                    onVariantChange={handleVariantChange}
+                                    onMultiSelectChange={handleMultiSelectChange}
+                                    onGroupVariantChange={handleGroupVariantChange}
+                                    setValue={setValue}
+                                    readOnly={isLocked}
+                                    currentStoreId={customer?.storeId ? String(customer.storeId) : null}
+                                />
                             </>
                         )}
                         {activeTab === 'other' && (
@@ -504,7 +490,7 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                 {/* 操作ボタン & 合計（画面下部固定） */}
                 <div
                     ref={footerRef}
-                    className="fixed bottom-0 left-0 right-0 flex flex-wrap items-center justify-between gap-3 px-10 py-3 lg:gap-6"
+                    className="fixed bottom-0 left-0 right-0 flex items-center justify-between gap-6 px-10 py-3"
                     style={{
                         backgroundColor: '#ffffff',
                         borderTop: '1px solid var(--brand-border)',
@@ -512,43 +498,38 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                         zIndex: 40,
                     }}
                 >
-                    {showTotals ? (
-                        <div
-                            className="flex items-center gap-x-8 flex-wrap"
-                            style={{ fontFamily: 'var(--font-mincho)', color: 'var(--brand-text)' }}
-                        >
-                            {[
-                                { label: '小計', value: totals.subtotal, sign: '¥' },
-                                { label: '消費税', value: totals.tax, sign: '¥' },
-                                { label: '合計', value: totals.total, sign: '¥' },
-                                { label: '会費入金', value: totals.membershipPaidAmount, sign: totals.membershipPaidAmount > 0 ? '−¥' : '¥' },
-                            ].map((t) => (
-                                <div key={t.label} className="flex items-baseline gap-2">
-                                    <span style={{ fontSize: '12px', color: 'var(--brand-text-muted)', letterSpacing: '0.15em' }}>{t.label}</span>
-                                    <span style={{ fontFamily: 'var(--font-garamond), var(--font-mincho)', fontSize: '16px', fontVariantNumeric: 'tabular-nums' }}>
-                                        {t.sign}{t.value.toLocaleString()}
-                                    </span>
-                                </div>
-                            ))}
-                            <div className="basis-full lg:hidden" aria-hidden="true" />
-                            <div className="ml-auto flex items-baseline gap-2 pl-4 lg:ml-0" style={{ borderLeft: '1px solid var(--brand-border)' }}>
-                                <span style={{ fontSize: '13px', color: 'var(--brand-navy)', letterSpacing: '0.25em', fontWeight: 600 }}>差引合計</span>
-                                <span style={{ fontFamily: 'var(--font-garamond), var(--font-mincho)', fontSize: '24px', fontWeight: 600, color: 'var(--brand-navy)', fontVariantNumeric: 'tabular-nums' }}>
-                                    ¥{totals.grandTotal.toLocaleString()}
+                    <div
+                        className="flex items-center gap-x-8 flex-wrap"
+                        style={{ fontFamily: 'var(--font-mincho)', color: 'var(--brand-text)' }}
+                    >
+                        {[
+                            { label: '小　計', value: totals.subtotal, sign: '¥' },
+                            { label: '消費税', value: totals.tax, sign: '¥' },
+                            { label: '合　計', value: totals.total, sign: '¥' },
+                            { label: '会費入金', value: totals.membershipPaidAmount, sign: totals.membershipPaidAmount > 0 ? '−¥' : '¥' },
+                        ].map((t) => (
+                            <div key={t.label} className="flex items-baseline gap-2">
+                                <span style={{ fontSize: '12px', color: 'var(--brand-text-muted)', letterSpacing: '0.15em' }}>{t.label}</span>
+                                <span style={{ fontFamily: 'var(--font-garamond), var(--font-mincho)', fontSize: '16px', fontVariantNumeric: 'tabular-nums' }}>
+                                    {t.sign}{t.value.toLocaleString()}
                                 </span>
                             </div>
+                        ))}
+                        <div className="flex items-baseline gap-2 pl-4" style={{ borderLeft: '1px solid var(--brand-border)' }}>
+                            <span style={{ fontSize: '13px', color: 'var(--brand-navy)', letterSpacing: '0.25em', fontWeight: 600 }}>差引合計</span>
+                            <span style={{ fontFamily: 'var(--font-garamond), var(--font-mincho)', fontSize: '24px', fontWeight: 600, color: 'var(--brand-navy)', fontVariantNumeric: 'tabular-nums' }}>
+                                ¥{totals.grandTotal.toLocaleString()}
+                            </span>
                         </div>
-                    ) : (
-                        <div />
-                    )}
+                    </div>
 
-                    <div className="ml-auto flex flex-col items-end gap-1">
+                    <div className="flex flex-col items-end gap-1">
                         {mode === 'edit' && isDirty && (
                             <span className="font-mincho" style={{ fontSize: '12px', color: 'var(--brand-red)', letterSpacing: '0.15em' }}>
                                 ※ 未保存の変更があります
                             </span>
                         )}
-                        <div className="flex min-w-0 items-center gap-2 overflow-x-auto">
+                        <div className="flex items-center gap-3">
                             {mode === 'create' ? (
                                 <button
                                     type="submit"
@@ -574,7 +555,7 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                                             <button
                                                 type="submit"
                                                 disabled={isSubmitting}
-                                                className={`font-mincho rounded border border-transparent px-10 py-3 text-[15px] text-white ${isSubmitting ? 'cursor-not-allowed bg-gray-300' : 'cursor-pointer bg-[var(--brand-navy)]'}`}
+                                                className={`rounded border-0 px-6 py-3 text-white ${isSubmitting ? 'cursor-not-allowed bg-gray-300' : 'cursor-pointer bg-green-600'}`}
                                             >
                                                 {isSubmitting ? '保存中...' : '更新'}
                                             </button>
@@ -582,7 +563,7 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                                                 type="button"
                                                 disabled={isConfirming || isDirty}
                                                 onClick={handleCreateFormal}
-                                                className={`font-mincho rounded border border-transparent px-8 py-3 text-[15px] text-white ${isConfirming || isDirty ? 'cursor-not-allowed bg-gray-300' : 'cursor-pointer bg-[var(--brand-navy-light)]'}`}
+                                                className={`rounded border-0 px-6 py-3 text-white ${isConfirming || isDirty ? 'cursor-not-allowed bg-gray-300' : 'cursor-pointer bg-blue-700'}`}
                                                 title={isDirty ? '先に「更新」で保存してください' : '事前相談見積から本見積を作成'}
                                             >
                                                 {isConfirming ? '作成中...' : '本見積を作成'}
@@ -590,7 +571,7 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                                         </>
                                     )}
                                     {isConfirmed && estimate.estimateType === 'PRE_CONSULTATION' && (
-                                        <span className="inline-flex items-center whitespace-nowrap rounded border border-transparent bg-gray-200 px-4 py-3 text-[15px] text-gray-600">
+                                        <span className="rounded bg-gray-200 px-4 py-2 text-sm text-gray-600">
                                             事前相談見積（本見積作成済み・閲覧のみ）
                                         </span>
                                     )}
@@ -599,27 +580,52 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                                             type="submit"
                                             disabled={isSubmitting || estimate.hasInvoice}
                                             title={estimate.hasInvoice ? '請求書作成済みのため更新できません' : undefined}
-                                            className={`font-mincho rounded border-0 px-5 py-3 text-[15px] text-white ${isSubmitting || estimate.hasInvoice ? 'cursor-not-allowed bg-gray-300' : 'cursor-pointer bg-[var(--brand-navy)]'}`}
+                                            className={`rounded border-0 px-6 py-3 text-white ${isSubmitting || estimate.hasInvoice ? 'cursor-not-allowed bg-gray-300' : 'cursor-pointer bg-green-600'}`}
                                         >
                                             {isSubmitting ? '保存中...' : estimate.hasInvoice ? '更新不可（請求書作成済み）' : '更新（本見積）'}
                                         </button>
                                     )}
+                                    <div className="flex items-center gap-3 text-sm">
+                                        <label className="flex items-center gap-1 cursor-pointer">
+                                            <input type="radio" name="showOptions-estimate" checked={showSelectedOptions} onChange={() => setShowSelectedOptions(true)} />
+                                            選択オプション表示
+                                        </label>
+                                        <label className="flex items-center gap-1 cursor-pointer">
+                                            <input type="radio" name="showOptions-estimate" checked={!showSelectedOptions} onChange={() => setShowSelectedOptions(false)} />
+                                            非表示
+                                        </label>
+                                    </div>
                                     <button
                                         type="button"
                                         disabled={isDirty}
-                                        onClick={handlePdfClick}
-                                        className={`font-mincho rounded px-10 py-3 text-[15px] ${isDirty ? 'cursor-not-allowed border border-transparent bg-gray-300 text-white' : 'cursor-pointer border border-[var(--brand-gold)] bg-[var(--brand-gold)] text-[var(--brand-navy-dark)]'}`}
+                                        onClick={() => {
+                                            const params = new URLSearchParams({ _t: Date.now().toString() })
+                                            if (!showSelectedOptions) params.set('showOptions', 'false')
+                                            window.open(`/api/pdf/estimate/${estimate.id}?${params.toString()}`, '_blank')
+                                        }}
+                                        className={`rounded border-0 px-6 py-3 text-white ${isDirty ? 'cursor-not-allowed bg-gray-300' : 'cursor-pointer bg-cyan-600'}`}
                                     >
-                                        PDF
+                                        PDFプレビュー
                                     </button>
-                                    <PdfExportDialog
-                                        open={pdfDialogOpen}
-                                        onOpenChange={setPdfDialogOpen}
-                                        pdfEndpoint={`/api/pdf/estimate/${estimate.id}`}
-                                    />
                                 </>
                             )}
-                            {closeButton}
+                            <button
+                                type="button"
+                                onClick={() => { router.push('/cases'); router.refresh() }}
+                                className="font-mincho transition-colors"
+                                style={{
+                                    padding: '12px 36px',
+                                    backgroundColor: '#ffffff',
+                                    color: 'var(--brand-text-muted)',
+                                    border: '1px solid var(--brand-border)',
+                                    fontSize: '15px',
+                                    letterSpacing: '0.25em',
+                                    fontWeight: 500,
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                閉じる
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -633,7 +639,7 @@ export function EstimateFormCreate({ customerId }: { customerId: string }) {
         resolver: zodResolver(estimateFormSchema),
         defaultValues: DEFAULT_FORM_VALUES,
     })
-    const { loading, customer, items, setItems, freeItems, onSubmit } = useEstimateCreate(customerId, methods.reset)
+    const { loading, customer, items, setItems, freeItems, planId, handlePlanChange, onSubmit } = useEstimateCreate(customerId, methods.reset)
 
     if (loading || !customer) return <LoadingState />
 
@@ -644,6 +650,8 @@ export function EstimateFormCreate({ customerId }: { customerId: string }) {
             items={items}
             setItems={setItems}
             freeItems={freeItems}
+            planId={planId}
+            handlePlanChange={handlePlanChange}
             onSubmit={onSubmit}
             methods={methods}
         />
@@ -655,7 +663,7 @@ export function EstimateFormEdit({ estimateId }: { estimateId: string }) {
         resolver: zodResolver(estimateFormSchema),
         defaultValues: DEFAULT_FORM_VALUES,
     })
-    const { loading, customer, estimate, items, setItems, freeItems, onSubmit } = useEstimateEdit(estimateId, methods.reset)
+    const { loading, customer, estimate, items, setItems, freeItems, planId, handlePlanChange, onSubmit } = useEstimateEdit(estimateId, methods.reset)
 
     if (loading || !customer || !estimate) return <LoadingState />
 
@@ -667,6 +675,8 @@ export function EstimateFormEdit({ estimateId }: { estimateId: string }) {
             items={items}
             setItems={setItems}
             freeItems={freeItems}
+            planId={planId}
+            handlePlanChange={handlePlanChange}
             onSubmit={onSubmit}
             methods={methods}
         />

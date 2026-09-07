@@ -6,6 +6,8 @@ import { getEstimate, createEstimate, updateEstimate, Estimate, EstimateItem, Es
 import { getCustomer } from '@/lib/customers'
 import { getCompanyProfile } from '@/lib/company'
 import { getProducts, ProductItem } from '@/lib/products'
+import { getProductPlanSettings, applyPlanOverrides, BASE_PLAN_ID } from '@/lib/plans'
+import { scopeApplies } from '@/lib/productScope'
 import { expandMultiRowToItems } from '@/lib/expandMultiRow'
 import { toast } from '@/hooks/use-toast'
 import { handleLoadError, handleSaveError } from '@/lib/errorHandler'
@@ -29,8 +31,8 @@ function filterProductsByStore(products: ProductItem[], storeId: string | null):
     }))
 }
 
-// 新規作成時: 商品マスタ → 初期明細行（全て qty=0）
-function buildNewEstimateItems(filteredProducts: ProductItem[]): EstimateItem[] {
+// 新規作成時: 商品マスタ → 初期明細行（プラン限定セット化商品は、その適用範囲が現在の会員区分に合う場合のみ qty=1）
+function buildNewEstimateItems(filteredProducts: ProductItem[], isMember: boolean): EstimateItem[] {
     const ordered: EstimateItem[] = []
     const addedIds = new Set<string>()
     for (const product of filteredProducts) {
@@ -55,18 +57,23 @@ function buildNewEstimateItems(filteredProducts: ProductItem[]): EstimateItem[] 
                 productItem: { ...product },
             } as EstimateItem)
         } else {
-            const firstVariant = product.variants[0] ?? null
+            const defaultVariant =
+                product.variants.find((v: any) => v.isDefaultSet) ?? product.variants[0] ?? null
+            const isForcedSet =
+                (!!(product as any).isPlanForcedSet && scopeApplies((product as any).setableScope, isMember)) ||
+                !!(product as any).isSoleSetParent ||
+                !!(product as any).isSoleSetParentChild
             ordered.push({
                 productItemId: product.id,
-                productVariantId: firstVariant?.id ?? undefined,
+                productVariantId: defaultVariant?.id ?? undefined,
                 description: (product as any).defaultDescription ?? '',
-                unitPriceGeneral: (firstVariant as any)?.priceGeneral || 0,
-                unitPriceMember: (firstVariant as any)?.priceMember || 0,
-                qty: 0,
+                unitPriceGeneral: (defaultVariant as any)?.priceGeneral || 0,
+                unitPriceMember: (defaultVariant as any)?.priceMember || 0,
+                qty: isForcedSet ? 1 : 0,
                 amount: 0,
                 sortNo: ordered.length,
                 productItem: { ...product },
-                productVariant: firstVariant,
+                productVariant: defaultVariant,
             } as EstimateItem)
         }
         addedIds.add(key)
@@ -78,7 +85,8 @@ function buildNewEstimateItems(filteredProducts: ProductItem[]): EstimateItem[] 
 function buildEstimateItemsForProduct(
     product: any,
     startSortNo: number,
-    existingItems: EstimateItem[]
+    existingItems: EstimateItem[],
+    isMember: boolean
 ): EstimateItem[] {
     if (product.isMultiRow && product.rows?.length > 0) {
         const out: EstimateItem[] = []
@@ -186,34 +194,105 @@ function buildEstimateItemsForProduct(
                 unitPriceMember: selectedVariants.reduce((s: number, v: any) => s + v.priceMember, 0),
             } as EstimateItem]
         }
-        return [{ ...allExisting[0], productItem: { ...product } }]
+        const existing = allExisting[0]
+        // プラン切替でこの商品の疑似セット子化状態、または「プラン内で唯一のセット親商品」状態が変わった場合、
+        // 自動チェックの付け外しを行う（疑似セット子化は、セット可否の適用範囲が現在の会員区分に合う場合のみ有効）
+        const wasForcedSet =
+            (!!(existing as any).productItem?.isPlanForcedSet &&
+                scopeApplies((existing as any).productItem?.setableScope, isMember)) ||
+            !!(existing as any).productItem?.isSoleSetParent ||
+            !!(existing as any).productItem?.isSoleSetParentChild
+        const isForcedSet =
+            (!!product.isPlanForcedSet && scopeApplies(product.setableScope, isMember)) ||
+            !!product.isSoleSetParent ||
+            !!product.isSoleSetParentChild
+        const newDefaultVariant = product.variants.find((v: any) => v.isDefaultSet) ?? product.variants[0] ?? null
+        if (isForcedSet && !wasForcedSet && !(existing.qty > 0)) {
+            // 新たに疑似セット子化 / 唯一の親商品化された瞬間(かつユーザーがまだチェックしていない): 自動チェックする
+            return [{
+                ...existing,
+                productItem: { ...product },
+                productVariantId: newDefaultVariant?.id ?? existing.productVariantId,
+                productVariant: newDefaultVariant,
+                unitPriceGeneral: newDefaultVariant?.priceGeneral ?? existing.unitPriceGeneral,
+                unitPriceMember: newDefaultVariant?.priceMember ?? existing.unitPriceMember,
+                qty: 1,
+            } as EstimateItem]
+        }
+        if (!isForcedSet && wasForcedSet && existing.qty === 1) {
+            // 疑似セット子化 / 唯一の親商品状態が解除された瞬間(かつ自動チェック時の数量から変更されていない): 自動チェックを解除する
+            return [{ ...existing, productItem: { ...product }, qty: 0 } as EstimateItem]
+        }
+        // 自動チェックの有無自体は変わらなくても、プラン別デフォルト種類は変わりうる。
+        // まだユーザーがチェックしていない商品に限り、種類の選択をプランのデフォルトに追従させる。
+        const oldDefaultVariant =
+            (existing as any).productItem?.variants?.find((v: any) => v.isDefaultSet) ?? null
+        const defaultVariantChanged = String(newDefaultVariant?.id ?? '') !== String(oldDefaultVariant?.id ?? '')
+        if (defaultVariantChanged && !(existing.qty > 0)) {
+            return [{
+                ...existing,
+                productItem: { ...product },
+                productVariantId: newDefaultVariant?.id ?? existing.productVariantId,
+                productVariant: newDefaultVariant,
+                unitPriceGeneral: newDefaultVariant?.priceGeneral ?? existing.unitPriceGeneral,
+                unitPriceMember: newDefaultVariant?.priceMember ?? existing.unitPriceMember,
+            } as EstimateItem]
+        }
+        return [{ ...existing, productItem: { ...product } }]
     }
-    const firstVariant = product.variants[0] ?? null
+    const defaultVariant = product.variants.find((v: any) => v.isDefaultSet) ?? product.variants[0] ?? null
     return [{
         productItemId: product.id,
-        productVariantId: firstVariant?.id ?? undefined,
+        productVariantId: defaultVariant?.id ?? undefined,
         description: product.defaultDescription ?? '',
-        unitPriceGeneral: firstVariant?.priceGeneral || 0,
-        unitPriceMember: firstVariant?.priceMember || 0,
-        qty: 0,
+        unitPriceGeneral: defaultVariant?.priceGeneral || 0,
+        unitPriceMember: defaultVariant?.priceMember || 0,
+        qty:
+            ((!!product.isPlanForcedSet && scopeApplies(product.setableScope, isMember)) ||
+                !!product.isSoleSetParent ||
+                !!product.isSoleSetParentChild)
+                ? 1
+                : 0,
         amount: 0,
         sortNo: startSortNo,
         productItem: { ...product },
-        productVariant: firstVariant,
+        productVariant: defaultVariant,
     } as EstimateItem]
 }
 
 // 編集時: 全商品 × 既存明細 → マージ済み明細リスト
-function buildMergedEstimateItems(filteredProducts: ProductItem[], existingItems: EstimateItem[]): EstimateItem[] {
+function buildMergedEstimateItems(
+    filteredProducts: ProductItem[],
+    existingItems: EstimateItem[],
+    isMember: boolean
+): EstimateItem[] {
     const mergedItems: EstimateItem[] = []
     const addedIds = new Set<string>()
     for (const product of filteredProducts) {
         const key = String(product.id)
         if (addedIds.has(key)) continue
-        mergedItems.push(...buildEstimateItemsForProduct(product, mergedItems.length, existingItems))
+        mergedItems.push(...buildEstimateItemsForProduct(product, mergedItems.length, existingItems, isMember))
         addedIds.add(key)
     }
     return mergedItems
+}
+
+// プラン切替時: 新プランで非表示になる商品の明細名を返す（無ければ空配列）
+function findItemsDisappearingOnPlanChange(
+    snapshot: EstimateItem[],
+    newFilteredProducts: ProductItem[]
+): string[] {
+    const newProductIds = new Set(newFilteredProducts.map((p) => String(p.id)))
+    const names = snapshot
+        .filter(
+            (it) =>
+                (it.qty ?? 0) > 0 &&
+                it.productItemId &&
+                !newProductIds.has(String(it.productItemId))
+        )
+        .map((it) => (it as any).productItem?.name)
+        .filter((name): name is string => !!name)
+    return Array.from(new Set(names))
 }
 
 // -------------------------------------------------------
@@ -226,6 +305,9 @@ export function useEstimateCreate(customerId: string, reset: UseFormReset<Estima
     const [customer, setCustomer] = useState<any>(null)
     const [items, setItems] = useState<EstimateItem[]>([])
     const [freeItems, setFreeItems] = useState<EstimateFreeItem[]>([])
+    // プラン切替時に再フィルタするための「店舗のみで絞り込んだ全商品」（プラン絞り込み前）
+    const [storeFilteredProducts, setStoreFilteredProducts] = useState<ProductItem[]>([])
+    const [planId, setPlanId] = useState<string>(BASE_PLAN_ID)
 
     const loadData = useCallback(async () => {
         try {
@@ -233,8 +315,12 @@ export function useEstimateCreate(customerId: string, reset: UseFormReset<Estima
             const companyProfile = await getCompanyProfile().catch(() => null)
             setCustomer(customerData)
             const storeId = customerData?.storeId ? String(customerData.storeId) : null
-            const filteredProducts = filterProductsByStore(allProducts, storeId)
-            const initialItems = buildNewEstimateItems(filteredProducts)
+            const filteredByStore = filterProductsByStore(allProducts, storeId)
+            setStoreFilteredProducts(filteredByStore)
+            setPlanId(BASE_PLAN_ID)
+            const planSettings = await getProductPlanSettings(BASE_PLAN_ID)
+            const filteredProducts = applyPlanOverrides(filteredByStore, planSettings)
+            const initialItems = buildNewEstimateItems(filteredProducts, DEFAULT_FORM_VALUES.isMember === 'true')
             setItems(initialItems)
             const initialFreeItems = buildDocumentFreeItems<EstimateFreeItem>([], initialItems, [MATURITY_SERVICE_NAME, EXECUTION_SURCHARGE_NAME], { ignoreQtyFilter: true })
             setFreeItems(initialFreeItems)
@@ -260,6 +346,36 @@ export function useEstimateCreate(customerId: string, reset: UseFormReset<Estima
             setLoading(false)
         }
     }, [customerId, reset])
+
+    // プラン切替: 新プランで非表示になる明細があれば確認の上、明細を再構築する。
+    // キャンセル時は null を返す（呼び出し側は planId の select を元に戻す）。
+    const handlePlanChange = useCallback(
+        async (
+            newPlanId: string,
+            currentFormItems: { qty?: number; description?: string }[] | undefined,
+            isMember: boolean
+        ): Promise<EstimateItem[] | null> => {
+            const planSettings = await getProductPlanSettings(newPlanId)
+            const newFilteredProducts = applyPlanOverrides(storeFilteredProducts, planSettings)
+            const snapshot = items.map((item, i) => ({
+                ...item,
+                qty: currentFormItems?.[i]?.qty ?? item.qty,
+                description: currentFormItems?.[i]?.description ?? item.description,
+            }))
+            const disappearingNames = findItemsDisappearingOnPlanChange(snapshot, newFilteredProducts)
+            if (disappearingNames.length > 0) {
+                const ok = confirm(
+                    `プランを切り替えると、以下の明細は選択できなくなり削除されます:\n\n・${disappearingNames.join('\n・')}\n\nよろしいですか？`
+                )
+                if (!ok) return null
+            }
+            const rebuilt = buildMergedEstimateItems(newFilteredProducts, snapshot, isMember)
+            setItems(rebuilt)
+            setPlanId(newPlanId)
+            return rebuilt
+        },
+        [items, storeFilteredProducts]
+    )
 
     useEffect(() => {
         loadData()
@@ -322,7 +438,7 @@ export function useEstimateCreate(customerId: string, reset: UseFormReset<Estima
         }
     }
 
-    return { loading, customer, setCustomer, estimate: null as Estimate | null, items, setItems, freeItems, setFreeItems, onSubmit }
+    return { loading, customer, setCustomer, estimate: null as Estimate | null, items, setItems, freeItems, setFreeItems, planId, handlePlanChange, onSubmit }
 }
 
 // -------------------------------------------------------
@@ -335,6 +451,9 @@ export function useEstimateEdit(estimateId: string, reset: UseFormReset<Estimate
     const [estimate, setEstimate] = useState<Estimate | null>(null)
     const [items, setItems] = useState<EstimateItem[]>([])
     const [freeItems, setFreeItems] = useState<EstimateFreeItem[]>([])
+    // プラン切替時に再フィルタするための「店舗のみで絞り込んだ全商品」（プラン絞り込み前）
+    const [storeFilteredProducts, setStoreFilteredProducts] = useState<ProductItem[]>([])
+    const [planId, setPlanId] = useState<string>(BASE_PLAN_ID)
 
     const loadData = useCallback(async () => {
         try {
@@ -344,14 +463,21 @@ export function useEstimateEdit(estimateId: string, reset: UseFormReset<Estimate
             const customerData = await getCustomer(estimateData.customerId)
             setCustomer(customerData)
             const storeId = customerData?.storeId ? String(customerData.storeId) : null
-            const filteredProducts = filterProductsByStore(allProducts, storeId)
-            const mergedItems = buildMergedEstimateItems(filteredProducts, existingItems)
+            const filteredByStore = filterProductsByStore(allProducts, storeId)
+            setStoreFilteredProducts(filteredByStore)
+            const currentPlanId = estimateData.planId || BASE_PLAN_ID
+            setPlanId(currentPlanId)
+            const planSettings = await getProductPlanSettings(currentPlanId)
+            const filteredProducts = applyPlanOverrides(filteredByStore, planSettings)
+            const isMember = !!(estimateData as any).isMember
+            const mergedItems = buildMergedEstimateItems(filteredProducts, existingItems, isMember)
             const loadedFreeItems: EstimateFreeItem[] = (estimateData as any).freeItems || []
             const paddedFreeItems = buildDocumentFreeItems(loadedFreeItems, mergedItems, [MATURITY_SERVICE_NAME, EXECUTION_SURCHARGE_NAME])
             setItems(mergedItems)
             setFreeItems(paddedFreeItems)
             reset({
                 docNo: estimateData.docNo || '',
+                planId: currentPlanId,
                 status: estimateData.status || 'DRAFT',
                 isMember: String((estimateData as any).isMember ?? false),
                 cremationProcessType: (estimateData as any).cremationProcessType || '',
@@ -396,6 +522,36 @@ export function useEstimateEdit(estimateId: string, reset: UseFormReset<Estimate
             router.push('/cases')
         }
     }, [loading, estimate, router])
+
+    // プラン切替: 新プランで非表示になる明細があれば確認の上、明細を再構築する。
+    // キャンセル時は null を返す（呼び出し側は planId の select を元に戻す）。
+    const handlePlanChange = useCallback(
+        async (
+            newPlanId: string,
+            currentFormItems: { qty?: number; description?: string }[] | undefined,
+            isMember: boolean
+        ): Promise<EstimateItem[] | null> => {
+            const planSettings = await getProductPlanSettings(newPlanId)
+            const newFilteredProducts = applyPlanOverrides(storeFilteredProducts, planSettings)
+            const snapshot = items.map((item, i) => ({
+                ...item,
+                qty: currentFormItems?.[i]?.qty ?? item.qty,
+                description: currentFormItems?.[i]?.description ?? item.description,
+            }))
+            const disappearingNames = findItemsDisappearingOnPlanChange(snapshot, newFilteredProducts)
+            if (disappearingNames.length > 0) {
+                const ok = confirm(
+                    `プランを切り替えると、以下の明細は選択できなくなり削除されます:\n\n・${disappearingNames.join('\n・')}\n\nよろしいですか？`
+                )
+                if (!ok) return null
+            }
+            const rebuilt = buildMergedEstimateItems(newFilteredProducts, snapshot, isMember)
+            setItems(rebuilt)
+            setPlanId(newPlanId)
+            return rebuilt
+        },
+        [items, storeFilteredProducts]
+    )
 
     const onSubmit = async (formValues: EstimateFormData) => {
         try {
@@ -446,7 +602,7 @@ export function useEstimateEdit(estimateId: string, reset: UseFormReset<Estimate
         }
     }
 
-    return { loading, customer, setCustomer, estimate, items, setItems, freeItems, setFreeItems, onSubmit }
+    return { loading, customer, setCustomer, estimate, items, setItems, freeItems, setFreeItems, planId, handlePlanChange, onSubmit }
 }
 
 // -------------------------------------------------------

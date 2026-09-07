@@ -575,12 +575,22 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
         if (scope === 'GENERAL_ONLY' && !isMember) return true
         return false
     }
+    // 複数行構成商品(車種行+距離加算行等)は、固定料金の加算行のみセット対象とする
+    const isMultiRowFixedSetIncludedFor = (item: PdfDocumentItem, isMember: boolean): boolean =>
+        !!(
+            item.productItem?.isSetChild &&
+            item.productRowId &&
+            item.calcType === 'FIXED' &&
+            (item.sign ?? 1) === 1 &&
+            scopeApplies(item.productItem?.setableScope, isMember)
+        )
     // 列ごとに「セット」「サービス」として 0 円扱いか判定するヘルパー
     const isSetIncludedFor = (item: PdfDocumentItem, isMember: boolean): boolean =>
         !!(
             (item.productItem?.isSetChild &&
                 item.productVariant?.isDefaultSet &&
                 scopeApplies(item.productItem?.setableScope, isMember)) ||
+            isMultiRowFixedSetIncludedFor(item, isMember) ||
             isAdhocSetFor(item, isMember)
         )
     const isServiceIncludedFor = (item: PdfDocumentItem, isMember: boolean): boolean =>

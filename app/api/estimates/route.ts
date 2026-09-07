@@ -169,6 +169,7 @@ export async function POST(request: NextRequest) {
         const estimate = await prisma.estimate.create({
             data: {
                 customerId: BigInt(customerId),
+                planId: data.planId ? BigInt(data.planId) : undefined,
                 docNo,
                 status: data.status || 'DRAFT',
                 isMember: data.isMember === true || data.isMember === 'true',

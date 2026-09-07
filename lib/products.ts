@@ -94,6 +94,12 @@ export interface ProductItem {
     sortNo?: number
     isSetParent?: boolean
     isSetChild?: boolean
+    /** プラン設定(overrideDefaultVariantId)により疑似的にセット子扱いにされた一般商品かどうか。商品マスタ本来のセット子とは区別する */
+    isPlanForcedSet?: boolean
+    /** このプランで表示されるセット親商品(isSetParent)が1件だけの場合、その商品にtrueが立つ。プラン選択時の自動チェックに使う */
+    isSoleSetParent?: boolean
+    /** isSoleSetParent商品に紐づく子商品(本来のセット子で、プラン限定セット化ではないもの)にtrueが立つ */
+    isSoleSetParentChild?: boolean
     serviceableScope?: AppliesTo
     setableScope?: AppliesTo
     isMaturityServiceable?: boolean
