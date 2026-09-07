@@ -430,12 +430,6 @@ export default function FlowersListPage() {
                                             render: (f) => f.jointNames || '-',
                                         },
                                         {
-                                            key: 'deliveryTo',
-                                            label: '配送先',
-                                            width: '120px',
-                                            render: (f) => f.deliveryTo || '-',
-                                        },
-                                        {
                                             key: 'amount',
                                             label: '金額',
                                             render: (f) => `¥${f.amount.toLocaleString()}`,
