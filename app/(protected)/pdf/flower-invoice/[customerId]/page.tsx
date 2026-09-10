@@ -272,7 +272,7 @@ export default function FlowerInvoicePdfPage() {
                                 <div className="mb-[1.3rem]">
                                     <div className="flex items-baseline gap-2 px-[0.2rem] py-[0.3rem] text-[1.2rem] font-semibold leading-none">
                                         御請求金額　：
-                                        <span className="font-serif text-[1.2rem] font-semibold tabular-nums">
+                                        <span className="text-[1.2rem] font-semibold tabular-nums">
                                             ¥{totalWithTax.toLocaleString()}
                                         </span>
                                     </div>
@@ -281,7 +281,7 @@ export default function FlowerInvoicePdfPage() {
 
                                 {/* 明細テーブル */}
                                 <table
-                                    className="mb-[1.1rem] w-full border-collapse font-serif text-[0.8rem] leading-none"
+                                    className="mb-[1.1rem] w-full border-collapse text-[0.8rem] leading-none"
                                     style={{ tableLayout: 'fixed' }}
                                 >
                                     <colgroup>
@@ -407,7 +407,7 @@ export default function FlowerInvoicePdfPage() {
                                 {/* 振込先 */}
                                 {company?.bank2Name && (
                                     <div
-                                        className="mb-[0.9rem] flex overflow-x-auto border border-black font-serif text-[0.8rem]"
+                                        className="mb-[0.9rem] flex overflow-x-auto border border-black text-[0.8rem]"
                                         style={{ borderRadius: '2px' }}
                                     >
                                         <div

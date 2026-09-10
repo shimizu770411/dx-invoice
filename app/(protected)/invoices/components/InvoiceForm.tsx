@@ -62,9 +62,8 @@ function InvoiceFormContent({
     const { fields: freeItemFields } = useFieldArray({ control, name: 'freeItems' })
 
     const [activeTab, setActiveTab] = useState<'items' | 'other'>('items')
-    const { pdfDialogOpen, setPdfDialogOpen, handlePdfClick } = usePdfExportTrigger(
-        invoice ? `/api/pdf/invoice/${invoice.id}` : null
-    )
+    const pdfEndpoint = invoice ? `/api/pdf/invoice/${invoice.id}` : null
+    const { pdfDialogOpen, setPdfDialogOpen, handlePdfClick } = usePdfExportTrigger(pdfEndpoint)
 
     // 画面下部固定フッターの高さぶんコンテンツに余白を確保する（タブレット幅ではボタンが折り返してフッターが高くなるため、固定値ではなく実測値を使う）
     const footerRef = useRef<HTMLDivElement>(null)
@@ -480,7 +479,7 @@ function InvoiceFormContent({
                             <PdfExportDialog
                                 open={pdfDialogOpen}
                                 onOpenChange={setPdfDialogOpen}
-                                pdfEndpoint={invoice ? `/api/pdf/invoice/${invoice.id}` : null}
+                                pdfEndpoint={pdfEndpoint}
                             />
                             <button
                                 type="button"
