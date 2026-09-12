@@ -1,0 +1,365 @@
+<title>備考欄改修と祭壇増額</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500&family=Noto+Serif+JP:wght@400;500;600&display=swap">
+<style>
+    :root {
+        --navy: #020e70;
+        --navy-light: #2a3490;
+        --gold: #c4ae6a;
+        --gold-soft: #8a7e5c;
+        --crimson: #9a1f28;
+        --ground: #f7f6f2;
+        --surface: #fffefb;
+        --border: #e5e1d4;
+        --rule: #d4cfc0;
+        --text: #1a1a1a;
+        --muted: #6b6b6b;
+
+        --mincho: 'Noto Serif JP', '游明朝 Medium', 'Yu Mincho', YuMincho, 'Hiragino Mincho ProN', serif;
+        --garamond: 'EB Garamond', 'Noto Serif JP', serif;
+    }
+
+    @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+            --navy: #b9c0ff;
+            --navy-light: #98a2f0;
+            --gold: #d8c488;
+            --gold-soft: #b3a479;
+            --crimson: #ef8f96;
+            --ground: #14141a;
+            --surface: #1c1c24;
+            --border: #33323c;
+            --rule: #45444f;
+            --text: #eceae4;
+            --muted: #a09e98;
+        }
+    }
+
+    :root[data-theme="dark"] {
+        --navy: #b9c0ff;
+        --navy-light: #98a2f0;
+        --gold: #d8c488;
+        --gold-soft: #b3a479;
+        --crimson: #ef8f96;
+        --ground: #14141a;
+        --surface: #1c1c24;
+        --border: #33323c;
+        --rule: #45444f;
+        --text: #eceae4;
+        --muted: #a09e98;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+        margin: 0;
+        padding-block: clamp(32px, 6vw, 72px);
+        padding-left: max(20px, calc((100% - 760px) / 2));
+        padding-right: max(20px, calc((100% - 760px) / 2));
+        background: var(--ground);
+        color: var(--text);
+        font-family: var(--mincho);
+        font-size: 16px;
+        line-height: 1.9;
+        -webkit-font-smoothing: antialiased;
+    }
+
+    .masthead { display: flex; flex-direction: column; gap: 14px; padding-bottom: 26px; border-bottom: 1px solid var(--rule); }
+    .eyebrow {
+        font-family: var(--garamond);
+        font-size: 12px;
+        letter-spacing: 0.34em;
+        text-transform: uppercase;
+        color: var(--gold-soft);
+    }
+    h1 {
+        margin: 0;
+        font-size: clamp(26px, 5vw, 36px);
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        line-height: 1.45;
+        color: var(--navy);
+        text-wrap: balance;
+    }
+    .meta { display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: 13px; color: var(--muted); letter-spacing: 0.08em; }
+    .meta .num { font-family: var(--garamond); font-size: 15px; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+
+    .lede { margin: 26px 0 0; font-size: 16px; color: var(--text); letter-spacing: 0.03em; }
+
+    section { margin-top: 52px; }
+    h2 {
+        margin: 0 0 6px;
+        padding-left: 14px;
+        border-left: 3px solid var(--gold);
+        font-size: 20px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        line-height: 1.5;
+        color: var(--navy);
+        text-wrap: balance;
+    }
+    .sub { margin: 0 0 22px 17px; font-size: 13px; color: var(--muted); letter-spacing: 0.08em; }
+
+    h3 {
+        margin: 30px 0 10px;
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        color: var(--text);
+    }
+
+    p { margin: 0 0 14px; letter-spacing: 0.03em; }
+    p:last-child { margin-bottom: 0; }
+
+    ul { margin: 0 0 14px; padding-left: 1.3em; }
+    li { margin-bottom: 7px; letter-spacing: 0.03em; }
+    li:last-child { margin-bottom: 0; }
+
+    /* これまで / これから の対比 */
+    .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); border: 1px solid var(--border); margin: 18px 0 20px; }
+    .compare > div { background: var(--surface); padding: 18px 20px; }
+    .compare .tag {
+        display: block;
+        margin-bottom: 10px;
+        font-family: var(--garamond);
+        font-size: 11px;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+    }
+    .compare .before .tag { color: var(--muted); }
+    .compare .after .tag { color: var(--navy); }
+    .compare p { font-size: 14.5px; line-height: 1.85; }
+    .compare .after { box-shadow: inset 3px 0 0 var(--gold); }
+
+    /* 帳票の見え方サンプル */
+    .specimen {
+        margin: 18px 0 20px;
+        padding: 20px 22px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        font-size: 13.5px;
+        line-height: 2;
+        letter-spacing: 0.02em;
+        overflow-x: auto;
+    }
+    .specimen .cap {
+        display: block;
+        margin-bottom: 10px;
+        font-family: var(--garamond);
+        font-size: 11px;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        color: var(--gold-soft);
+    }
+    .specimen .line { white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .specimen .ruled { border-bottom: 1px solid var(--text); display: inline-block; min-width: 17em; }
+    .specimen .indent { padding-left: 5.2em; }
+    .specimen .dim { color: var(--muted); }
+
+    table { width: 100%; border-collapse: collapse; margin: 16px 0 20px; font-size: 14px; }
+    caption { text-align: left; padding-bottom: 9px; font-size: 13px; color: var(--muted); letter-spacing: 0.08em; }
+    th, td { padding: 9px 12px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; letter-spacing: 0.03em; }
+    th { font-weight: 600; font-size: 12.5px; letter-spacing: 0.12em; color: var(--gold-soft); border-bottom-color: var(--rule); }
+    td.num { font-family: var(--garamond); font-size: 15px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .table-wrap { overflow-x: auto; }
+
+    /* 対応が必要な項目 */
+    .action { margin-top: 52px; padding: 26px 28px; background: var(--surface); border: 1px solid var(--border); border-top: 3px solid var(--crimson); }
+    .action h2 { border-left: none; padding-left: 0; color: var(--crimson); }
+    .action .sub { margin-left: 0; }
+
+    .docnos { display: flex; flex-wrap: wrap; gap: 7px; margin: 4px 0 18px; padding: 0; list-style: none; }
+    .docnos li {
+        margin: 0;
+        padding: 4px 11px;
+        border: 1px solid var(--rule);
+        font-family: var(--garamond);
+        font-size: 14px;
+        letter-spacing: 0.04em;
+        font-variant-numeric: tabular-nums;
+        color: var(--text);
+    }
+    .docnos li.unnumbered { font-family: var(--mincho); font-size: 12.5px; color: var(--muted); }
+
+    .note { margin-top: 22px; padding-top: 18px; border-top: 1px dotted var(--rule); font-size: 14px; color: var(--muted); }
+
+    footer { margin-top: 56px; padding-top: 22px; border-top: 1px solid var(--rule); font-size: 12.5px; color: var(--muted); letter-spacing: 0.08em; }
+    footer .num { font-family: var(--garamond); font-size: 14px; }
+
+    @media (max-width: 560px) {
+        .compare { grid-template-columns: 1fr; }
+        .specimen { font-size: 12.5px; }
+    }
+</style>
+
+<header class="masthead">
+    <span class="eyebrow">Release Notes</span>
+    <h1>備考欄の刷新と、親祭壇の増額対応</h1>
+    <div class="meta">
+        <span>玉泉院 葬儀業務システム</span>
+        <span class="num">2026年9月12日</span>
+        <span class="num">0831316</span>
+    </div>
+</header>
+
+<p class="lede">
+    見積書・請求書の備考欄に手で書き足していた金額を、専用の入力欄で受け取る形に変えました。
+    あわせて、基本プランの親祭壇に増額を選べるようにしています。
+    帳票の見た目は従来と変わらず、入力の手間と書式のばらつきだけが減ります。
+</p>
+
+<section>
+    <h2>見積書 ─ 別料金を入力欄に</h2>
+    <p class="sub">見積画面「各担当、備考欄」タブ / 見積書PDF</p>
+
+    <div class="compare">
+        <div class="before">
+            <span class="tag">これまで</span>
+            <p>新規作成のたびに備考欄へ4行の文言が自動で入り、担当者がその行に金額を書き足していました。桁区切りの有無や全角半角が人によって揃わず、行ごと消えてしまうこともありました。</p>
+        </div>
+        <div class="after">
+            <span class="tag">これから</span>
+            <p>火葬料金・お布施・新聞広告の3つが、金額専用の入力欄になりました。備考欄には本来の申し送りだけを書きます。文言は見積書が自動で出力します。</p>
+        </div>
+    </div>
+
+    <div class="specimen">
+        <span class="cap">見積書の備考欄</span>
+        <div class="line">（備考）</div>
+        <div class="line">【別料金】　・火葬料金：25,000円</div>
+        <div class="line indent">・お布施：60,000円</div>
+        <div class="line indent">・新聞広告：<span class="dim">（未入力の項目は空欄のまま）</span></div>
+        <div class="line">【備考】</div>
+        <div class="line dim">　ここから、登録された備考が続きます</div>
+    </div>
+
+    <ul>
+        <li>金額は3桁カンマ区切りに揃います。未入力の項目は見出しだけが出ます</li>
+        <li>入力欄の高さを4行ぶん詰めました。自動出力される行のぶんです</li>
+        <li>これらの金額は小計・消費税・合計には加算されません。別料金としての表示のみです</li>
+    </ul>
+</section>
+
+<section>
+    <h2>請求書 ─ 支払合計と振込先</h2>
+    <p class="sub">請求画面「各担当、備考欄」タブ / 請求書PDF</p>
+
+    <p>請求書の備考欄に、支払総額を示すブロックを追加しました。手で入力するのは<strong>生花代だけ</strong>です。</p>
+
+    <div class="table-wrap">
+        <table>
+            <caption>備考欄に追加された3項目</caption>
+            <thead>
+                <tr><th>項目</th><th>入力</th><th>金額の出どころ</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>葬儀代金</td><td>不可</td><td>請求書の差引合計をそのまま表示</td></tr>
+                <tr><td>生花代</td><td>可</td><td>担当者が入力</td></tr>
+                <tr><td>支払合計</td><td>不可</td><td>葬儀代金 ＋ 生花代を自動計算</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="specimen">
+        <span class="cap">請求書の備考欄</span>
+        <div class="line">（備考）</div>
+        <div class="line">　葬儀代金：876,110円</div>
+        <div class="line"><span class="ruled">　生花代：15,000円</span></div>
+        <div class="line">　支払合計：891,110円</div>
+        <div class="line">【備考】</div>
+        <div class="line dim">　ここから、登録された備考が続きます</div>
+        <div class="line" style="margin-top:1em">お振込先：琉球銀行　本店営業部　普通　1234567　カ）ニホンフェニックス</div>
+    </div>
+
+    <ul>
+        <li>生花代と支払合計の間に罫線が入ります</li>
+        <li>備考欄の一番下に、自社情報に登録された<strong>振込先1</strong>が1行で出ます。備考の量に関わらず常に最下部です</li>
+        <li>振込先が未登録のときは、その行自体が出ません</li>
+        <li>生花代は請求書の小計・消費税・差引合計には加算されません。支払合計にのみ反映されます</li>
+    </ul>
+</section>
+
+<section>
+    <h2>親祭壇の増額</h2>
+    <p class="sub">プラン設定画面 / 見積・請求の明細</p>
+
+    <p>基本プランで親祭壇を選んだとき、金額の増額を選べるようになりました。現在は<strong>5万円増</strong>と<strong>8.1万円増</strong>の2つが登録されています。</p>
+
+    <h3>選び方</h3>
+    <p>明細で親祭壇の行の操作アイコンを押すと、種類選択の画面に「増額」の欄が出ます。選ぶと祭壇の金額がその場で上乗せされ、明細には「5万円増 適用」と表示されます。</p>
+
+    <div class="table-wrap">
+        <table>
+            <caption>会員27万コースに8.1万円増を選んだ場合</caption>
+            <thead>
+                <tr><th>　</th><th>増額なし</th><th>8.1万円増</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>一般価格</td><td class="num">350,000</td><td class="num">431,000</td></tr>
+                <tr><td>会員価格</td><td class="num">270,000</td><td class="num">351,000</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <ul>
+        <li><strong>帳票に増額の行は出ません。</strong>祭壇の金額そのものが上乗せ後の金額になります</li>
+        <li>一般価格・会員価格の両方に同額が加算されます</li>
+        <li>金額や表示名はプラン設定画面から変更でき、選択肢を増やすこともできます。今後の金額改定に改修は要りません</li>
+        <li>増額を選んだまま祭壇の種類を変えても、二重に上乗せされません</li>
+        <li>登録のないプラン、親祭壇以外の商品では、増額の欄そのものが出ません</li>
+    </ul>
+</section>
+
+<section>
+    <h2>その他の修正</h2>
+    <p class="sub">内部改善</p>
+    <ul>
+        <li>請求書を顧客から直接作成する経路で、備考が保存されない不具合がありました。画面から使われていない経路のため実害は出ていませんが、経路ごと整理しました</li>
+        <li>見積・請求書に項目を追加したとき、保存や引き継ぎへの通し忘れを自動で検知する仕組みを入れました。項目が増えるたびに起きていた取りこぼしを防ぎます</li>
+    </ul>
+</section>
+
+<div class="action">
+    <h2>対応をお願いしたいこと</h2>
+    <p class="sub">既存の見積 13件</p>
+
+    <p>
+        既存の見積のうち<strong>22件</strong>は、備考欄の文言と金額を自動で移行済みです。
+        残る13件は、金額欄に入れられない書き方（「80000〜」「両紙」「22万円」など）が含まれていたため、
+        内容が失われないよう<strong>あえて自動移行していません</strong>。
+    </p>
+
+    <p>該当する見積は、備考欄に文言が残ったままです。このままだと帳票で同じ文言が二重に表示されます。</p>
+
+    <ul class="docnos">
+        <li>202608004</li>
+        <li>202608008</li>
+        <li>202608009</li>
+        <li>202608010</li>
+        <li>202608013</li>
+        <li>202608016</li>
+        <li>202608017</li>
+        <li>202608018</li>
+        <li>202609001</li>
+        <li class="unnumbered">見積番号なし 4件</li>
+    </ul>
+
+    <h3>手順</h3>
+    <ul>
+        <li>対象の見積を開き「各担当、備考欄」タブへ</li>
+        <li>備考欄から【別料金】〜【備考】の4行を削除</li>
+        <li>金額が確定しているものは、火葬料金・お布施・新聞広告の欄に入れ直す（「22万円」なら 220000）</li>
+        <li>「80000〜」「両紙」のように金額で表せない内容は、備考欄に文章として書き残してください</li>
+    </ul>
+
+    <p class="note">
+        「80000〜」という書き方が9件と最も多く、現場で定着している記載のようです。
+        金額欄は数値専用のため、今後も同じ場面が出ます。
+        幅のある金額をどう残したいか、一度ご確認いただくとよいかもしれません。
+    </p>
+</div>
+
+<footer>
+    玉泉院 葬儀業務システム ／ 2026年9月12日リリース ／ <span class="num">40</span> ファイル変更
+</footer>

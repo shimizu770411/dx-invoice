@@ -8,6 +8,7 @@ import { getCompanyProfile } from '@/lib/company'
 import { getProducts, ProductItem } from '@/lib/products'
 import { getProductPlanSettings, applyPlanOverrides, BASE_PLAN_ID } from '@/lib/plans'
 import { scopeApplies } from '@/lib/productScope'
+import { resolveUnitPriceGeneral, resolveUnitPriceMember } from '@/lib/itemPricing'
 import { expandMultiRowToItems } from '@/lib/expandMultiRow'
 import { toast } from '@/hooks/use-toast'
 import { handleLoadError, handleSaveError } from '@/lib/errorHandler'
@@ -207,6 +208,23 @@ function buildEstimateItemsForProduct(
             !!product.isSoleSetParent ||
             !!product.isSoleSetParentChild
         const newDefaultVariant = product.variants.find((v: any) => v.isDefaultSet) ?? product.variants[0] ?? null
+        // プラン別のデフォルト種類は、プランを切り替えると変わりうる。
+        // 切替後はそのプランの初期種類に必ず揃える（チェック済みでも、担当者が選び直した後でも上書きする）。
+        // 以前は「まだチェックしていない商品だけ」追従させていたが、
+        // 基本プランの時点で自動チェックが入る商品は永久に追従せず、プラン設定が効かなかった。
+        const oldDefaultVariant =
+            (existing as any).productItem?.variants?.find((v: any) => v.isDefaultSet) ?? null
+        const defaultVariantChanged = String(newDefaultVariant?.id ?? '') !== String(oldDefaultVariant?.id ?? '')
+        const planDefaultVariantPatch =
+            defaultVariantChanged && newDefaultVariant
+                ? {
+                      productVariantId: newDefaultVariant.id,
+                      productVariant: newDefaultVariant,
+                      unitPriceGeneral: resolveUnitPriceGeneral(existing, newDefaultVariant),
+                      unitPriceMember: resolveUnitPriceMember(existing, newDefaultVariant, isMember),
+                  }
+                : {}
+
         if (isForcedSet && !wasForcedSet && !(existing.qty > 0)) {
             // 新たに疑似セット子化 / 唯一の親商品化された瞬間(かつユーザーがまだチェックしていない): 自動チェックする
             return [{
@@ -214,29 +232,21 @@ function buildEstimateItemsForProduct(
                 productItem: { ...product },
                 productVariantId: newDefaultVariant?.id ?? existing.productVariantId,
                 productVariant: newDefaultVariant,
-                unitPriceGeneral: newDefaultVariant?.priceGeneral ?? existing.unitPriceGeneral,
-                unitPriceMember: newDefaultVariant?.priceMember ?? existing.unitPriceMember,
+                unitPriceGeneral: newDefaultVariant
+                    ? resolveUnitPriceGeneral(existing, newDefaultVariant)
+                    : existing.unitPriceGeneral,
+                unitPriceMember: newDefaultVariant
+                    ? resolveUnitPriceMember(existing, newDefaultVariant, isMember)
+                    : existing.unitPriceMember,
                 qty: 1,
             } as EstimateItem]
         }
         if (!isForcedSet && wasForcedSet && existing.qty === 1) {
             // 疑似セット子化 / 唯一の親商品状態が解除された瞬間(かつ自動チェック時の数量から変更されていない): 自動チェックを解除する
-            return [{ ...existing, productItem: { ...product }, qty: 0 } as EstimateItem]
+            return [{ ...existing, productItem: { ...product }, ...planDefaultVariantPatch, qty: 0 } as EstimateItem]
         }
-        // 自動チェックの有無自体は変わらなくても、プラン別デフォルト種類は変わりうる。
-        // まだユーザーがチェックしていない商品に限り、種類の選択をプランのデフォルトに追従させる。
-        const oldDefaultVariant =
-            (existing as any).productItem?.variants?.find((v: any) => v.isDefaultSet) ?? null
-        const defaultVariantChanged = String(newDefaultVariant?.id ?? '') !== String(oldDefaultVariant?.id ?? '')
-        if (defaultVariantChanged && !(existing.qty > 0)) {
-            return [{
-                ...existing,
-                productItem: { ...product },
-                productVariantId: newDefaultVariant?.id ?? existing.productVariantId,
-                productVariant: newDefaultVariant,
-                unitPriceGeneral: newDefaultVariant?.priceGeneral ?? existing.unitPriceGeneral,
-                unitPriceMember: newDefaultVariant?.priceMember ?? existing.unitPriceMember,
-            } as EstimateItem]
+        if (defaultVariantChanged) {
+            return [{ ...existing, productItem: { ...product }, ...planDefaultVariantPatch } as EstimateItem]
         }
         return [{ ...existing, productItem: { ...product } }]
     }
