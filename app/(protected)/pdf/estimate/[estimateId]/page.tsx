@@ -120,6 +120,7 @@ export default function EstimatePdfPage() {
                 document={estimate}
                 products={products}
                 hideSelectedOptions={hideSelectedOptions}
+                showSeparateFees
             />
         </div>
     )

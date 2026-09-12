@@ -13,6 +13,9 @@ const docNoSchema = z
         message: '見積番号は空欄、または9桁の数字（例: 202607001）で入力してください',
     })
 
+// 【別料金】の金額欄。未入力は空文字として保持し、保存時に未設定へ変換する
+const separateFeeSchema = z.union([z.string(), z.number()])
+
 export const estimateFormSchema = z.object({
     docNo: docNoSchema,
     planId: z.string(),
@@ -31,6 +34,11 @@ export const estimateFormSchema = z.object({
     decorationStaff: z.string(),
     returnStaff: z.string(),
     remarks: z.string(),
+    // 備考欄の【別料金】ブロックに表示する金額。合計金額には算入しない。
+    // 金額入力欄は未入力時に空文字、入力時に数値を返すため両方を受ける
+    cremationFee: separateFeeSchema,
+    offeringFee: separateFeeSchema,
+    newspaperAdFee: separateFeeSchema,
     items: z.array(estimateItemFieldSchema),
     freeItems: z.array(estimateFreeItemFieldSchema),
     // 種類変更等、フォーム外の変更を dirty 化するための隠しマーカー
@@ -59,6 +67,9 @@ export const DEFAULT_FORM_VALUES: EstimateFormData = {
     decorationStaff: '',
     returnStaff: '',
     remarks: '',
+    cremationFee: '',
+    offeringFee: '',
+    newspaperAdFee: '',
     items: [],
     freeItems: [],
 }

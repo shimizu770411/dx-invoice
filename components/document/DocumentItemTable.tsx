@@ -14,6 +14,11 @@ import { resolveProductImageUrl } from '@/lib/utils'
 import { scopeApplies } from '@/lib/productScope'
 import { computeMultiRowAmount } from '@/lib/expandMultiRow'
 import { EXECUTION_SURCHARGE_NAME } from '@/lib/documentUtils'
+import { PlanSurcharge, canApplySurcharge } from '@/lib/planSurcharges'
+
+// props 未指定時のフォールバック。毎レンダー新しい配列を渡すと、
+// これに依存する処理が無駄に再計算されるため安定した参照を使う
+const EMPTY_SURCHARGES: PlanSurcharge[] = []
 
 // 種類列: 表示文字列（バリアント名連結+「（n種類）」）がこの文字数を超えたら集約表示にする
 // 列幅320px（左右padding24pxを除くと296px）で全角文字が折り返さず収まる目安の文字数
@@ -117,6 +122,9 @@ type DocumentItem = {
     groupSelections?: string | null
     /** 保存後の行がどのバリアントグループ（重箱の基本セット／追加オプション等）由来かを示す */
     productVariantGroupId?: string | null
+    /** 親祭壇の増額。各単価には既に上乗せ済みのため、表示と再選択のためだけに持つ */
+    surchargeAmount?: number | null
+    planSurchargeId?: string | null
 }
 
 type DocumentFreeItem = {
@@ -140,12 +148,15 @@ type Props = {
             isService?: boolean
             isMaturityService?: boolean
             rowVariant?: DocumentRowVariant
+            surcharge?: { id: string; amount: number } | null
         }
     ) => void
     setValue?: UseFormSetValue<DocumentFormData>
     readOnly?: boolean
     /** 顧客の現在の担当店舗 ID。保存済み variant の店舗と異なる場合に警告表示 */
     currentStoreId?: string | null
+    /** 選択中プランの親祭壇の増額選択肢。空のプランでは増額の選択自体を出さない */
+    planSurcharges?: PlanSurcharge[]
     onMultiSelectChange?: (
         index: number,
         variantIds: string[],
@@ -168,12 +179,21 @@ export function DocumentItemTable({
     currentStoreId,
     onMultiSelectChange,
     onGroupVariantChange,
+    planSurcharges = EMPTY_SURCHARGES,
 }: Props) {
     /** 保存済み variant の店舗が現在の顧客店舗と一致しないか判定 */
     const isStoreMismatch = (item: DocumentItem | undefined): boolean => {
         const variantStoreId = item?.productVariant?.storeId
         if (!variantStoreId) return false // 全店舗共通 variant は OK
         return String(variantStoreId) !== String(currentStoreId ?? '')
+    }
+
+    /** その行に適用中の増額。選択肢がマスタから消えていても、保存済みの額から表示を復元する */
+    const selectedSurchargeOf = (item: DocumentItem | undefined): { label: string; amount: number } | null => {
+        if (!item?.surchargeAmount) return null
+        const fromMaster = planSurcharges.find((s) => String(s.id) === String(item.planSurchargeId))
+        if (fromMaster) return { label: fromMaster.label, amount: fromMaster.amount }
+        return { label: `+¥${item.surchargeAmount.toLocaleString()}`, amount: item.surchargeAmount }
     }
     const [variantDialogIndex, setVariantDialogIndex] = useState<number | null>(null)
     const [pendingVariant, setPendingVariant] = useState<ProductVariant | null>(null)
@@ -184,6 +204,8 @@ export function DocumentItemTable({
     >({})
     const [pendingIsService, setPendingIsService] = useState(false)
     const [pendingIsMaturityService, setPendingIsMaturityService] = useState(false)
+    // ダイアログで選択中の増額。'' は「増額なし」
+    const [pendingSurchargeId, setPendingSurchargeId] = useState<string>('')
     const [pendingAdhocSetScope, setPendingAdhocSetScope] = useState<
         'NONE' | 'MEMBER_ONLY' | 'BOTH'
     >('NONE')
@@ -300,6 +322,8 @@ export function DocumentItemTable({
     const openVariantDialog = (index: number) => {
         const item = items[index]
         const isMulti = !!item?.productRowId
+        // 適用中の増額を選択状態に復元する
+        setPendingSurchargeId(item?.planSurchargeId ? String(item.planSurchargeId) : '')
         if (isMulti && item?.productItemId) {
             // 複数行構成商品: 商品単位モード（同じ productItem の全行の variants を初期化）
             const productItemId = String(item.productItemId)
@@ -422,10 +446,17 @@ export function DocumentItemTable({
                     isMaturityService: pendingIsMaturityService,
                 })
             } else if (pendingVariant) {
+                // 増額を選べるのは親祭壇だけ。それ以外の商品では常に未選択として扱う
+                const surchargeMaster = canApplySurcharge(item?.productItem)
+                    ? planSurcharges.find((s) => String(s.id) === pendingSurchargeId)
+                    : undefined
                 onVariantChange?.(variantDialogIndex, pendingVariant, {
                     isService: pendingIsService,
                     isMaturityService: pendingIsMaturityService,
                     adhocSetScope: pendingAdhocSetScope,
+                    surcharge: surchargeMaster
+                        ? { id: String(surchargeMaster.id), amount: surchargeMaster.amount }
+                        : null,
                 } as any)
                 setValue?.(
                     `items.${variantDialogIndex}.qty` as `items.${number}.qty`,
@@ -443,6 +474,7 @@ export function DocumentItemTable({
         setPendingGroupSelections({})
         setPendingIsService(false)
         setPendingAdhocSetScope('NONE')
+        setPendingSurchargeId('')
     }
 
     const watchedItems = useWatch({ control, name: 'items' })
@@ -948,6 +980,15 @@ export function DocumentItemTable({
                                                     ) : (
                                                         <div>¥{amount.toLocaleString()}</div>
                                                     )}
+                                                    {/* 増額は帳票に行として出ないため、画面では金額が上乗せ済みであることを明示する */}
+                                                    {selectedSurchargeOf(item) && (
+                                                        <div
+                                                            className="text-xs"
+                                                            style={{ color: 'var(--brand-navy)', fontWeight: 600 }}
+                                                        >
+                                                            {selectedSurchargeOf(item)?.label} 適用
+                                                        </div>
+                                                    )}
                                                 </>
                                             )}
                                         </td>
@@ -1238,6 +1279,34 @@ export function DocumentItemTable({
                             return (
                                 <div className="min-h-0 flex-1 overflow-y-auto pr-1">
                                     <p className="mb-4 text-lg font-medium">{item?.productItem?.name}</p>
+                                    {/* 親祭壇の増額。帳票には行として出ず、会員価格に上乗せされた金額で表示される */}
+                                    {canApplySurcharge(item?.productItem) && planSurcharges.length > 0 && (
+                                        <div
+                                            className="mb-4"
+                                            style={{ padding: '12px 14px', border: '1px solid var(--brand-border)' }}
+                                        >
+                                            <div className="mb-2 font-mincho text-sm">増額</div>
+                                            <select
+                                                value={pendingSurchargeId}
+                                                onChange={(e) => setPendingSurchargeId(e.target.value)}
+                                                className="w-full rounded border border-gray-300 px-3 py-2 text-gray-900 focus:outline-none"
+                                                style={{ fontFamily: 'var(--font-mincho)', fontSize: '14px' }}
+                                            >
+                                                <option value="">増額なし</option>
+                                                {planSurcharges.map((s) => (
+                                                    <option key={s.id} value={String(s.id)}>
+                                                        {s.label}（+¥{s.amount.toLocaleString()}）
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <p
+                                                className="mt-2 font-mincho"
+                                                style={{ fontSize: '12px', color: 'var(--brand-text-muted)' }}
+                                            >
+                                                一般価格・会員価格の両方に上乗せされます。帳票には増額の行は出ず、祭壇の金額が上乗せ後の金額になります。
+                                            </p>
+                                        </div>
+                                    )}
                                     {canBeService && (
                                         <label
                                             className="mb-4 flex items-center gap-2 font-mincho cursor-pointer select-none"

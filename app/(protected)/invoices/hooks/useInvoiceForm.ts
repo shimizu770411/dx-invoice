@@ -209,6 +209,8 @@ export function useInvoiceEdit(invoiceId: string, reset: UseFormReset<InvoiceFor
                 decorationStaff: (invoiceData as any).decorationStaff || '',
                 returnStaff: (invoiceData as any).returnStaff || '',
                 remarks: (invoiceData as any).remarks || '',
+                // 生花代。未設定は空文字にする（0円との区別を保つため ?? で判定する）
+                flowerFee: (invoiceData as any).flowerFee ?? '',
                 items: mergedItems.map((item) => ({
                     qty: item.qty,
                     description: item.description || '',

@@ -7,9 +7,13 @@ import { FormSelect } from '@/components/form/FormSelect'
 import { FormTextarea } from '@/components/form/FormTextarea'
 import type { DocumentFormData } from './DocumentItemTable'
 
-// PDF出力時の備考欄1行の折り返し文字数（例:「【別料金】　・火葬料金：１２３４５６７８９０１２」）× 表示行数
+// PDF出力時の備考欄1行の折り返し文字数（例:「【別料金】　・火葬料金：１２３４５６７８９０１２」）
 export const REMARKS_LINE_LENGTH = 24
-export const REMARKS_ROWS = 15
+// PDF側が備考欄の冒頭に固定出力する行数。
+// 見積書は【別料金】〜【備考】、請求書は葬儀代金〜【備考】で、どちらも4行
+export const REMARKS_FIXED_BLOCK_ROWS = 4
+// 備考欄の表示行数と文字数上限。固定出力するぶん、入力欄はその行数を差し引いた高さにする
+export const REMARKS_ROWS = 15 - REMARKS_FIXED_BLOCK_ROWS
 export const MAX_REMARKS_LENGTH = REMARKS_LINE_LENGTH * REMARKS_ROWS
 // 備考欄の入力幅。実測した24文字ぶんの表示幅(約471px)にpadding/borderと安全マージンを加えた値
 export const REMARKS_TEXTAREA_MAX_WIDTH = '510px'
@@ -19,9 +23,17 @@ type Props = {
     disabled?: boolean
     estimateStaffLabel?: string
     preConsultStaffSlot?: React.ReactNode
+    /** 備考欄の上に差し込む金額入力（見積は【別料金】3項目、請求書は支払合計3項目） */
+    remarksHeaderSlot?: React.ReactNode
 }
 
-export function DocumentOtherFields({ control, disabled, estimateStaffLabel = '見積担当', preConsultStaffSlot }: Props) {
+export function DocumentOtherFields({
+    control,
+    disabled,
+    estimateStaffLabel = '見積担当',
+    preConsultStaffSlot,
+    remarksHeaderSlot,
+}: Props) {
     return (
         <div className="mb-8">
             <div className="grid grid-cols-2 gap-4">
@@ -69,6 +81,7 @@ export function DocumentOtherFields({ control, disabled, estimateStaffLabel = '�
                 ブラウザの自動折り返しではなく maxLineLength/maxRows で1行の文字数・最大行数そのものを制御する。
                 行数が REMARKS_ROWS を超えないためスクロールバーは表示されず、幅もその分の余白は不要 */}
             <div className="mt-4" style={{ maxWidth: REMARKS_TEXTAREA_MAX_WIDTH }}>
+                {remarksHeaderSlot}
                 <FormTextarea
                     name="remarks"
                     control={control}

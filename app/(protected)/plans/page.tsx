@@ -16,6 +16,7 @@ import {
 import { AppliesTo } from '@/lib/products'
 import { toast } from '@/hooks/use-toast'
 import { handleSaveError, handleOperationError } from '@/lib/errorHandler'
+import { PlanSurchargeEditor } from './components/PlanSurchargeEditor'
 
 // useQuery の data が未取得の間、フォールバックとして毎レンダー新しい配列を渡すと
 // それに依存する useEffect が無限に発火してしまうため、安定した参照を使う。
@@ -327,6 +328,8 @@ export default function PlansPage() {
                     読み込み中…
                 </div>
             ) : (
+                <>
+                <PlanSurchargeEditor planId={selectedPlanId} />
                 <div className="bg-white" style={{ border: '1px solid var(--brand-border)' }}>
                     <div
                         className="grid items-center gap-4 px-5 py-3 font-mincho"
@@ -466,6 +469,7 @@ export default function PlansPage() {
                         ))
                     )}
                 </div>
+                </>
             )}
         </div>
     )

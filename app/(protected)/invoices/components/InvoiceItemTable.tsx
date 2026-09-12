@@ -6,6 +6,7 @@ import { InvoiceFormData } from '../schemas/InvoiceFormSchema'
 import { DocumentItemTable } from '@/components/document/DocumentItemTable'
 import type { DocumentFormData } from '@/components/document/DocumentItemTable'
 import { ProductVariant } from '@/lib/products'
+import type { PlanSurcharge } from '@/lib/planSurcharges'
 
 type Props = {
     items: InvoiceItem[]
@@ -21,6 +22,8 @@ type Props = {
     currentStoreId?: string | null
     onMultiSelectChange?: (index: number, variantIds: string[], options?: { adhocSetScope?: 'NONE' | 'MEMBER_ONLY' | 'BOTH'; isService?: boolean; isMaturityService?: boolean }) => void
     onGroupVariantChange?: (index: number, groupId: string, variantIds: string[]) => void
+    /** 選択中プランの親祭壇の増額選択肢 */
+    planSurcharges?: PlanSurcharge[]
 }
 
 export function InvoiceItemTable({ control, fields, freeFields, setValue, ...rest }: Props) {

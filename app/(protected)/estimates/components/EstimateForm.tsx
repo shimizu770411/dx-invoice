@@ -14,11 +14,16 @@ import { EstimateOtherFields } from './EstimateOtherFields'
 import { EstimateCustomerSummary } from './EstimateCustomerSummary'
 import { EstimateBasicInfo } from './EstimateBasicInfo'
 import { ProductVariant } from '@/lib/products'
-import { resolveUnitPriceMember } from '@/lib/itemPricing'
+import { resolveUnitPriceMember, resolveUnitPriceGeneral } from '@/lib/itemPricing'
+import { getPlanSurcharges, PlanSurcharge } from '@/lib/planSurcharges'
 import { confirmEstimate } from '@/lib/estimates'
 import { toast } from '@/hooks/use-toast'
 import { PdfExportDialog } from '@/components/document/PdfExportDialog'
 import { usePdfExportTrigger } from '@/hooks/usePdfExportTrigger'
+
+// useQuery の data が未取得の間、毎レンダー新しい配列を渡すと
+// それに依存する処理が無駄に再計算されるため安定した参照を使う
+const EMPTY_SURCHARGES: PlanSurcharge[] = []
 
 interface Estimate {
     id: string
@@ -73,6 +78,12 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
     const { data: allPlans = [] } = useQuery({ queryKey: ['plans', 'all'], queryFn: () => getAllPlans() })
     // 選択肢は原則アクティブなプランのみ。ただし編集中の見積が既に非表示プランを参照している場合はそれも残す。
     const plans = allPlans.filter((p) => p.isActive || p.id === planId)
+    // 親祭壇の増額選択肢。プランを切り替えると、そのプランの選択肢に入れ替わる
+    const { data: planSurcharges = EMPTY_SURCHARGES } = useQuery({
+        queryKey: ['plan-surcharges', planId],
+        queryFn: () => getPlanSurcharges(planId),
+        enabled: !!planId,
+    })
     const [planChanging, setPlanChanging] = useState(false)
 
     const [activeTab, setActiveTab] = useState<'items' | 'other'>('items')
@@ -134,12 +145,16 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
             isMaturityService?: boolean
             adhocSetScope?: 'NONE' | 'MEMBER_ONLY' | 'GENERAL_ONLY' | 'BOTH'
             rowVariant?: any
+            /** 親祭壇の増額。未選択のときは null */
+            surcharge?: { id: string; amount: number } | null
         }
     ) => {
         const isMember = watchedIsMember === 'true'
         const isService = options?.isService ?? false
         const isMaturityService = options?.isMaturityService ?? false
         const adhocSetScope = options?.adhocSetScope ?? 'NONE'
+        const surchargeAmount = options?.surcharge?.amount ?? null
+        const planSurchargeId = options?.surcharge?.id ?? null
         // setItems の updater 内では setValue（別コンポーネントの状態更新）を直接呼ばない。
         // updater は React 内部で複数回呼ばれ得るため、副作用はここに一旦控えて updater の外で発火する。
         let overwrittenDescription: string | undefined
@@ -171,10 +186,13 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                     description,
                     productVariantId: variant.id,
                     productVariant: variant,
-                    unitPriceGeneral: variant.priceGeneral,
+                    // 増額は一般価格・会員価格の両方に同額を上乗せする
+                    unitPriceGeneral: resolveUnitPriceGeneral(item, variant, surchargeAmount),
                     unitPriceMember: isService || isMaturityService
                         ? 0
-                        : resolveUnitPriceMember(item, variant, isMember),
+                        : resolveUnitPriceMember(item, variant, isMember, surchargeAmount),
+                    surchargeAmount,
+                    planSurchargeId,
                     isService,
                     isMaturityService,
                     adhocSetScope,
@@ -481,6 +499,7 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                                     setValue={setValue}
                                     readOnly={isLocked}
                                     currentStoreId={customer?.storeId ? String(customer.storeId) : null}
+                                    planSurcharges={planSurcharges}
                                 />
                             </>
                         )}

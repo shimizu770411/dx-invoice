@@ -11,17 +11,25 @@ import { InvoiceOtherFields } from './InvoiceOtherFields'
 import { InvoiceCustomerSummary } from './InvoiceCustomerSummary'
 import { InvoiceBasicInfo } from './InvoiceBasicInfo'
 import { InvoiceConfirmButtons } from './InvoiceConfirmButtons'
+import { useQuery } from '@tanstack/react-query'
 import { ProductVariant } from '@/lib/products'
-import { resolveUnitPriceMember } from '@/lib/itemPricing'
+import { resolveUnitPriceMember, resolveUnitPriceGeneral } from '@/lib/itemPricing'
+import { getPlanSurcharges, PlanSurcharge } from '@/lib/planSurcharges'
 import { toast } from '@/hooks/use-toast'
 import type { InvoiceConfirmationFields } from '@/lib/invoices'
 import { PdfExportDialog } from '@/components/document/PdfExportDialog'
 import { usePdfExportTrigger } from '@/hooks/usePdfExportTrigger'
 
+// useQuery の data が未取得の間、毎レンダー新しい配列を渡すと
+// それに依存する処理が無駄に再計算されるため安定した参照を使う
+const EMPTY_SURCHARGES: PlanSurcharge[] = []
+
 interface Invoice extends InvoiceConfirmationFields {
     id: string
     docNo?: string | null
     isPaid?: boolean
+    /** 見積から引き継いだプラン。親祭壇の増額選択肢の取得に使う */
+    planId?: string | null
 }
 
 interface ContentProps {
@@ -62,6 +70,12 @@ function InvoiceFormContent({
     const { fields: freeItemFields } = useFieldArray({ control, name: 'freeItems' })
 
     const [activeTab, setActiveTab] = useState<'items' | 'other'>('items')
+    // 親祭壇の増額選択肢。請求書は見積から引き継いだプランの選択肢を使う
+    const { data: planSurcharges = EMPTY_SURCHARGES } = useQuery({
+        queryKey: ['plan-surcharges', invoice?.planId],
+        queryFn: () => getPlanSurcharges(String(invoice?.planId)),
+        enabled: !!invoice?.planId,
+    })
     const pdfEndpoint = invoice ? `/api/pdf/invoice/${invoice.id}` : null
     const { pdfDialogOpen, setPdfDialogOpen, handlePdfClick } = usePdfExportTrigger(pdfEndpoint)
 
@@ -94,12 +108,16 @@ function InvoiceFormContent({
             isMaturityService?: boolean
             adhocSetScope?: 'NONE' | 'MEMBER_ONLY' | 'GENERAL_ONLY' | 'BOTH'
             rowVariant?: any
+            /** 親祭壇の増額。未選択のときは null */
+            surcharge?: { id: string; amount: number } | null
         }
     ) => {
         const isMember = watchedIsMember === 'true'
         const isService = options?.isService ?? false
         const isMaturityService = options?.isMaturityService ?? false
         const adhocSetScope = options?.adhocSetScope ?? 'NONE'
+        const surchargeAmount = options?.surcharge?.amount ?? null
+        const planSurchargeId = options?.surcharge?.id ?? null
         // setItems の updater 内では setValue（別コンポーネントの状態更新）を直接呼ばない。
         // updater は React 内部で複数回呼ばれ得るため、副作用はここに一旦控えて updater の外で発火する。
         let overwrittenDescription: string | undefined
@@ -131,10 +149,13 @@ function InvoiceFormContent({
                     description,
                     productVariantId: variant.id,
                     productVariant: variant,
-                    unitPriceGeneral: variant.priceGeneral,
+                    // 増額は一般価格・会員価格の両方に同額を上乗せする
+                    unitPriceGeneral: resolveUnitPriceGeneral(item, variant, surchargeAmount),
                     unitPriceMember: isService || isMaturityService
                         ? 0
-                        : resolveUnitPriceMember(item, variant, isMember),
+                        : resolveUnitPriceMember(item, variant, isMember, surchargeAmount),
+                    surchargeAmount,
+                    planSurchargeId,
                     isService,
                     isMaturityService,
                     adhocSetScope,
@@ -384,11 +405,12 @@ function InvoiceFormContent({
                                 setValue={setValue}
                                 readOnly={isLocked}
                                 currentStoreId={customer?.storeId ? String(customer.storeId) : null}
+                                planSurcharges={planSurcharges}
                             />
                         </>
                     )}
                     {activeTab === 'other' && (
-                        <InvoiceOtherFields control={control} disabled={isLocked} />
+                        <InvoiceOtherFields control={control} disabled={isLocked} grandTotal={totals.grandTotal} />
                     )}
                     </fieldset>
                 </div>

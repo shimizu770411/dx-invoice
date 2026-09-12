@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { getInvoice } from '@/lib/invoices'
 import { getProducts } from '@/lib/products'
+import { getCompanyProfile } from '@/lib/company'
+import { buildBankTransferText } from '@/lib/separateFees'
 import { getProductPlanSettings, applyPlanOverrides, BASE_PLAN_ID } from '@/lib/plans'
 import { CreateButton } from '@/components/button/CreateButton'
 import { ResetButton } from '@/components/button/ResetButton'
@@ -19,6 +21,7 @@ export default function InvoicePdfPage() {
     const [loading, setLoading] = useState(true)
     const [invoice, setInvoice] = useState<any>(null)
     const [products, setProducts] = useState<any[]>([])
+    const [bankTransferText, setBankTransferText] = useState<string | null>(null)
     const [generating, setGenerating] = useState(false)
 
     useEffect(() => {
@@ -29,6 +32,23 @@ export default function InvoicePdfPage() {
     const loadData = async () => {
         try {
             const [invoiceData, productsData] = await Promise.all([getInvoice(invoiceId), getProducts()])
+
+            // 備考欄の最下部に出す振込先。取得に失敗しても請求書自体は表示できるよう、
+            // ここだけ個別にフォールバックして振込先なしで描画する
+            try {
+                const company = await getCompanyProfile()
+                setBankTransferText(
+                    buildBankTransferText({
+                        name: company.bank1Name,
+                        branch: company.bank1Branch,
+                        type: company.bank1Type,
+                        account: company.bank1Account,
+                        holder: company.bank1Holder,
+                    })
+                )
+            } catch (companyError) {
+                console.error('Failed to load company profile:', companyError)
+            }
 
             // プラン別商品設定の内容を商品情報に反映する。取得に失敗しても
             // PDF自体は元データのまま表示できるよう、ここだけ個別にフォールバックする。
@@ -121,6 +141,8 @@ export default function InvoicePdfPage() {
                 document={invoice}
                 products={products}
                 hideSelectedOptions={hideSelectedOptions}
+                showInvoiceFees
+                bankTransferText={bankTransferText}
             />
         </div>
     )

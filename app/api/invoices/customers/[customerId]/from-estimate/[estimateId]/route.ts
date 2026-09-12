@@ -111,6 +111,9 @@ export async function POST(
                         isMaturityService: item.isMaturityService ?? false,
                         adhocSetScope: item.adhocSetScope ?? 'NONE',
                         multiSelectVariantIds: (item as any).multiSelectVariantIds || null,
+                        // 親祭壇の増額も引き継ぐ。unitPriceMember は上乗せ済みの金額をそのままコピーしている
+                        surchargeAmount: (item as any).surchargeAmount ?? null,
+                        planSurchargeId: (item as any).planSurchargeId ?? null,
                         sortNo: item.sortNo,
                     })),
                 },

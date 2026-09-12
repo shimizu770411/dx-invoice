@@ -95,6 +95,35 @@ import { handleLoadError, handleSaveError, handleOperationError } from '@/lib/er
 `EstimateForm.tsx`/`InvoiceForm.tsx`、`useEstimateForm.ts`/`useInvoiceForm.ts` のいずれかを
 修正した際は `check-doc-form-sync` Skill で反対側への同期要否を確認する。
 
+#### 見積・請求書に項目を追加するときの通し先
+
+見積・請求書の項目は、保存・読み込み・引き継ぎの各処理が項目名を1つずつ列挙する作りになっている。
+DBに列を足しただけでは画面から保存も表示もされず、どこか1か所でも書き漏らすとその項目だけ黙って消える。
+項目を追加する場合、最低限この4か所すべてに通すこと。
+
+見積:
+1. 新規保存API `app/api/estimates/route.ts`
+2. 更新保存API `app/api/estimates/[id]/route.ts`
+3. 編集画面の読み込み `app/(protected)/estimates/hooks/useEstimateForm.ts`（新規作成時と編集時の2か所）
+4. 本見積作成の引き継ぎ `app/api/estimates/[id]/confirm/route.ts`
+
+請求書（見積から作成する経路しかないため、顧客から直接作る新規保存APIは持たない）:
+1. 更新保存API `app/api/invoices/[id]/route.ts`
+2. 編集画面の読み込み `app/(protected)/invoices/hooks/useInvoiceForm.ts`
+3. 見積からの引き継ぎ `app/api/invoices/customers/[customerId]/from-estimate/[estimateId]/route.ts`
+
+加えて、フォームの入力値定義と初期値（`EstimateFormSchema.ts` / `InvoiceFormSchema.ts`）にも通す。
+
+この通し忘れは `lib/__tests__/documentFieldCoverage.test.ts` が検知する。
+スキーマの全項目を「画面から編集する」「サーバー側で決まる」のどちらかに分類させる作りなので、
+項目を追加すると必ず一度テストが落ちて分類を迫られる。
+落ちたら、落ちたファイルにその項目を通すか、その処理では扱わない項目であれば
+テスト内のリストへ理由を添えて追記する。
+除外リストへ逃がすのは、その項目が画面から編集されないと確信できる場合だけ。
+
+見積・請求書の両方に関わる項目かどうかも必ず確認する
+（上記「見積・請求書フォームの同期確認」も参照）。
+
 #### APIレスポンス形式の規約（新規 route のみ適用）
 
 新規で作成する API route のレスポンス形式は以下に統一すること。既存 route は変更しない。

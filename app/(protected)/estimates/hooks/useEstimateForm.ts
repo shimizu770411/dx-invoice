@@ -493,6 +493,10 @@ export function useEstimateEdit(estimateId: string, reset: UseFormReset<Estimate
                 decorationStaff: (estimateData as any).decorationStaff || '',
                 returnStaff: (estimateData as any).returnStaff || '',
                 remarks: (estimateData as any).remarks || '',
+                // 【別料金】の金額。未設定は空文字にする（0円との区別を保つため ?? で判定する）
+                cremationFee: (estimateData as any).cremationFee ?? '',
+                offeringFee: (estimateData as any).offeringFee ?? '',
+                newspaperAdFee: (estimateData as any).newspaperAdFee ?? '',
                 items: mergedItems.map((item) => ({
                     qty: item.qty,
                     description: item.description || '',

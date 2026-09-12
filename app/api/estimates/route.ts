@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-middleware'
 import { serializeBigInt } from '@/lib/prisma-utils'
 import { calculateDocumentTotals } from '@/lib/documentTotals'
-import { buildDocNoPrefix, buildDocNo, isValidDocNo, pickLatestValidDocNo } from '@/lib/documentUtils'
+import { buildDocNoPrefix, buildDocNo, isValidDocNo, pickLatestValidDocNo, toNullableAmount } from '@/lib/documentUtils'
 import { recordOperationLog } from '@/lib/operationLog'
 import { OperationAction, OperationEntityType } from '@phoenix-jpn/db'
 import { VALID_CREMATION_PROCESS_TYPES, VALID_ALTAR_PLACE_TYPES, VALID_ALTAR_TYPES } from '@/lib/documentEnums'
@@ -190,6 +190,9 @@ export async function POST(request: NextRequest) {
                 decorationStaff: data.decorationStaff || null,
                 returnStaff: data.returnStaff || null,
                 remarks: data.remarks || null,
+                cremationFee: toNullableAmount(data.cremationFee),
+                offeringFee: toNullableAmount(data.offeringFee),
+                newspaperAdFee: toNullableAmount(data.newspaperAdFee),
                 issuedAt: data.issuedAt ? new Date(data.issuedAt) : null,
                 items: {
                     create: (data.items || []).map((item: any, index: number) => ({
@@ -216,6 +219,9 @@ export async function POST(request: NextRequest) {
                         isMaturityService: Boolean(item.isMaturityService),
                         adhocSetScope: item.adhocSetScope ?? 'NONE',
                         multiSelectVariantIds: item.multiSelectVariantIds || null,
+                        // 親祭壇の増額。各単価には上乗せ済みのため、記録として保存する
+                        surchargeAmount: toNullableAmount(item.surchargeAmount),
+                        planSurchargeId: item.planSurchargeId ? BigInt(item.planSurchargeId) : null,
                         sortNo: item.sortNo ?? index,
                     })),
                 },

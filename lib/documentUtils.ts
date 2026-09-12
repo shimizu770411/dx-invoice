@@ -226,3 +226,13 @@ export function pickLatestValidDocNo(docNos: (string | null | undefined)[]): str
     if (valid.length === 0) return null
     return valid.reduce((max, cur) => (Number(cur) > Number(max) ? cur : max))
 }
+
+// 金額入力欄の値をDB保存用に変換する。空文字・未入力は null、数値として解釈できない値も null にする。
+// 0 は「0円」として有効な入力なので null にはしない。
+export function toNullableAmount(value: unknown): number | null {
+    if (value === null || value === undefined || value === '') return null
+    const normalized = typeof value === 'string' ? value.replace(/,/g, '').trim() : value
+    if (normalized === '') return null
+    const num = Number(normalized)
+    return Number.isFinite(num) ? Math.trunc(num) : null
+}

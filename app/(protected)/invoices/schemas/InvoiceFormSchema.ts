@@ -12,6 +12,10 @@ const docNoSchema = z
         message: '請求番号は空欄、または9桁の数字（例: 202607001）で入力してください',
     })
 
+// 備考欄の支払合計ブロックの生花代。未入力は空文字として保持し、保存時に未設定へ変換する。
+// 金額入力欄は未入力時に空文字、入力時に数値を返すため両方を受ける
+const flowerFeeSchema = z.union([z.string(), z.number()])
+
 export const invoiceFormSchema = z.object({
     docNo: docNoSchema,
     status: z.string(),
@@ -28,6 +32,8 @@ export const invoiceFormSchema = z.object({
     decorationStaff: z.string(),
     returnStaff: z.string(),
     remarks: z.string(),
+    // 備考欄の支払合計ブロックに表示する生花代。請求書本体の合計金額には算入しない
+    flowerFee: flowerFeeSchema,
     items: z.array(invoiceItemFieldSchema),
     freeItems: z.array(invoiceFreeItemFieldSchema),
     _changeMarker: z.string().optional(),
@@ -53,6 +59,7 @@ export const DEFAULT_INVOICE_FORM_VALUES: InvoiceFormData = {
     decorationStaff: '',
     returnStaff: '',
     remarks: '',
+    flowerFee: '',
     items: [],
     freeItems: [],
 }

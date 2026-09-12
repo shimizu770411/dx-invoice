@@ -64,6 +64,9 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
                     decorationStaff: source.decorationStaff,
                     returnStaff: source.returnStaff,
                     remarks: source.remarks,
+                    cremationFee: source.cremationFee,
+                    offeringFee: source.offeringFee,
+                    newspaperAdFee: source.newspaperAdFee,
                     issuedAt: source.issuedAt,
                 },
             })
@@ -89,6 +92,9 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
                         isMaturityService: item.isMaturityService,
                         adhocSetScope: item.adhocSetScope,
                         multiSelectVariantIds: item.multiSelectVariantIds,
+                        // 親祭壇の増額も引き継ぐ。unitPriceMember は上乗せ済みの金額をそのままコピーしている
+                        surchargeAmount: item.surchargeAmount,
+                        planSurchargeId: item.planSurchargeId,
                         sortNo: item.sortNo,
                     },
                 })

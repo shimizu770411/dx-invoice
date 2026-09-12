@@ -29,6 +29,9 @@ export interface EstimateItem {
     isMaturityService?: boolean
     adhocSetScope?: 'NONE' | 'MEMBER_ONLY' | 'GENERAL_ONLY' | 'BOTH'
     multiSelectVariantIds?: string | null
+    /** 親祭壇の増額。一般単価・会員単価には既に上乗せ済み */
+    surchargeAmount?: number | null
+    planSurchargeId?: string | null
     /** 保存後の行がどのバリアントグループ（重箱の基本セット／追加オプション等）由来かを示す */
     productVariantGroupId?: string | null
     /** グループ商品の選択状態（保存前の一時データ）。JSON文字列: { [groupId]: variantId[] } */

@@ -5,6 +5,7 @@ import { AutoFitOneLineText } from './AutoFitOneLineText'
 import { resolveProductImageUrl } from '@/lib/utils'
 import { scopeApplies } from '@/lib/productScope'
 import { computeMultiRowAmount } from '@/lib/expandMultiRow'
+import { buildSeparateFeesText, buildInvoiceFeeLines, SEPARATE_FEES_BLOCK_END } from '@/lib/separateFees'
 import { useDateFormat } from '@/hooks/useDateFormat'
 import {
     A4_HEIGHT_MM,
@@ -140,6 +141,12 @@ export type PdfDocument = {
     items: PdfDocumentItem[]
     freeItems?: PdfFreeItem[]
     remarks?: string | null
+    // 備考欄の【別料金】ブロックに表示する金額（見積のみ）。合計金額には含まれない
+    cremationFee?: number | null
+    offeringFee?: number | null
+    newspaperAdFee?: number | null
+    // 備考欄の支払合計ブロックに表示する生花代（請求書のみ）。合計金額には含まれない
+    flowerFee?: number | null
     customer?: PdfDocumentCustomer | null
 }
 
@@ -150,7 +157,19 @@ type Props = {
     document: PdfDocument
     products: PdfProductItem[]
     hideSelectedOptions?: boolean
+    /** 備考欄の冒頭に【別料金】〜【備考】の固定ブロックを出力する（見積書のみ） */
+    showSeparateFees?: boolean
+    /** 備考欄の冒頭に葬儀代金〜【備考】の固定ブロックを出力する（請求書のみ） */
+    showInvoiceFees?: boolean
+    /** 備考欄の最下部に出す振込先の1行（請求書のみ）。未登録なら渡さない */
+    bankTransferText?: string | null
 }
+
+// 支払合計ブロックの罫線の長さ。備考欄の幅いっぱいだと不格好なため、
+// 金額が収まる範囲に留める（指示書の図に合わせた比率）
+const INVOICE_FEE_BLOCK_WIDTH = '83%'
+// 備考欄の文字サイズ（text-[0.75rem] と一致させる）。振込先の自動縮小の基準に使う
+const REMARKS_FONT_PX = 12
 
 // ──────────────────────────────────────────────────────────
 // テーブル行ビルダー
@@ -414,6 +433,7 @@ function fmtAmount(n: number): string {
     return n.toLocaleString()
 }
 
+
 // 故人名の文字数に応じてフォントサイズを縮小し、「故　○○○○　様」欄が枠内で1行に収まるようにする
 function getDeceasedNameFontSize(name?: string | null): string {
     const len = (name ?? '').length
@@ -542,7 +562,17 @@ function computeItemTableRowPlan(
     return { targetBodyRows, grandTotalExtraPx: Math.max(0, budgetPx - usedPx) + FINAL_ADJUSTMENT_PX }
 }
 
-export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc, products, hideSelectedOptions }: Props) {
+export function PdfInvoiceLayout({
+    contentId,
+    containerRef,
+    title,
+    document: doc,
+    products,
+    hideSelectedOptions,
+    showSeparateFees,
+    showInvoiceFees,
+    bankTransferText,
+}: Props) {
     const { docNo, membershipPaidAmount, items } = doc
     const docAny = doc as any
     const formatDate = useDateFormat()
@@ -1330,13 +1360,40 @@ export function PdfInvoiceLayout({ contentId, containerRef, title, document: doc
                             </table>
                         </div>
                         {/* 調整 */}
-                        <div className="min-h-0 flex-1 overflow-hidden border-b border-black px-1 text-[0.75rem]">
+                        <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-b border-black px-1 text-[0.75rem]">
                             <div>(備考)</div>
-                            <div className="mx-2">
+                            <div className="mx-2 min-h-0 flex-1 overflow-hidden">
+                                {showSeparateFees && (
+                                    <div className="whitespace-pre-wrap break-words">
+                                        {buildSeparateFeesText(doc)}
+                                    </div>
+                                )}
+                                {showInvoiceFees && (
+                                    <div>
+                                        {buildInvoiceFeeLines(doc.grandTotal, doc.flowerFee).map((line) => (
+                                            <div
+                                                key={line.label}
+                                                // 生花代と支払合計の間だけ罫線を挟む。行を増やさず下線として引く
+                                                className={line.underline ? 'border-b border-black' : ''}
+                                                style={{ width: INVOICE_FEE_BLOCK_WIDTH }}
+                                            >
+                                                {line.label}：{line.amountText}
+                                            </div>
+                                        ))}
+                                        <div>{SEPARATE_FEES_BLOCK_END}</div>
+                                    </div>
+                                )}
                                 {doc.remarks ? (
                                     <div className="whitespace-pre-wrap break-words">{doc.remarks}</div>
                                 ) : null}
                             </div>
+                            {/* 振込先は備考本文の量にかかわらず、備考欄の最下部に固定で出す。
+                                口座名義まで入ると備考欄の幅に収まらないことがあるため、1行に収まるよう自動縮小する */}
+                            {bankTransferText ? (
+                                <div className="mx-2 shrink-0">
+                                    <AutoFitOneLineText text={bankTransferText} basePx={REMARKS_FONT_PX} />
+                                </div>
+                            ) : null}
                         </div>
                         {/* その他情報 */}
                         <table className="w-full border-collapse border-t border-black text-xs">
