@@ -443,6 +443,11 @@ function getDeceasedNameFontSize(name?: string | null): string {
     if (len <= 16) return '1rem' // text-base 相当
     return '0.875rem' // text-sm 相当
 }
+// 故人名は文字数に応じて縮小するが、行の高さまで一緒に縮むとヘッダー全体が低くなる。
+// 明細テーブルの高さは「ヘッダーは常にHEADER_HEIGHT_PX」という前提で決めているため、
+// 縮んだ分がそのまま明細表の下（差引合計額の行と外枠の間）の隙間として残ってしまう。
+// 最大サイズ(1.875rem=30px)の行の高さに固定し、文字サイズによらず一定にする。
+const DECEASED_NAME_LINE_HEIGHT_PX = 30
 
 
 // 明細欄は常に「39行」固定とする（品目行がこれに満たない分は空白行で埋める。
@@ -556,13 +561,13 @@ function computeItemTableRowPlan(
     const availableForBodyRows = budgetPx - fixedRowsHeightPx(ITEM_TABLE_LINE_HEIGHT) - footerExtraRows * rowUnit
     const targetBodyRows = Math.max(ITEM_TABLE_TARGET_BODY_ROWS, Math.floor(availableForBodyRows / rowUnit))
     const usedPx = fixedRowsHeightPx(ITEM_TABLE_LINE_HEIGHT) + (targetBodyRows + footerExtraRows) * rowUnit
-    // 端数は差引合計額の行の高さで吸収し、表の下端を枠にほぼぴったり合わせる。
-    // 以前はここで差引合計額の高さに一律+3pxしていたが、それだと表の高さが常に予算を
-    // 3px超過し、下端（差引合計額の罫線）が切れる状態だったため廃止した。
-    // ただし各行の高さはブラウザ側でサブピクセル丸めされ、行数が多い書類ほど計算値との
-    // 差が積み上がる（実測で本文44行の書類が約0.6px超過）。吸収量からこの丸め分を
-    // 引いておき、どの行数でも枠内に収まるようにする。数px程度なので外枠の罫線と重なり、
-    // 見た目には隙間として出ない。
+    // 端数は差引合計額の行の高さで吸収する。以前はここで差引合計額の高さに一律+3pxして
+    // いたが、それだと表の高さが常に予算を3px超過し、下端（差引合計額の罫線）が切れる
+    // 状態だったため廃止した。
+    // 各行の高さはブラウザ側でサブピクセル丸めされ、行数や罫線の共有状況によって計算値と
+    // 数pxずれる。はみ出す側にずれると下端が切れてしまうので、吸収量から丸め分を引いて
+    // 必ず少し足りない側に倒しておく。足りなかった分は、明細テーブルに height:100% を
+    // 指定してあるためブラウザが各行へごくわずかずつ配分して埋める（枠との隙間は出ない）。
     const ROUNDING_ALLOWANCE_PX = 2
     return { targetBodyRows, grandTotalExtraPx: Math.max(0, budgetPx - usedPx - ROUNDING_ALLOWANCE_PX) }
 }
@@ -802,7 +807,10 @@ export function PdfInvoiceLayout({
         const rowStyle =
             !row.multiRowGroupSize && rowUnitCount > 1
                 ? {
-                      height: `${rowUnitCount * (ITEM_TABLE_FONT_PX * itemTableLineHeight + ITEM_TABLE_BORDER_PX) - ITEM_TABLE_BORDER_PX}px`,
+                      // 行の高さは「N×(文字の高さ+罫線)」。通常の行N本ぶんとちょうど同じにする
+                      // （以前はここから罫線1本分を引いていたため、2行以上の行がある書類だけ
+                      // 表全体が1pxずつ低くなり、下端の隙間が書類によってばらついていた）。
+                      height: `${rowUnitCount * (ITEM_TABLE_FONT_PX * itemTableLineHeight + ITEM_TABLE_BORDER_PX)}px`,
                   }
                 : undefined
         return (
@@ -984,8 +992,11 @@ export function PdfInvoiceLayout({
                         <div>&nbsp;</div>
                         <div className="text-center">
                             <div
-                                className="inline-block whitespace-nowrap border-b border-black pb-[4px] align-bottom font-black leading-none tracking-wide"
-                                style={{ fontSize: getDeceasedNameFontSize(customer?.deceasedName) }}
+                                className="inline-block whitespace-nowrap border-b border-black pb-[4px] align-bottom font-black tracking-wide"
+                                style={{
+                                    fontSize: getDeceasedNameFontSize(customer?.deceasedName),
+                                    lineHeight: `${DECEASED_NAME_LINE_HEIGHT_PX}px`,
+                                }}
                             >
                                 故　
                                 <span className="px-3">{customer?.deceasedName || ''}</span>
@@ -1058,7 +1069,7 @@ export function PdfInvoiceLayout({
                     <div className="w-[60%] border-r-2 border-black" style={{ overflow: 'hidden' }}>
                         <table
                             className="w-full border-collapse text-[0.75rem]"
-                            style={{ lineHeight: itemTableLineHeight, tableLayout: 'fixed' }}
+                            style={{ lineHeight: itemTableLineHeight, tableLayout: 'fixed', height: '100%' }}
                         >
                             <colgroup>
                                 <col style={{ width: '24%' }} />
