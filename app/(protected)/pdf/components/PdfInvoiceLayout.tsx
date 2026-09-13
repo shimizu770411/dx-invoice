@@ -477,13 +477,13 @@ const PAGE_CONTENT_HEIGHT_PX = A4_HEIGHT_MM * PX_PER_MM - PAGE_BODY_PADDING_PX -
 // 明細テーブルに使える高さは、この固定値をページ高さから差し引いた残りとする。
 const HEADER_HEIGHT_PX = 112.796875
 const FOOTER_HEIGHT_PX = 86
-// 品名の下に種類名を表示する行（showProductVariantName、needsDoubleHeight）による
-// 高さのブレは解消済みのため、残る誤差はブラウザの端数丸め（後述のborder-collapse分）
-// 程度。念のための小さな安全マージンは「行間（フォントサイズ）」を決める際の
-// 最大パターン(行数最多)の判定にだけ効かせる。書類ごとの空白行数・端数吸収
-// （差引合計額の高さ）は、マージンを引かない本来の予算をフルに使う
-// （そうしないと、実際には余裕があるのに使われない余白が残ってしまうため）。
-const ITEM_TABLE_SAFETY_MARGIN_PX = 5
+// 明細行は「その行が実際に何行分の高さになるか」(itemRowUnitCount)を数えたうえで、
+// その行数ぶんの高さを明示指定しているため、計算値と実描画のズレはブラウザの端数丸め
+// （後述のborder-collapse分）程度に収まる。安全マージンは「行間（フォントサイズ）」を
+// 決める際の最大パターン(行数最多)の判定にだけ効かせ、1行の高さの半分を確保する。
+// 書類ごとの空白行数・端数吸収（差引合計額の高さ）は、マージンを引かない本来の予算を
+// フルに使う（そうしないと、実際には余裕があるのに使われない余白が残ってしまうため）。
+const ITEM_TABLE_SAFETY_MARGIN_PX = (ITEM_TABLE_FONT_PX * ITEM_TABLE_DEFAULT_LEADING + ITEM_TABLE_BORDER_PX) / 2
 const ITEM_TABLE_FULL_BUDGET_PX = PAGE_CONTENT_HEIGHT_PX - HEADER_HEIGHT_PX - FOOTER_HEIGHT_PX
 const ITEM_TABLE_BUDGET_PX = ITEM_TABLE_FULL_BUDGET_PX - ITEM_TABLE_SAFETY_MARGIN_PX
 
@@ -556,10 +556,15 @@ function computeItemTableRowPlan(
     const availableForBodyRows = budgetPx - fixedRowsHeightPx(ITEM_TABLE_LINE_HEIGHT) - footerExtraRows * rowUnit
     const targetBodyRows = Math.max(ITEM_TABLE_TARGET_BODY_ROWS, Math.floor(availableForBodyRows / rowUnit))
     const usedPx = fixedRowsHeightPx(ITEM_TABLE_LINE_HEIGHT) + (targetBodyRows + footerExtraRows) * rowUnit
-    // 計算上はほぼ0まで詰められるが、実測で89番・84番とも同じだけ小さな隙間が残るため、
-    // 差引合計額の高さに一律+3pxする（実測に基づく最終調整）。
-    const FINAL_ADJUSTMENT_PX = 3
-    return { targetBodyRows, grandTotalExtraPx: Math.max(0, budgetPx - usedPx) + FINAL_ADJUSTMENT_PX }
+    // 端数は差引合計額の行の高さで吸収し、表の下端を枠にほぼぴったり合わせる。
+    // 以前はここで差引合計額の高さに一律+3pxしていたが、それだと表の高さが常に予算を
+    // 3px超過し、下端（差引合計額の罫線）が切れる状態だったため廃止した。
+    // ただし各行の高さはブラウザ側でサブピクセル丸めされ、行数が多い書類ほど計算値との
+    // 差が積み上がる（実測で本文44行の書類が約0.6px超過）。吸収量からこの丸め分を
+    // 引いておき、どの行数でも枠内に収まるようにする。数px程度なので外枠の罫線と重なり、
+    // 見た目には隙間として出ない。
+    const ROUNDING_ALLOWANCE_PX = 2
+    return { targetBodyRows, grandTotalExtraPx: Math.max(0, budgetPx - usedPx - ROUNDING_ALLOWANCE_PX) }
 }
 
 export function PdfInvoiceLayout({
@@ -676,6 +681,96 @@ export function PdfInvoiceLayout({
           }
         : undefined
     const displayRows = buildDisplayRows(products, items, doc.freeItems)
+    // 摘要欄は「摘要テキスト」と「数量・単価」を上下に積んで表示するため、行によって
+    // 1行にも2行以上にもなる。どの行が何行になるかをここで確定させ、
+    //   ・空白行の本数(blankRowCount)
+    //   ・その行に持たせる高さ(rowStyle)
+    //   ・実際の描画（1行ずつ高さを固定した自動縮小表示）
+    // の3つが必ず同じ行数を見るようにする。折り返しに任せると行数が予測できず、
+    // 明細表が使える高さを超えてページ下端が切れてしまうため、ここで一本化している。
+    const buildDescriptionLines = (row: DisplayRow): string[] => {
+        const lines: string[] = []
+        const pushText = (text: string) => {
+            if (text) lines.push(...text.split('\n'))
+        }
+        // 摘要テキストの前後にある空行（入力時に紛れ込んだ改行・空白だけの行）は、
+        // 中身が無いのに明細欄の行を消費してしまうため落とす。
+        // 文章の途中の空行と、行内の字下げ（先頭の空白）はそのまま残す。
+        const pushDescriptionText = (text: string) => {
+            const raw = text.split('\n')
+            let start = 0
+            let end = raw.length
+            while (start < end && raw[start].trim() === '') start++
+            while (end > start && raw[end - 1].trim() === '') end--
+            for (let i = start; i < end; i++) lines.push(raw[i])
+        }
+        // 1) 摘要テキスト
+        if (row.displayDescriptionLines && !row.isSecondaryRow) {
+            lines.push(...row.displayDescriptionLines)
+        } else if (row.isMergedDescription && !row.isSecondaryRow) {
+            pushDescriptionText(
+                `${row.displayDescription ?? ''}${
+                    row.showQtyInDescription && row.estimateItem?.qty
+                        ? `　${row.estimateItem.qty.toLocaleString()}${row.estimateItem?.productVariant?.unitLabel ?? ''}`
+                        : ''
+                }`
+            )
+        } else {
+            const baseText = !row.isSecondaryRow ? (row.displayDescription ?? row.estimateItem?.description ?? '') : ''
+            // 複数行構成商品: useForDescriptionLabel行(この行自体)の選択種類名を摘要欄に追記
+            const labelText = row.isDescriptionLabelRow ? (row.descriptionLabelOverride ?? '') : ''
+            // 商品マスタ設定: 摘要欄末尾に個数(+単位)を追記（種類も表示する場合は「種類　個数」の順）
+            const qtyText =
+                row.isDescriptionLabelRow && row.showQtyInDescription && row.descriptionQtyOverride
+                    ? `　${row.descriptionQtyOverride.toLocaleString()}${row.descriptionUnitLabel ?? ''}`
+                    : !row.hasDescriptionLabelRow &&
+                        !row.isSecondaryRow &&
+                        row.showQtyInDescription &&
+                        row.estimateItem?.qty
+                      ? `　${row.estimateItem.qty.toLocaleString()}${row.estimateItem?.productVariant?.unitLabel ?? ''}`
+                      : ''
+            pushDescriptionText(`${baseText}${labelText}${qtyText}`)
+        }
+        // 2) 数量・単価
+        if (!row.isSecondaryRow) {
+            // 複数行構成商品(単価×数量型)は「数量 × 単価」を表示。それ以外は数量が1より大きい場合のみ表示。
+            // 親付きフリー行（満期サービス以外）は qty=1 でも常に数量を表示。
+            // showQtyInDescription有効時は摘要欄に個数を出しているため重複を避ける。
+            const qtyText =
+                row.estimateItem &&
+                isMultiRowItem(row.estimateItem) &&
+                row.estimateItem.calcType === 'UNIT_PRICE_X_QTY'
+                    ? `${row.estimateItem.qty.toLocaleString()} × ¥${fmtAmount(isMember ? row.estimateItem.unitPriceMember : row.estimateItem.unitPriceGeneral)}`
+                    : row.estimateItem &&
+                        !row.showQtyInDescription &&
+                        (row.estimateItem.qty > 1 || (row.isFreeItem && row.isFixedRow && !row.isMaturity))
+                      ? `数量: ${row.estimateItem.qty.toLocaleString()}`
+                      : ''
+            // 複数行構成商品(hasReturn)の返品行。数量>0のときのみ「▲数量 × 単価」を次の行に追記する
+            const deductionText =
+                row.deductionItem && (row.deductionItem.qty ?? 0) > 0
+                    ? `\n▲${row.deductionItem.qty.toLocaleString()} × ¥${fmtAmount(isMember ? row.deductionItem.unitPriceMember : row.deductionItem.unitPriceGeneral)}`
+                    : ''
+            const unitPriceText =
+                row.isFreeItem && !row.isFixedRow && row.estimateItem
+                    ? `${row.estimateItem.qty > 1 ? '　' : ''}単価: ¥${fmtAmount(row.estimateItem.unitPriceGeneral)}`
+                    : ''
+            pushText(`${qtyText}${deductionText}${unitPriceText}`)
+        }
+        return lines
+    }
+    // その明細行が明細欄の何行分の高さを占めるか。
+    // ・複数行構成商品の先頭行は、摘要セルが rowSpan で後続行とまとめて multiRowGroupSize 行に
+    //   またがるため、摘要がその行数を超える分だけを先頭行に加算する（後続行はそれぞれ1行）。
+    //   ただし行ごとに摘要を出す商品(hasDescriptionLabelRow)は摘要セルがまたがらないので対象外。
+    // ・品名の下に種類名を出す行は品名側だけで2行必要
+    const itemRowUnitCount = (row: DisplayRow): number => {
+        const descriptionLineCount = buildDescriptionLines(row).length
+        if (row.multiRowGroupSize && !row.hasDescriptionLabelRow) {
+            return Math.max(1, descriptionLineCount - (row.multiRowGroupSize - 1))
+        }
+        return Math.max(1, row.needsDoubleHeight ? 2 : 1, descriptionLineCount)
+    }
     // tfoot内の会員入金額行・解約手数料行（値引含む2行）は品目数に応じて増減する。
     // 行間(ITEM_TABLE_LINE_HEIGHT)は全書類共通の固定値。フッター変動行数が
     // 最大パターンより少ない書類は、その分だけ通常サイズの空白行が増える
@@ -689,22 +784,27 @@ export function PdfInvoiceLayout({
         itemTableFooterExtraRows,
         ITEM_TABLE_FULL_BUDGET_PX
     )
-    // needsDoubleHeight行は見た目上1行(DisplayRow1件)だが、実際は2行分の高さを占有するため、
-    // 空白行の計算でも2行分としてカウントする。
-    const doubleHeightRowCount = displayRows.filter((row) => row.needsDoubleHeight).length
-    // 品目行が目標行数(最低39行、余裕があればそれ以上)に満たない分だけ空白行で埋める
-    const blankRowCount = Math.max(0, targetBodyRows - displayRows.length - doubleHeightRowCount)
+    // 品目行が目標行数(最低39行、余裕があればそれ以上)に満たない分だけ空白行で埋める。
+    // 2行以上を占める明細行は、見た目上1行(DisplayRow1件)でもその行数分としてカウントする。
+    const itemRowUnitTotal = displayRows.reduce((sum, row) => sum + itemRowUnitCount(row), 0)
+    const blankRowCount = Math.max(0, targetBodyRows - itemRowUnitTotal)
     // 満期サービス行は商品行群の直後ではなく、明細欄の最終行（小計の直前）に固定表示する
     const normalRows = displayRows.filter((row) => !row.isMaturity)
     const maturityRows = displayRows.filter((row) => row.isMaturity)
     const renderItemRow = (row: DisplayRow, index: number, rows: DisplayRow[], keyPrefix: string) => {
         const isNextSecondary = rows[index + 1]?.isSecondaryRow
         const mergeCls = `${row.isSecondaryRow ? 'border-t-0' : ''} ${isNextSecondary ? 'border-b-0' : ''}`
-        // needsDoubleHeight行は、品名の下に表示する種類名の分だけ本来2行分の高さが必要。
-        // rowSpanで2行に分割すると高さが均等配分されないため、1行のまま明示的に高さを2倍にする。
-        const rowStyle = row.needsDoubleHeight
-            ? { height: `${2 * (ITEM_TABLE_FONT_PX * itemTableLineHeight + ITEM_TABLE_BORDER_PX) - ITEM_TABLE_BORDER_PX}px` }
-            : undefined
+        // 2行以上を占める行は、明示的にその行数分の高さを指定して、行数計算と実際の高さを
+        // 一致させる（rowSpanで分割すると高さが均等配分されないため、行自体は分けない）。
+        // 複数行構成商品の先頭行だけは rowSpan で後続行と高さを分け合うので指定しない。
+        const rowUnitCount = itemRowUnitCount(row)
+        const descriptionLines = buildDescriptionLines(row)
+        const rowStyle =
+            !row.multiRowGroupSize && rowUnitCount > 1
+                ? {
+                      height: `${rowUnitCount * (ITEM_TABLE_FONT_PX * itemTableLineHeight + ITEM_TABLE_BORDER_PX) - ITEM_TABLE_BORDER_PX}px`,
+                  }
+                : undefined
         return (
         <Fragment key={`${keyPrefix}-${index}`}>
             <tr key={`${keyPrefix}-main-${index}`} style={rowStyle}>
@@ -747,61 +847,24 @@ export function PdfInvoiceLayout({
                     className={`border border-l-0 border-black px-0.5 text-left align-top ${row.hasDescriptionLabelRow ? mergeCls : ''}`}
                     rowSpan={row.hasDescriptionLabelRow ? 1 : row.multiRowGroupSize}
                 >
-                    {row.displayDescriptionLines && !row.isSecondaryRow ? (
-                        row.displayDescriptionLines.map((line, i) => (
-                            <div
-                                key={i}
-                                style={{
-                                    height: `${ITEM_TABLE_FONT_PX * itemTableLineHeight + ITEM_TABLE_BORDER_PX}px`,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                }}
-                            >
-                                <AutoFitOneLineText text={line} basePx={ITEM_TABLE_FONT_PX} />
-                            </div>
-                        ))
-                    ) : row.isMergedDescription && !row.isSecondaryRow ? (
-                        <AutoFitOneLineText
-                            text={`${row.displayDescription ?? ''}${
-                                row.showQtyInDescription && row.estimateItem?.qty
-                                    ? `　${row.estimateItem.qty.toLocaleString()}${row.estimateItem?.productVariant?.unitLabel ?? ''}`
-                                    : ''
-                            }`}
-                            basePx={ITEM_TABLE_FONT_PX}
-                        />
-                    ) : (
-                    <div className="whitespace-pre-wrap break-words">
-                        {!row.isSecondaryRow ? (row.displayDescription ?? row.estimateItem?.description ?? '') : ''}
-                        {/* 複数行構成商品: useForDescriptionLabel行(この行自体)の選択種類名を摘要欄に追記 */}
-                        {row.isDescriptionLabelRow ? (row.descriptionLabelOverride ?? '') : ''}
-                        {/* 商品マスタ設定: 摘要欄末尾に個数(+単位)を追記（種類も表示する場合は「種類　個数」の順） */}
-                        {row.isDescriptionLabelRow && row.showQtyInDescription && row.descriptionQtyOverride
-                            ? `　${row.descriptionQtyOverride.toLocaleString()}${row.descriptionUnitLabel ?? ''}`
-                            : !row.hasDescriptionLabelRow && !row.isSecondaryRow && row.showQtyInDescription && row.estimateItem?.qty
-                            ? `　${row.estimateItem.qty.toLocaleString()}${row.estimateItem?.productVariant?.unitLabel ?? ''}`
-                            : ''}
-                    </div>
-                    )}
-                    {!row.isSecondaryRow && (
-                    <div className="whitespace-pre-wrap">
-                        {/* 複数行構成商品(単価×数量型)は「数量 × 単価」を表示。それ以外は数量が1より大きい場合のみ表示。親付きフリー行（満期サービス以外）は qty=1 でも常に数量を表示。showQtyInDescription有効時は摘要欄に個数を出しているため重複を避ける。 */}
-                        {row.estimateItem && isMultiRowItem(row.estimateItem) && row.estimateItem.calcType === 'UNIT_PRICE_X_QTY'
-                            ? `${row.estimateItem.qty.toLocaleString()} × ¥${fmtAmount(isMember ? row.estimateItem.unitPriceMember : row.estimateItem.unitPriceGeneral)}`
-                            : row.estimateItem &&
-                              !row.showQtyInDescription &&
-                              (row.estimateItem.qty > 1 ||
-                                  (row.isFreeItem && row.isFixedRow && !row.isMaturity))
-                            ? `数量: ${row.estimateItem.qty.toLocaleString()}`
-                            : ''}
-                        {/* 複数行構成商品(hasReturn)の返品行。数量>0のときのみ「▲数量 × 単価」を2行目に追記する */}
-                        {row.deductionItem && (row.deductionItem.qty ?? 0) > 0
-                            ? `\n▲${row.deductionItem.qty.toLocaleString()} × ¥${fmtAmount(isMember ? row.deductionItem.unitPriceMember : row.deductionItem.unitPriceGeneral)}`
-                            : ''}
-                        {row.isFreeItem && !row.isFixedRow && row.estimateItem
-                            ? `${row.estimateItem.qty > 1 ? '　' : ''}単価: ¥${fmtAmount(row.estimateItem.unitPriceGeneral)}`
-                            : ''}
-                    </div>
-                    )}
+                    {/* 摘要欄は buildDescriptionLines で確定させた行数ぶんだけ、1行ずつ高さを固定して
+                        描画する。各行は幅に収まらなければ自動縮小（それでも収まらなければ末尾を省略）
+                        するため、想定外の折り返しで行が増えて明細表が伸びることがない。 */}
+                    {descriptionLines.map((line, i) => (
+                        <div
+                            key={i}
+                            style={{
+                                // N行ぶんの高さは「N×(文字の高さ+罫線) − 罫線」。行と行の間にだけ罫線1本分が
+                                // 入るので、最終行にはそれを足さない。ここで足してしまうと1行の行が1pxずつ
+                                // 高くなり、行数が多い書類で表全体が数十px膨らんでページ下端が切れる。
+                                height: `${ITEM_TABLE_FONT_PX * itemTableLineHeight + (i < descriptionLines.length - 1 ? ITEM_TABLE_BORDER_PX : 0)}px`,
+                                display: 'flex',
+                                alignItems: 'center',
+                            }}
+                        >
+                            <AutoFitOneLineText text={line} basePx={ITEM_TABLE_FONT_PX} />
+                        </div>
+                    ))}
                 </td>
                 )}
                 <td
