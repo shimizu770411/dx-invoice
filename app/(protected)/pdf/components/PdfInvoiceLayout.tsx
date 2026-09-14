@@ -880,11 +880,11 @@ export function PdfInvoiceLayout({
                 >
                     {row.estimateItem && !row.isMaturity ? (
                         isServiceIncludedFor(row.estimateItem, false) ? (
-                            <span style={{ color: '#8a7e5c', fontWeight: 600 }}>
+                            <span style={{ fontWeight: 600 }}>
                                 サービス
                             </span>
                         ) : isSetIncludedFor(row.estimateItem, false) ? (
-                            <span style={{ color: '#8a7e5c', fontWeight: 600 }}>
+                            <span style={{ fontWeight: 600 }}>
                                 セット
                             </span>
                         ) : (
@@ -903,15 +903,15 @@ export function PdfInvoiceLayout({
                 >
                     {row.estimateItem ? (
                         isMaturityServiceIncludedFor(row.estimateItem) ? (
-                            <span style={{ color: '#8a7e5c', fontWeight: 600 }}>
+                            <span style={{ fontWeight: 600 }}>
                                 満期サービス
                             </span>
                         ) : isServiceIncludedFor(row.estimateItem, true) ? (
-                            <span style={{ color: '#8a7e5c', fontWeight: 600 }}>
+                            <span style={{ fontWeight: 600 }}>
                                 サービス
                             </span>
                         ) : isSetIncludedFor(row.estimateItem, true) ? (
-                            <span style={{ color: '#8a7e5c', fontWeight: 600 }}>
+                            <span style={{ fontWeight: 600 }}>
                                 セット
                             </span>
                         ) : (
