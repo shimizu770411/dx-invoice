@@ -83,11 +83,15 @@ function buildNewEstimateItems(filteredProducts: ProductItem[], isMember: boolea
 }
 
 // 編集時: 1商品 → 既存明細とマージした明細行
+// isPlanChange=true（プラン切替）のときだけ、プラン別の初期種類への追従と
+// 疑似セット子化の自動チェック付け外しを行う。読み込み時にこれを走らせると、
+// 保存済みの単価が商品マスタの現在価格で上書きされてしまう。
 function buildEstimateItemsForProduct(
     product: any,
     startSortNo: number,
     existingItems: EstimateItem[],
-    isMember: boolean
+    isMember: boolean,
+    isPlanChange: boolean
 ): EstimateItem[] {
     if (product.isMultiRow && product.rows?.length > 0) {
         const out: EstimateItem[] = []
@@ -214,7 +218,10 @@ function buildEstimateItemsForProduct(
         // 基本プランの時点で自動チェックが入る商品は永久に追従せず、プラン設定が効かなかった。
         const oldDefaultVariant =
             (existing as any).productItem?.variants?.find((v: any) => v.isDefaultSet) ?? null
-        const defaultVariantChanged = String(newDefaultVariant?.id ?? '') !== String(oldDefaultVariant?.id ?? '')
+        // 種類の入れ替えと、それに伴う商品マスタの現在価格の取り込みは、プラン切替時にだけ行う。
+        // 読み込み時にも行うと、価格改定後に旧書類を開いただけで保存済みの単価が上書きされる。
+        const defaultVariantChanged =
+            isPlanChange && String(newDefaultVariant?.id ?? '') !== String(oldDefaultVariant?.id ?? '')
         const planDefaultVariantPatch =
             defaultVariantChanged && newDefaultVariant
                 ? {
@@ -227,17 +234,18 @@ function buildEstimateItemsForProduct(
 
         if (isForcedSet && !wasForcedSet && !(existing.qty > 0)) {
             // 新たに疑似セット子化 / 唯一の親商品化された瞬間(かつユーザーがまだチェックしていない): 自動チェックする
+            // 読み込み時は数量を立てるだけにとどめ、種類と単価は保存済みの値を保つ
             return [{
                 ...existing,
                 productItem: { ...product },
-                productVariantId: newDefaultVariant?.id ?? existing.productVariantId,
-                productVariant: newDefaultVariant,
-                unitPriceGeneral: newDefaultVariant
-                    ? resolveUnitPriceGeneral(existing, newDefaultVariant)
-                    : existing.unitPriceGeneral,
-                unitPriceMember: newDefaultVariant
-                    ? resolveUnitPriceMember(existing, newDefaultVariant, isMember)
-                    : existing.unitPriceMember,
+                ...(isPlanChange && newDefaultVariant
+                    ? {
+                          productVariantId: newDefaultVariant.id,
+                          productVariant: newDefaultVariant,
+                          unitPriceGeneral: resolveUnitPriceGeneral(existing, newDefaultVariant),
+                          unitPriceMember: resolveUnitPriceMember(existing, newDefaultVariant, isMember),
+                      }
+                    : {}),
                 qty: 1,
             } as EstimateItem]
         }
@@ -274,14 +282,17 @@ function buildEstimateItemsForProduct(
 function buildMergedEstimateItems(
     filteredProducts: ProductItem[],
     existingItems: EstimateItem[],
-    isMember: boolean
+    isMember: boolean,
+    isPlanChange: boolean
 ): EstimateItem[] {
     const mergedItems: EstimateItem[] = []
     const addedIds = new Set<string>()
     for (const product of filteredProducts) {
         const key = String(product.id)
         if (addedIds.has(key)) continue
-        mergedItems.push(...buildEstimateItemsForProduct(product, mergedItems.length, existingItems, isMember))
+        mergedItems.push(
+            ...buildEstimateItemsForProduct(product, mergedItems.length, existingItems, isMember, isPlanChange)
+        )
         addedIds.add(key)
     }
     return mergedItems
@@ -379,7 +390,7 @@ export function useEstimateCreate(customerId: string, reset: UseFormReset<Estima
                 )
                 if (!ok) return null
             }
-            const rebuilt = buildMergedEstimateItems(newFilteredProducts, snapshot, isMember)
+            const rebuilt = buildMergedEstimateItems(newFilteredProducts, snapshot, isMember, true)
             setItems(rebuilt)
             setPlanId(newPlanId)
             return rebuilt
@@ -480,7 +491,7 @@ export function useEstimateEdit(estimateId: string, reset: UseFormReset<Estimate
             const planSettings = await getProductPlanSettings(currentPlanId)
             const filteredProducts = applyPlanOverrides(filteredByStore, planSettings)
             const isMember = !!(estimateData as any).isMember
-            const mergedItems = buildMergedEstimateItems(filteredProducts, existingItems, isMember)
+            const mergedItems = buildMergedEstimateItems(filteredProducts, existingItems, isMember, false)
             const loadedFreeItems: EstimateFreeItem[] = (estimateData as any).freeItems || []
             const paddedFreeItems = buildDocumentFreeItems(loadedFreeItems, mergedItems, [MATURITY_SERVICE_NAME, EXECUTION_SURCHARGE_NAME])
             setItems(mergedItems)
@@ -559,7 +570,7 @@ export function useEstimateEdit(estimateId: string, reset: UseFormReset<Estimate
                 )
                 if (!ok) return null
             }
-            const rebuilt = buildMergedEstimateItems(newFilteredProducts, snapshot, isMember)
+            const rebuilt = buildMergedEstimateItems(newFilteredProducts, snapshot, isMember, true)
             setItems(rebuilt)
             setPlanId(newPlanId)
             return rebuilt
