@@ -81,6 +81,9 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
                         productVariantGroupId: item.productVariantGroupId,
                         productRowId: item.productRowId,
                         productRowVariantId: item.productRowVariantId,
+                        // 保存時点の商品名・種類名は、事前相談見積で控えた内容をそのまま引き継ぐ
+                        productItemName: item.productItemName,
+                        productVariantName: item.productVariantName,
                         calcType: item.calcType,
                         sign: item.sign,
                         description: item.description,

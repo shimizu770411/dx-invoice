@@ -100,6 +100,9 @@ export async function POST(
                         productVariantGroupId: item.productVariantGroupId,
                         productRowId: item.productRowId,
                         productRowVariantId: item.productRowVariantId,
+                        // 保存時点の商品名・種類名は、見積で控えた内容をそのまま引き継ぐ
+                        productItemName: item.productItemName ?? null,
+                        productVariantName: item.productVariantName ?? null,
                         calcType: item.calcType,
                         sign: item.sign ?? 1,
                         description: item.description,

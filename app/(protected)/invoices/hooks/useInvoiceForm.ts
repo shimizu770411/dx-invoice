@@ -4,10 +4,11 @@ import { useRouter } from 'next/navigation'
 import { getInvoice, updateInvoice } from '@/lib/invoices'
 import { getCustomer } from '@/lib/customers'
 import { getProducts } from '@/lib/products'
+import { withProductsMissingFromMaster } from '@/lib/documentMissingProducts'
 import { InvoiceItem, InvoiceFreeItem } from '@/lib/invoices'
 import { toast } from '@/hooks/use-toast'
 import { handleLoadError, handleSaveError } from '@/lib/errorHandler'
-import { calculateDocumentFormTotals } from '@/lib/documentTotals'
+import { calculateDocumentFormTotals, calcDocumentItemAmount } from '@/lib/documentTotals'
 import { useDocumentItems } from '@/hooks/useDocumentItems'
 import { expandEachModeItems, expandVariantGroupItems, buildDocumentFreeItems, MATURITY_SERVICE_NAME, CANCELLATION_FEE_NAME, EXECUTION_SURCHARGE_NAME, EXECUTION_SURCHARGE_AMOUNT } from '@/lib/documentUtils'
 import { useDocumentProductSearch } from '@/hooks/useDocumentProductSearch'
@@ -39,12 +40,17 @@ export function useInvoiceEdit(invoiceId: string, reset: UseFormReset<InvoiceFor
 
             // 顧客の担当店舗でvariantを絞り込み（該当店舗 + 全店舗共通）
             const storeId = customerData?.storeId ? String(customerData.storeId) : null
-            const filteredProducts = allProducts.map((product) => ({
-                ...product,
-                variants: product.variants.filter(
-                    (v) => !v.storeId || (storeId && String(v.storeId) === storeId)
-                ),
-            }))
+            // 商品マスタから消えた商品（無効化された商品など）の明細を落とさないよう、
+            // 保存済み明細が参照している商品を補ってからマージする
+            const filteredProducts = withProductsMissingFromMaster(
+                allProducts.map((product) => ({
+                    ...product,
+                    variants: product.variants.filter(
+                        (v) => !v.storeId || (storeId && String(v.storeId) === storeId)
+                    ),
+                })),
+                existingItems
+            )
 
             // 全アクティブ品目と既存請求明細をマージ
             const mergedItems: InvoiceItem[] = []
@@ -155,11 +161,16 @@ export function useInvoiceEdit(invoiceId: string, reset: UseFormReset<InvoiceFor
                         const variantIds = allExisting
                             .map((it: any) => String(it.productVariantId))
                             .filter(Boolean)
-                        const selectedVariants = (product.variants || []).filter((v: any) =>
-                            variantIds.includes(String(v.id))
+                        // 単価は保存済み明細の合計を使う。商品マスタの現在価格で集計し直すと、
+                        // 価格改定後に旧書類を開いただけで金額が変わり、保存で確定してしまう。
+                        const totalGeneral = allExisting.reduce(
+                            (s: number, it: any) => s + (it.unitPriceGeneral || 0),
+                            0
                         )
-                        const totalGeneral = selectedVariants.reduce((s: number, v: any) => s + v.priceGeneral, 0)
-                        const totalMember = selectedVariants.reduce((s: number, v: any) => s + v.priceMember, 0)
+                        const totalMember = allExisting.reduce(
+                            (s: number, it: any) => s + (it.unitPriceMember || 0),
+                            0
+                        )
                         mergedItems.push({
                             ...allExisting[0],
                             productItem: { ...product },
@@ -172,7 +183,8 @@ export function useInvoiceEdit(invoiceId: string, reset: UseFormReset<InvoiceFor
                     }
                     continue
                 }
-                const firstVariant = product.variants[0] ?? null
+                // 商品マスタから消えた商品を補った場合、種類一覧が無いこともある
+                const firstVariant = (product.variants ?? [])[0] ?? null
                 mergedItems.push({
                     productItemId: product.id,
                     productVariantId: firstVariant?.id ?? undefined,
@@ -247,8 +259,9 @@ export function useInvoiceEdit(invoiceId: string, reset: UseFormReset<InvoiceFor
             const allMergedItems = items.map((item, i) => {
                 const qty = formValues.items[i]?.qty ?? item.qty
                 const description = formValues.items[i]?.description ?? item.description ?? ''
-                const unitPrice = isMember ? item.unitPriceMember : item.unitPriceGeneral
-                const amount = unitPrice * qty
+                // セット扱い・サービス扱いの行は 0 円になる。ここで単価×数量をそのまま入れると、
+                // 0円扱いのはずの行まで積み上がった合計がサーバー側で算出され保存されてしまう
+                const amount = calcDocumentItemAmount(item, qty, isMember)
                 return { ...item, qty, description, amount }
             })
             const activeItems = allMergedItems.filter((item) => item.qty > 0).map((item, i) => ({ ...item, sortNo: i }))

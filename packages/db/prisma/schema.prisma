@@ -510,6 +510,10 @@ model EstimateItem {
   productRowId         BigInt?       @map("product_row_id")
   productRowVariantId  BigInt?       @map("product_row_variant_id")
   productVariantGroupId BigInt?      @map("product_variant_group_id")
+  // 保存時点の商品名・種類名。商品マスタの名称を変えても発行済み書類の文言が変わらないようにするための控え。
+  // 表示側はこれを優先し、未設定（この列を追加する前に作られた書類）のときだけ商品マスタの名称にフォールバックする
+  productItemName      String?       @db.VarChar(120) @map("product_item_name")
+  productVariantName   String?       @db.VarChar(120) @map("product_variant_name")
   calcType             RowCalcType?  @map("calc_type")
   sign                 Int           @default(1)
   description          String?       @db.VarChar(255)
@@ -616,6 +620,10 @@ model InvoiceItem {
   productRowId         BigInt?       @map("product_row_id")
   productRowVariantId  BigInt?       @map("product_row_variant_id")
   productVariantGroupId BigInt?      @map("product_variant_group_id")
+  // 保存時点の商品名・種類名。商品マスタの名称を変えても発行済み書類の文言が変わらないようにするための控え。
+  // 表示側はこれを優先し、未設定（この列を追加する前に作られた書類）のときだけ商品マスタの名称にフォールバックする
+  productItemName      String?       @db.VarChar(120) @map("product_item_name")
+  productVariantName   String?       @db.VarChar(120) @map("product_variant_name")
   calcType             RowCalcType?  @map("calc_type")
   sign                 Int           @default(1)
   description          String?       @db.VarChar(255)

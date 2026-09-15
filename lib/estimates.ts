@@ -34,6 +34,10 @@ export interface EstimateItem {
     planSurchargeId?: string | null
     /** 保存後の行がどのバリアントグループ（重箱の基本セット／追加オプション等）由来かを示す */
     productVariantGroupId?: string | null
+    /** 保存時点の商品名。商品マスタで改名されても発行済み書類の文言を保つための控え */
+    productItemName?: string | null
+    /** 保存時点の種類名。複数行構成商品では行内の選択肢のラベル */
+    productVariantName?: string | null
     /** グループ商品の選択状態（保存前の一時データ）。JSON文字列: { [groupId]: variantId[] } */
     groupSelections?: string | null
     sortNo: number

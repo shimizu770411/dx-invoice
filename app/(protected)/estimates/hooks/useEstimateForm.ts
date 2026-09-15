@@ -8,11 +8,12 @@ import { getCompanyProfile } from '@/lib/company'
 import { getProducts, ProductItem } from '@/lib/products'
 import { getProductPlanSettings, applyPlanOverrides, BASE_PLAN_ID } from '@/lib/plans'
 import { scopeApplies } from '@/lib/productScope'
+import { withProductsMissingFromMaster } from '@/lib/documentMissingProducts'
 import { resolveUnitPriceGeneral, resolveUnitPriceMember } from '@/lib/itemPricing'
 import { expandMultiRowToItems } from '@/lib/expandMultiRow'
 import { toast } from '@/hooks/use-toast'
 import { handleLoadError, handleSaveError } from '@/lib/errorHandler'
-import { calculateDocumentFormTotals } from '@/lib/documentTotals'
+import { calculateDocumentFormTotals, calcDocumentItemAmount } from '@/lib/documentTotals'
 import { useDocumentItems } from '@/hooks/useDocumentItems'
 import { expandEachModeItems, expandVariantGroupItems, buildDocumentFreeItems, MATURITY_SERVICE_NAME, EXECUTION_SURCHARGE_NAME, EXECUTION_SURCHARGE_AMOUNT } from '@/lib/documentUtils'
 import { useDocumentProductSearch } from '@/hooks/useDocumentProductSearch'
@@ -190,13 +191,14 @@ function buildEstimateItemsForProduct(
     if (allExisting.length > 0) {
         if (product.isMultiSelect && product.multiSelectMerge === false && allExisting.length > 1) {
             const variantIds = allExisting.map((it: any) => String(it.productVariantId)).filter(Boolean)
-            const selectedVariants = (product.variants || []).filter((v: any) => variantIds.includes(String(v.id)))
+            // 単価は保存済み明細の合計を使う。商品マスタの現在価格で集計し直すと、
+            // 価格改定後に旧書類を開いただけで金額が変わり、保存で確定してしまう。
             return [{
                 ...allExisting[0],
                 productItem: { ...product },
                 multiSelectVariantIds: JSON.stringify(variantIds),
-                unitPriceGeneral: selectedVariants.reduce((s: number, v: any) => s + v.priceGeneral, 0),
-                unitPriceMember: selectedVariants.reduce((s: number, v: any) => s + v.priceMember, 0),
+                unitPriceGeneral: allExisting.reduce((s, it) => s + (it.unitPriceGeneral || 0), 0),
+                unitPriceMember: allExisting.reduce((s, it) => s + (it.unitPriceMember || 0), 0),
             } as EstimateItem]
         }
         const existing = allExisting[0]
@@ -211,7 +213,9 @@ function buildEstimateItemsForProduct(
             (!!product.isPlanForcedSet && scopeApplies(product.setableScope, isMember)) ||
             !!product.isSoleSetParent ||
             !!product.isSoleSetParentChild
-        const newDefaultVariant = product.variants.find((v: any) => v.isDefaultSet) ?? product.variants[0] ?? null
+        // 商品マスタから消えた商品を補った場合、種類一覧が無いこともある
+        const productVariants: any[] = product.variants ?? []
+        const newDefaultVariant = productVariants.find((v: any) => v.isDefaultSet) ?? productVariants[0] ?? null
         // プラン別のデフォルト種類は、プランを切り替えると変わりうる。
         // 切替後はそのプランの初期種類に必ず揃える（チェック済みでも、担当者が選び直した後でも上書きする）。
         // 以前は「まだチェックしていない商品だけ」追従させていたが、
@@ -258,7 +262,8 @@ function buildEstimateItemsForProduct(
         }
         return [{ ...existing, productItem: { ...product } }]
     }
-    const defaultVariant = product.variants.find((v: any) => v.isDefaultSet) ?? product.variants[0] ?? null
+    const defaultVariant =
+        (product.variants ?? []).find((v: any) => v.isDefaultSet) ?? (product.variants ?? [])[0] ?? null
     return [{
         productItemId: product.id,
         productVariantId: defaultVariant?.id ?? undefined,
@@ -415,8 +420,9 @@ export function useEstimateCreate(customerId: string, reset: UseFormReset<Estima
             const allMergedItems = items.map((item, i) => {
                 const qty = formValues.items[i]?.qty ?? item.qty
                 const description = formValues.items[i]?.description ?? item.description ?? ''
-                const unitPrice = isMember ? item.unitPriceMember : item.unitPriceGeneral
-                const amount = unitPrice * qty
+                // セット扱い・サービス扱いの行は 0 円になる。ここで単価×数量をそのまま入れると、
+                // 0円扱いのはずの行まで積み上がった合計がサーバー側で算出され保存されてしまう
+                const amount = calcDocumentItemAmount(item, qty, isMember)
                 return { ...item, qty, description, amount }
             })
             const activeItems = allMergedItems.filter((item) => item.qty > 0).map((item, i) => ({ ...item, sortNo: i }))
@@ -484,7 +490,13 @@ export function useEstimateEdit(estimateId: string, reset: UseFormReset<Estimate
             const customerData = await getCustomer(estimateData.customerId)
             setCustomer(customerData)
             const storeId = customerData?.storeId ? String(customerData.storeId) : null
-            const filteredByStore = filterProductsByStore(allProducts, storeId)
+            // 商品マスタから消えた商品（無効化された商品など）の明細を落とさないよう、
+            // 保存済み明細が参照している商品を補ってからマージする。
+            // プラン切替時もこの補完を効かせたいので、状態に持たせる時点で補っておく。
+            const filteredByStore = withProductsMissingFromMaster(
+                filterProductsByStore(allProducts, storeId),
+                existingItems
+            )
             setStoreFilteredProducts(filteredByStore)
             const currentPlanId = estimateData.planId || BASE_PLAN_ID
             setPlanId(currentPlanId)
@@ -584,8 +596,9 @@ export function useEstimateEdit(estimateId: string, reset: UseFormReset<Estimate
             const allMergedItems = items.map((item, i) => {
                 const qty = formValues.items[i]?.qty ?? item.qty
                 const description = formValues.items[i]?.description ?? item.description ?? ''
-                const unitPrice = isMember ? item.unitPriceMember : item.unitPriceGeneral
-                const amount = unitPrice * qty
+                // セット扱い・サービス扱いの行は 0 円になる。ここで単価×数量をそのまま入れると、
+                // 0円扱いのはずの行まで積み上がった合計がサーバー側で算出され保存されてしまう
+                const amount = calcDocumentItemAmount(item, qty, isMember)
                 return { ...item, qty, description, amount }
             })
             const activeItems = allMergedItems.filter((item) => item.qty > 0).map((item, i) => ({ ...item, sortNo: i }))

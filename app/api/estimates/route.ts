@@ -5,6 +5,7 @@ import { serializeBigInt } from '@/lib/prisma-utils'
 import { calculateDocumentTotals } from '@/lib/documentTotals'
 import { buildDocNoPrefix, buildDocNo, isValidDocNo, pickLatestValidDocNo, toNullableAmount } from '@/lib/documentUtils'
 import { recordOperationLog } from '@/lib/operationLog'
+import { loadProductNameLookup, pickProductItemName, pickProductVariantName } from '@/lib/documentItemNames'
 import { OperationAction, OperationEntityType } from '@phoenix-jpn/db'
 import { VALID_CREMATION_PROCESS_TYPES, VALID_ALTAR_PLACE_TYPES, VALID_ALTAR_TYPES } from '@/lib/documentEnums'
 
@@ -165,6 +166,9 @@ export async function POST(request: NextRequest) {
         const latestDocNo = pickLatestValidDocNo(candidateDocs.map((d) => d.docNo))
         const docNo = buildDocNo(prefix, latestDocNo, data.docNo)
 
+        // 保存時点の商品名・種類名を控えるための名称引き当て（商品マスタの改名を発行済み書類に波及させないため）
+        const nameLookup = await loadProductNameLookup(data.items || [])
+
         // 見積を作成
         const estimate = await prisma.estimate.create({
             data: {
@@ -205,6 +209,8 @@ export async function POST(request: NextRequest) {
                         productVariantGroupId: item.productVariantGroupId
                             ? BigInt(item.productVariantGroupId)
                             : null,
+                        productItemName: pickProductItemName(item, nameLookup),
+                        productVariantName: pickProductVariantName(item, nameLookup),
                         calcType:
                             item.calcType === 'FIXED' || item.calcType === 'UNIT_PRICE_X_QTY'
                                 ? item.calcType

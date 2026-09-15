@@ -5,6 +5,7 @@ import { serializeBigInt } from '@/lib/prisma-utils'
 import { calculateDocumentTotals } from '@/lib/documentTotals'
 import { isValidDocNo, toNullableAmount } from '@/lib/documentUtils'
 import { recordOperationLog } from '@/lib/operationLog'
+import { loadProductNameLookup, pickProductItemName, pickProductVariantName } from '@/lib/documentItemNames'
 import { OperationAction, OperationEntityType } from '@phoenix-jpn/db'
 import { VALID_CREMATION_PROCESS_TYPES, VALID_ALTAR_PLACE_TYPES, VALID_ALTAR_TYPES } from '@/lib/documentEnums'
 
@@ -34,6 +35,11 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
                     include: {
                         productItem: {
                             include: {
+                                // 商品マスタから消えた商品の明細も表示できるよう、
+                                // 種類一覧も明細に添えて返す（種類名の引き当てに使う）
+                                variants: {
+                                    orderBy: [{ sortNo: 'asc' }, { id: 'asc' }],
+                                },
                                 rows: { include: { variants: true } },
                                 variantGroups: { include: { variants: true } },
                             },
@@ -188,6 +194,9 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
         const altarType = data.altarType && VALID_ALTAR_TYPES.includes(data.altarType) ? data.altarType : null
 
         // 既存の明細削除 + 見積更新をトランザクションで実行
+        // 保存時点の商品名・種類名を控えるための名称引き当て（商品マスタの改名を発行済み書類に波及させないため）
+        const nameLookup = await loadProductNameLookup(data.items || [])
+
         const updated = await prisma.$transaction(async (tx) => {
             await tx.estimateItem.deleteMany({
                 where: { estimateId: BigInt(id) },
@@ -231,6 +240,8 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
                             productVariantGroupId: item.productVariantGroupId
                                 ? BigInt(item.productVariantGroupId)
                                 : null,
+                            productItemName: pickProductItemName(item, nameLookup),
+                            productVariantName: pickProductVariantName(item, nameLookup),
                             calcType:
                                 item.calcType === 'FIXED' || item.calcType === 'UNIT_PRICE_X_QTY'
                                     ? item.calcType

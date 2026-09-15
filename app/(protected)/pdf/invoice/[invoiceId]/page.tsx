@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { getInvoice } from '@/lib/invoices'
 import { getProducts } from '@/lib/products'
+import { withProductsMissingFromMaster } from '@/lib/documentMissingProducts'
 import { getCompanyProfile } from '@/lib/company'
 import { buildBankTransferText } from '@/lib/separateFees'
 import { getProductPlanSettings, applyPlanOverrides, BASE_PLAN_ID } from '@/lib/plans'
@@ -60,6 +61,10 @@ export default function InvoicePdfPage() {
             } catch (planError) {
                 console.error('Failed to apply plan overrides:', planError)
             }
+
+            // 商品マスタから消えた商品（無効化された商品など）の明細もPDFに出るよう、
+            // 保存済み明細が参照している商品を商品リストに補う
+            overriddenProducts = withProductsMissingFromMaster(overriddenProducts, invoiceData.items || [])
 
             const overriddenProductMap = new Map(overriddenProducts.map((p) => [p.id, p]))
             const patchedInvoice = {

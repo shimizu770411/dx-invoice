@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { getInvoice } from '@/lib/invoices'
 import { getProducts } from '@/lib/products'
+import { withProductsMissingFromMaster } from '@/lib/documentMissingProducts'
 import { toast } from '@/hooks/use-toast'
 import { PdfReceiptLayout } from '@/app/(protected)/pdf/components/PdfReceiptLayout'
 
@@ -25,7 +26,9 @@ export default function ReceiptPdfPage() {
         try {
             const [invoiceData, productsData] = await Promise.all([getInvoice(invoiceId), getProducts()])
             setInvoice(invoiceData)
-            setProducts(productsData)
+            // 商品マスタから消えた商品（無効化された商品など）の明細も領収書に出るよう、
+            // 保存済み明細が参照している商品を商品リストに補う
+            setProducts(withProductsMissingFromMaster(productsData, invoiceData.items || []))
         } catch (error) {
             console.error('Failed to load invoice:', error)
         } finally {

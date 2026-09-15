@@ -15,6 +15,8 @@ import { scopeApplies } from '@/lib/productScope'
 import { computeMultiRowAmount } from '@/lib/expandMultiRow'
 import { EXECUTION_SURCHARGE_NAME } from '@/lib/documentUtils'
 import { PlanSurcharge, canApplySurcharge } from '@/lib/planSurcharges'
+import { MISSING_FROM_MASTER_LABEL } from '@/lib/documentMissingProducts'
+import { displayProductItemName } from '@/lib/documentDisplayNames'
 
 // props 未指定時のフォールバック。毎レンダー新しい配列を渡すと、
 // これに依存する処理が無駄に再計算されるため安定した参照を使う
@@ -77,7 +79,12 @@ type DocumentVariantGroup = {
 
 type DocumentItem = {
     productItemId?: string | null
+    /** 保存時点の商品名・種類名。商品マスタで改名されても保存済み書類の文言を保つための控え */
+    productItemName?: string | null
+    productVariantName?: string | null
     productItem?: {
+        /** 商品マスタから消えた商品を保存済み明細から復元した行かどうか */
+        isMissingFromMaster?: boolean
         name?: string | null
         variants?: ProductVariant[]
         isSetParent?: boolean
@@ -623,8 +630,11 @@ export function DocumentItemTable({
                                 const isLinkedChildOfSelectedParent =
                                     !!isChild &&
                                     selectedParentChildIds.has(String(item?.productItemId))
+                                // 商品マスタから消えた商品を保存済み明細から復元した行。
+                                // 選べる種類がもう存在しないため、種類の選び直しはさせない
+                                const isMissingFromMaster = !!item?.productItem?.isMissingFromMaster
                                 const canSelectVariant =
-                                    checkedItems[index] || isLinkedChildOfSelectedParent
+                                    !isMissingFromMaster && (checkedItems[index] || isLinkedChildOfSelectedParent)
                                 const unitPrice =
                                     item != null ? (isMember ? item.unitPriceMember : item.unitPriceGeneral) : 0
                                 const liveQty = watchedItems?.[index]?.qty ?? item?.qty ?? 0
@@ -813,7 +823,24 @@ export function DocumentItemTable({
                                                             親祭壇
                                                         </span>
                                                     )}
-                                                    <span>{item?.productItem?.name ?? '-'}</span>
+                                                    {/* 品名は保存時点の控えを優先する（商品マスタで改名しても保存済み書類の文言を変えない） */}
+                                                    <span>{displayProductItemName(item, item?.productItem?.name) || '-'}</span>
+                                                    {isMissingFromMaster && (
+                                                        <span
+                                                            className="font-mincho"
+                                                            title="この商品は商品マスタから削除（無効化）されています。保存済みの内容をそのまま表示しています。種類の選び直しはできません。"
+                                                            style={{
+                                                                fontSize: '10px',
+                                                                padding: '2px 6px',
+                                                                backgroundColor: 'var(--brand-red)',
+                                                                color: '#ffffff',
+                                                                letterSpacing: '0.1em',
+                                                                fontWeight: 600,
+                                                            }}
+                                                        >
+                                                            ⚠ {MISSING_FROM_MASTER_LABEL}
+                                                        </span>
+                                                    )}
                                                     {isStoreMismatch(item) && (liveQty ?? 0) > 0 && (
                                                         <span
                                                             className="font-mincho"

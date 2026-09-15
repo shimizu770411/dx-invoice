@@ -225,7 +225,17 @@ function InvoiceFormContent({
         )
     }
 
+    // 会員区分の再計算は、担当者が画面で区分を切り替えたときだけ走らせる。
+    // この再計算は会員単価を商品マスタの現在価格で作り直すため、読み込み直後にも走らせると
+    // 保存済みの会員単価が上書きされ、価格改定後に旧書類を開くだけで金額が変わってしまう。
+    // このコンポーネントは読み込み完了後（reset 済み）にしかマウントされないので、
+    // 初回レンダー時の値を「読み込まれた区分」として控え、そこから変化したときだけ再計算する。
+    const loadedIsMemberRef = useRef<string | undefined>(undefined)
+
     useEffect(() => {
+        const previousIsMember = loadedIsMemberRef.current
+        loadedIsMemberRef.current = watchedIsMember
+        if (previousIsMember === undefined || previousIsMember === watchedIsMember) return
         const isMember = watchedIsMember === 'true'
         setItems((prev) =>
             prev.map((item) => {

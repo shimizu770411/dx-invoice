@@ -175,7 +175,9 @@ const DOCUMENTS: DocumentSpec[] = [
             'planSurchargeId',
             'sortNo',
         ],
-        serverManaged: ['id', 'estimateId', 'createdAt', 'updatedAt'],
+        // 商品名・種類名は画面から入力せず、保存時にサーバー側が商品IDから引き直して控える
+        // （商品マスタで改名されても発行済み書類の文言を変えないため。lib/documentItemNames.ts を参照）
+        serverManaged: ['id', 'estimateId', 'createdAt', 'updatedAt', 'productItemName', 'productVariantName'],
         // 編集画面の読み込み（useEstimateForm.ts）は検査しない。
         // 保存済みの明細行を丸ごと引き継ぐ作りで、項目を1つずつ列挙していないため通し忘れが起きない
         targets: [
@@ -208,7 +210,9 @@ const DOCUMENTS: DocumentSpec[] = [
             'planSurchargeId',
             'sortNo',
         ],
-        serverManaged: ['id', 'invoiceId', 'createdAt', 'updatedAt'],
+        // 商品名・種類名は画面から入力せず、保存時にサーバー側が商品IDから引き直して控える
+        // （商品マスタで改名されても発行済み書類の文言を変えないため。lib/documentItemNames.ts を参照）
+        serverManaged: ['id', 'invoiceId', 'createdAt', 'updatedAt', 'productItemName', 'productVariantName'],
         // 編集画面の読み込み（useInvoiceForm.ts）は検査しない。
         // 保存済みの明細行を丸ごと引き継ぐ作りで、項目を1つずつ列挙していないため通し忘れが起きない
         targets: [

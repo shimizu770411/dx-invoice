@@ -1,3 +1,5 @@
+import { calcDocumentItemAmount } from '@/lib/documentTotals'
+
 export const MATURITY_SERVICE_NAME = '満期サービス'
 export const CANCELLATION_FEE_NAME = '解約手数料'
 export const EXECUTION_SURCHARGE_NAME = '施行割増券'
@@ -79,10 +81,11 @@ export function expandEachModeItems<T extends { qty: number; multiSelectVariantI
             return ids.flatMap((variantId: string) => {
                 const v = (pi.variants || []).find((v: any) => String(v.id) === variantId)
                 if (!v) return []
-                return [{ ...item, productVariantId: String(v.id), productVariant: v,
+                const expanded = { ...item, productVariantId: String(v.id), productVariant: v,
                     unitPriceGeneral: v.priceGeneral, unitPriceMember: v.priceMember,
-                    amount: (isMember ? v.priceMember : v.priceGeneral) * item.qty,
-                    multiSelectVariantIds: null, description: v.name }]
+                    multiSelectVariantIds: null, description: v.name }
+                // セット扱い・サービス扱いの判定は、展開後に選ばれている種類で行う
+                return [{ ...expanded, amount: calcDocumentItemAmount(expanded, item.qty, isMember) }]
             })
         } catch { return [item] }
     }).map((item, i) => ({ ...item, sortNo: i }))
@@ -115,7 +118,7 @@ export function expandVariantGroupItems<T extends { qty: number; groupSelections
                     if (selectedVariants.length === 0) continue
                     const totalGeneral = selectedVariants.reduce((s: number, v: any) => s + v.priceGeneral, 0)
                     const totalMember = selectedVariants.reduce((s: number, v: any) => s + v.priceMember, 0)
-                    rows.push({
+                    const mergedRow = {
                         ...item,
                         productVariantId: String(selectedVariants[0].id),
                         productVariant: selectedVariants[0],
@@ -124,16 +127,16 @@ export function expandVariantGroupItems<T extends { qty: number; groupSelections
                         unitPriceGeneral: totalGeneral,
                         unitPriceMember: totalMember,
                         qty: 1,
-                        amount: (isMember ? totalMember : totalGeneral) * 1,
                         description: selectedVariants.map((v: any) => v.name).join('、'),
                         groupSelections: null,
-                    })
+                    }
+                    rows.push({ ...mergedRow, amount: calcDocumentItemAmount(mergedRow, 1, isMember) })
                     continue
                 }
                 for (const variantId of selectedIds) {
                     const v = (group.variants || []).find((vv: any) => String(vv.id) === variantId)
                     if (!v) continue
-                    rows.push({
+                    const groupRow = {
                         ...item,
                         productVariantId: String(v.id),
                         productVariant: v,
@@ -141,10 +144,10 @@ export function expandVariantGroupItems<T extends { qty: number; groupSelections
                         unitPriceGeneral: v.priceGeneral,
                         unitPriceMember: v.priceMember,
                         qty: 1,
-                        amount: (isMember ? v.priceMember : v.priceGeneral) * 1,
                         description: v.name,
                         groupSelections: null,
-                    })
+                    }
+                    rows.push({ ...groupRow, amount: calcDocumentItemAmount(groupRow, 1, isMember) })
                 }
             }
             return rows.length > 0 ? rows : []

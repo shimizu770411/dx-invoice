@@ -1,0 +1,775 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>見積・請求はいつ作るか</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@500&family=Noto+Sans+JP:wght@400;500;700&family=Noto+Serif+JP:wght@500;600;700&display=swap">
+
+<style>
+:root {
+    --ground: #faf9f5;
+    --surface: #ffffff;
+    --sunk: #f3f1ea;
+    --ink: #1a1a1a;
+    --ink-muted: #6b6b6b;
+    --navy: #020e70;
+    --navy-deep: #01083e;
+    --navy-wash: #eef0fb;
+    --gold: #c4ae6a;
+    --gold-soft: #8a7e5c;
+    --gold-wash: #f6f1e2;
+    --red: #9a1f28;
+    --red-wash: #f8eeef;
+    --rule: #e5e1d4;
+    --rule-strong: #d4cfc0;
+
+    --serif: "Noto Serif JP", "Yu Mincho", "游明朝", serif;
+    --sans: "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+    --garamond: "EB Garamond", "Noto Serif JP", serif;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --ground: #0b0d1a;
+        --surface: #141830;
+        --sunk: #0f1225;
+        --ink: #ece9e1;
+        --ink-muted: #a3a096;
+        --navy: #9aa4ff;
+        --navy-deep: #c6cbff;
+        --navy-wash: #1b2047;
+        --gold: #dcc98d;
+        --gold-soft: #bcab7c;
+        --gold-wash: #26220f;
+        --red: #e58690;
+        --red-wash: #2d1519;
+        --rule: #2b2f4d;
+        --rule-strong: #3a3f63;
+    }
+}
+
+:root[data-theme="dark"] {
+    --ground: #0b0d1a;
+    --surface: #141830;
+    --sunk: #0f1225;
+    --ink: #ece9e1;
+    --ink-muted: #a3a096;
+    --navy: #9aa4ff;
+    --navy-deep: #c6cbff;
+    --navy-wash: #1b2047;
+    --gold: #dcc98d;
+    --gold-soft: #bcab7c;
+    --gold-wash: #26220f;
+    --red: #e58690;
+    --red-wash: #2d1519;
+    --rule: #2b2f4d;
+    --rule-strong: #3a3f63;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 17px;
+    line-height: 1.9;
+    padding-inline: 20px;
+    padding-block: 0;
+    -webkit-font-smoothing: antialiased;
+}
+
+.page {
+    max-width: 880px;
+    margin-inline: auto;
+    padding-block: 48px 72px;
+    display: flex;
+    flex-direction: column;
+    gap: 56px;
+}
+
+.eyebrow {
+    font-family: var(--garamond);
+    font-size: 12px;
+    letter-spacing: 0.3em;
+    color: var(--gold-soft);
+    text-transform: uppercase;
+    margin: 0;
+}
+
+h1 {
+    font-family: var(--serif);
+    font-size: clamp(28px, 6vw, 40px);
+    font-weight: 600;
+    line-height: 1.45;
+    letter-spacing: 0.06em;
+    color: var(--navy);
+    margin: 14px 0 0;
+    text-wrap: balance;
+}
+
+h2 {
+    font-family: var(--serif);
+    font-size: clamp(21px, 4.2vw, 26px);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: var(--navy);
+    margin: 0;
+    text-wrap: balance;
+}
+
+h3 {
+    font-family: var(--serif);
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    color: var(--ink);
+    margin: 0;
+}
+
+p { margin: 0; }
+
+section {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+}
+
+.section-head {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-bottom: 14px;
+    border-bottom: 2px solid var(--rule);
+}
+
+.lede {
+    font-size: 17px;
+    color: var(--ink-muted);
+    line-height: 2;
+}
+
+/* ---- 表紙 ---- */
+.cover {
+    border-top: 5px solid var(--navy);
+    padding-top: 30px;
+    gap: 0;
+}
+
+.cover .meta {
+    margin-top: 26px;
+    padding: 20px 22px;
+    background: var(--sunk);
+    border-left: 4px solid var(--gold);
+    font-size: 16px;
+    line-height: 2;
+}
+
+.cover .meta strong {
+    font-family: var(--serif);
+    color: var(--navy);
+    font-weight: 600;
+}
+
+/* ---- 書類の連鎖 ---- */
+.chain {
+    display: flex;
+    align-items: stretch;
+    gap: 10px;
+}
+
+.chain-step {
+    flex: 1 1 0;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-top: 3px solid var(--gold);
+    padding: 16px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+.chain-step.is-navy { border-top-color: var(--navy); }
+
+.chain-step .name {
+    font-family: var(--serif);
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--navy);
+    letter-spacing: 0.04em;
+}
+
+.chain-step .when {
+    font-size: 14px;
+    color: var(--ink-muted);
+    line-height: 1.8;
+}
+
+.chain-arrow {
+    align-self: center;
+    color: var(--gold);
+    font-size: 22px;
+    line-height: 1;
+    flex: 0 0 auto;
+}
+
+.chain-note {
+    font-size: 14px;
+    color: var(--ink-muted);
+    text-align: center;
+    line-height: 1.8;
+}
+
+@media (max-width: 720px) {
+    .chain { flex-direction: column; }
+    .chain-arrow { transform: rotate(90deg); }
+}
+
+/* ---- 時間軸 ---- */
+.timeline {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.timeline > li {
+    position: relative;
+    padding-left: 34px;
+    padding-bottom: 30px;
+    border-left: 2px solid var(--rule-strong);
+}
+
+.timeline > li:last-child {
+    border-left-color: transparent;
+    padding-bottom: 0;
+}
+
+.timeline > li::before {
+    content: "";
+    position: absolute;
+    left: -9px;
+    top: 7px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--ground);
+    border: 3px solid var(--rule-strong);
+}
+
+.timeline > li.has-doc::before {
+    border-color: var(--gold);
+    background: var(--gold);
+}
+
+.stage {
+    font-family: var(--serif);
+    font-size: 19px;
+    font-weight: 600;
+    color: var(--ink);
+    letter-spacing: 0.06em;
+    display: block;
+}
+
+.stage-note {
+    font-size: 15px;
+    color: var(--ink-muted);
+    line-height: 1.9;
+    margin-top: 2px;
+}
+
+.doc-card {
+    margin-top: 12px;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.doc-card .tag {
+    align-self: flex-start;
+    font-family: var(--serif);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    padding: 3px 12px;
+    background: var(--navy);
+    color: #ffffff;
+}
+
+.doc-card.is-gold .tag {
+    background: var(--gold-wash);
+    color: var(--gold-soft);
+    border: 1px solid var(--gold);
+}
+
+.doc-card .what {
+    font-size: 16px;
+    line-height: 1.95;
+}
+
+.doc-card .how {
+    font-size: 14px;
+    color: var(--ink-muted);
+    line-height: 1.85;
+    padding-top: 8px;
+    border-top: 1px dashed var(--rule);
+}
+
+.doc-card .how b {
+    font-weight: 700;
+    color: var(--ink);
+}
+
+/* ---- 鍵 ---- */
+.locks {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.lock-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    background: var(--sunk);
+    border: 1px solid var(--rule);
+    padding: 16px 18px;
+}
+
+.lock-row .trigger {
+    font-family: var(--serif);
+    font-weight: 600;
+    color: var(--navy);
+    font-size: 16px;
+}
+
+.lock-row .result {
+    font-size: 15px;
+    color: var(--ink);
+}
+
+.lock-row .result b {
+    color: var(--red);
+    font-weight: 700;
+}
+
+.lock-icon {
+    flex: 0 0 auto;
+    font-size: 18px;
+    color: var(--gold-soft);
+}
+
+/* ---- 表 ---- */
+.table-wrap { overflow-x: auto; }
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 15.5px;
+    min-width: 460px;
+}
+
+caption {
+    text-align: left;
+    font-size: 14px;
+    color: var(--ink-muted);
+    padding-bottom: 10px;
+}
+
+th, td {
+    border: 1px solid var(--rule);
+    padding: 13px 14px;
+    text-align: left;
+    vertical-align: top;
+    line-height: 1.8;
+}
+
+thead th {
+    background: var(--navy-wash);
+    font-family: var(--serif);
+    font-weight: 600;
+    color: var(--navy);
+    letter-spacing: 0.04em;
+}
+
+tbody th {
+    background: var(--sunk);
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+td { background: var(--surface); }
+
+.num { font-variant-numeric: tabular-nums; }
+
+/* ---- 確認事項 ---- */
+.questions {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    counter-reset: q;
+}
+
+.questions > li {
+    counter-increment: q;
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 4px solid var(--red);
+    padding: 20px 22px 20px 64px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.questions > li::before {
+    content: counter(q);
+    position: absolute;
+    left: 18px;
+    top: 20px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--red-wash);
+    color: var(--red);
+    border: 1px solid var(--red);
+    font-family: var(--garamond);
+    font-size: 17px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-variant-numeric: tabular-nums;
+}
+
+.q-ask {
+    font-family: var(--serif);
+    font-size: 17.5px;
+    font-weight: 600;
+    line-height: 1.85;
+    color: var(--ink);
+    letter-spacing: 0.02em;
+}
+
+.q-now {
+    font-size: 15px;
+    color: var(--ink-muted);
+    line-height: 1.9;
+    background: var(--sunk);
+    padding: 12px 14px;
+}
+
+.q-now .label {
+    font-family: var(--garamond);
+    font-size: 11px;
+    letter-spacing: 0.28em;
+    color: var(--gold-soft);
+    display: block;
+    margin-bottom: 2px;
+}
+
+.group-label {
+    font-family: var(--serif);
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    color: var(--gold-soft);
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--rule);
+    margin-top: 10px;
+}
+
+.group-label:first-child { margin-top: 0; }
+
+.questions.from-5 { counter-reset: q 4; }
+.questions.from-9 { counter-reset: q 8; }
+
+/* ---- 締め ---- */
+.closing {
+    background: var(--navy-wash);
+    border-top: 3px solid var(--navy);
+    padding: 26px 24px;
+    font-size: 16.5px;
+    line-height: 2.05;
+}
+
+.closing strong {
+    font-family: var(--serif);
+    color: var(--navy);
+}
+
+@media (max-width: 480px) {
+    body { font-size: 16px; padding-inline: 16px; }
+    .questions > li { padding: 18px 16px 18px 16px; }
+    .questions > li::before { position: static; margin-bottom: 4px; }
+}
+
+@media print {
+    body { background: #ffffff; font-size: 12pt; }
+    .page { gap: 34px; padding-block: 0; }
+    section, .doc-card, .questions > li, .lock-row { break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+    <header class="cover">
+        <p class="eyebrow">Confirmation &middot; Document Timing</p>
+        <h1>見積・請求は<br>どの時点で作りますか</h1>
+        <div class="meta">
+            システムは今、<strong>事前相談 → 本見積 → 請求書 → 領収書</strong>という順番で書類を作る前提で動いています。<br>
+            この資料は、その前提が<strong>実際の現場の進め方と合っているか</strong>をご確認いただくためのものです。<br>
+            最後に、確認させていただきたい点を<strong>9つ</strong>まとめています。番号でお知らせください。
+        </div>
+    </header>
+
+    <section>
+        <div class="section-head">
+            <p class="eyebrow">Overview</p>
+            <h2>まず、全体の流れ</h2>
+        </div>
+        <p class="lede">
+            書類は4種類です。左から順に作ります。<strong>前の書類の内容が次の書類に引き継がれる</strong>ので、途中から始めたり、順番を飛ばしたりはできません。
+        </p>
+
+        <div class="chain">
+            <div class="chain-step">
+                <span class="name">事前相談見積</span>
+                <span class="when">ご相談の段階でお出しするお見積り</span>
+            </div>
+            <span class="chain-arrow" aria-hidden="true">&rarr;</span>
+            <div class="chain-step is-navy">
+                <span class="name">本見積</span>
+                <span class="when">内容が固まった段階の正式なお見積り</span>
+            </div>
+            <span class="chain-arrow" aria-hidden="true">&rarr;</span>
+            <div class="chain-step is-navy">
+                <span class="name">請求書</span>
+                <span class="when">施行後、実際にご請求する金額</span>
+            </div>
+            <span class="chain-arrow" aria-hidden="true">&rarr;</span>
+            <div class="chain-step">
+                <span class="name">領収書</span>
+                <span class="when">ご入金を確認したあとにお渡しするもの</span>
+            </div>
+        </div>
+        <p class="chain-note">矢印のところで、前の書類の品目・金額がそのまま次の書類に写されます。写したあとは、それぞれ別々に直せます。</p>
+    </section>
+
+    <section>
+        <div class="section-head">
+            <p class="eyebrow">Timeline</p>
+            <h2>いつ、どの書類を作る想定か</h2>
+        </div>
+        <p class="lede">
+            ご葬儀の進行に合わせて並べると、こうなります。<strong>金色の丸が付いている時点</strong>で、書類を作る操作が入ります。
+        </p>
+
+        <ol class="timeline">
+            <li class="has-doc">
+                <span class="stage">ご相談（生前のご相談・お問い合わせ）</span>
+                <span class="stage-note">まだ施行が決まっていない段階です。</span>
+                <div class="doc-card is-gold">
+                    <span class="tag">事前相談見積をつくる</span>
+                    <p class="what">案件の一覧から「見積書作成」を押すと、<b>必ずこの事前相談見積として</b>作られます。プランを選び、棺やお骨壺などの品目を選んで金額を出します。</p>
+                    <p class="how"><b>番号は自動</b>で振られます。まだ受付日が入っていなければ、作った日の年月がもとになります。</p>
+                </div>
+            </li>
+
+            <li>
+                <span class="stage">ご逝去・ご依頼・お迎え</span>
+                <span class="stage-note">案件として受け付け、受付日時を登録する段階です。</span>
+            </li>
+
+            <li class="has-doc">
+                <span class="stage">ご家族との打合せ</span>
+                <span class="stage-note">祭壇・棺・お料理などを実際に決めていく段階です。</span>
+                <div class="doc-card">
+                    <span class="tag">本見積をつくる</span>
+                    <p class="what">見積の画面で「本見積を作成」を押すと、事前相談見積の内容が<b>まるごと写された新しい見積</b>ができ、そちらに切り替わります。以後の変更はこちらで行います。</p>
+                    <p class="how"><b>番号は自動では振られません。</b>必要であれば手で入力します。空欄のままでも保存できます。</p>
+                </div>
+            </li>
+
+            <li>
+                <span class="stage">通夜</span>
+                <span class="stage-note">この時点では新しい書類は作りません。内容の変更は本見積を直します。</span>
+            </li>
+
+            <li>
+                <span class="stage">葬儀・告別式・火葬</span>
+                <span class="stage-note">同じく、変更は本見積を直します。</span>
+            </li>
+
+            <li class="has-doc">
+                <span class="stage">ご精算</span>
+                <span class="stage-note">実際にかかった分を確定してご請求する段階です。</span>
+                <div class="doc-card">
+                    <span class="tag">請求書をつくる</span>
+                    <p class="what">案件の一覧から「請求書作成」を押すと、本見積の内容が写された請求書ができます。当日増えた品目・減った品目は、<b>ここで直します</b>。</p>
+                    <p class="how"><b>番号は自動</b>で振られます。受付日の年月がもとになります。</p>
+                </div>
+            </li>
+
+            <li class="has-doc">
+                <span class="stage">ご入金</span>
+                <span class="stage-note">ご入金を確認した日を登録します。</span>
+                <div class="doc-card is-gold">
+                    <span class="tag">入金を登録し、領収書を出す</span>
+                    <p class="what">「入金登録」で入金日とメモを記録します。登録すると<b>領収書が出せるようになります</b>。</p>
+                    <p class="how">金額はご請求額の<b>全額を一度に</b>いただく前提です。分割や一部入金を記録する欄は今のところありません。</p>
+                </div>
+            </li>
+        </ol>
+    </section>
+
+    <section>
+        <div class="section-head">
+            <p class="eyebrow">Rule</p>
+            <h2>一度先に進むと、前の書類は直せません</h2>
+        </div>
+        <p class="lede">
+            これがいちばん大事な決まりです。書類を次に進めると、<strong>ひとつ前の書類には鍵がかかり、見るだけ</strong>になります。金額の食い違いを防ぐためです。
+        </p>
+
+        <div class="locks">
+            <div class="lock-row">
+                <span class="lock-icon" aria-hidden="true">&#128274;</span>
+                <span class="trigger">本見積を作ると</span>
+                <span class="result">事前相談見積は <b>閲覧のみ</b> になります（直したいときは本見積の方を直します）</span>
+            </div>
+            <div class="lock-row">
+                <span class="lock-icon" aria-hidden="true">&#128274;</span>
+                <span class="trigger">請求書を作ると</span>
+                <span class="result">本見積は <b>閲覧のみ</b> になります（直したいときは請求書の方を直します）</span>
+            </div>
+        </div>
+        <p class="chain-note">なお、前の書類がないと次には進めません。本見積がなければ請求書は作れず、請求書がなければ入金登録も領収書もできません。</p>
+    </section>
+
+    <section>
+        <div class="section-head">
+            <p class="eyebrow">Numbers &amp; Dates</p>
+            <h2>書類番号と、書類に出る日付</h2>
+        </div>
+        <p class="lede">
+            番号の振られ方と、実際に紙に印字される日付は、書類ごとに違います。現状はこうなっています。
+        </p>
+
+        <div class="table-wrap">
+            <table>
+                <caption>※「受付日」は案件に登録された受付日時のことです</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">書類</th>
+                        <th scope="col">番号の付き方</th>
+                        <th scope="col">紙に出る日付</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <th scope="row">事前相談見積</th>
+                        <td>自動。<span class="num">受付日の年月＋通し番号3桁</span>（例 <span class="num">202609001</span>）</td>
+                        <td>受付日</td>
+                    </tr>
+                    <tr>
+                        <th scope="row">本見積</th>
+                        <td>自動では振られない。手入力（空欄可）</td>
+                        <td>受付日</td>
+                    </tr>
+                    <tr>
+                        <th scope="row">請求書</th>
+                        <td>自動。<span class="num">受付日の年月＋通し番号3桁</span></td>
+                        <td>受付日</td>
+                    </tr>
+                    <tr>
+                        <th scope="row">領収書</th>
+                        <td>請求書と同じ案件から発行</td>
+                        <td>PDFを出した日</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section>
+        <div class="section-head">
+            <p class="eyebrow">Questions</p>
+            <h2>確認させていただきたいこと</h2>
+        </div>
+        <p class="lede">
+            以下の9点について、実際の運用に合っているかお聞かせください。合っていなければ、その通りに直します。
+        </p>
+
+        <p class="group-label">作るタイミングについて</p>
+        <ol class="questions">
+            <li>
+                <p class="q-ask">急なご依頼で事前のご相談がなかった場合も、最初の書類は「事前相談見積」として作ることになります。名称・進め方としてご不便はありませんか。</p>
+                <p class="q-now"><span class="label">Now</span>最初に作る見積は必ず事前相談見積になります。いきなり本見積から作ることはできません。</p>
+            </li>
+            <li>
+                <p class="q-ask">事前相談見積から本見積に切り替えるのは、どの時点が適切でしょうか。打合せが終わった時点ですか、それとも施行が終わってからですか。</p>
+                <p class="q-now"><span class="label">Now</span>切り替えた時点で事前相談見積は閲覧のみになります。切り替える時期の決まりはシステム側にはありません。</p>
+            </li>
+            <li>
+                <p class="q-ask">施行当日に品目が増えたり減ったりした場合、請求書の方だけを直す進め方でよろしいですか。</p>
+                <p class="q-now"><span class="label">Now</span>請求書を作った時点で本見積は閲覧のみになるため、直せるのは請求書だけです。本見積は打合せ時点の記録として残ります。</p>
+            </li>
+            <li>
+                <p class="q-ask">ご相談だけで終わり、施行にならなかった案件の見積は、そのまま残しておく扱いでよろしいですか。</p>
+                <p class="q-now"><span class="label">Now</span>作った見積を消す機能はありません。事前相談見積のまま残ります。</p>
+            </li>
+        </ol>
+
+        <p class="group-label">番号と日付について</p>
+        <ol class="questions from-5" start="5">
+            <li>
+                <p class="q-ask">本見積には番号が自動で振られません。番号を付ける決まりはありますか。付けない運用でよろしいですか。</p>
+                <p class="q-now"><span class="label">Now</span>事前相談見積と請求書は自動、本見積だけ手入力です。空欄のままでも保存できます。</p>
+            </li>
+            <li>
+                <p class="q-ask">書類番号の年月は「受付日」がもとになります。受付より前に作る事前相談見積は、ご相談した日の年月になりますが、それでよろしいですか。</p>
+                <p class="q-now"><span class="label">Now</span>受付日が未入力の間は、書類を作った日の年月を使います。あとから受付日を入れても、すでに振られた番号は変わりません。</p>
+            </li>
+            <li>
+                <p class="q-ask">見積書・請求書に印字されるのは受付日だけです。「発行日」や「お見積り日」を別に出す必要はありませんか。</p>
+                <p class="q-now"><span class="label">Now</span>書類を作った日・出した日は印字されません。</p>
+            </li>
+            <li>
+                <p class="q-ask">領収書の日付は、PDFを出した操作の日になります。ご入金いただいた日を印字すべきでしょうか。</p>
+                <p class="q-now"><span class="label">Now</span>入金日は登録されていますが、領収書には反映されず、出した日が印字されます。</p>
+            </li>
+        </ol>
+
+        <p class="group-label">ご入金と供花について</p>
+        <ol class="questions from-9" start="9">
+            <li>
+                <p class="q-ask">分割でのご入金や、一部だけ先にいただくことはありますか。また、供花のご請求は本体のご請求と同じタイミングで出しますか、別に出しますか。</p>
+                <p class="q-now"><span class="label">Now</span>入金は全額を一度にいただく前提で、登録するか取り消すかのどちらかです。供花のご請求は、ご注文主ごとに別の画面から出す仕組みになっています。</p>
+            </li>
+        </ol>
+    </section>
+
+    <section>
+        <div class="closing">
+            <strong>お願い</strong><br>
+            上の9点について、「これで合っている」「ここは実際と違う」を番号でお知らせください。<br>
+            現場の進め方に合わせて、システム側を調整いたします。
+        </div>
+    </section>
+
+</div>
+</body>
+</html>

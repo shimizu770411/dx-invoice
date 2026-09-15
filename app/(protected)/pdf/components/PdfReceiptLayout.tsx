@@ -2,6 +2,7 @@ import { Fragment, RefObject, useState, useEffect } from 'react'
 import { PdfCompanyProfile } from './PdfCompanyProfile'
 import { getCompanyProfile, CompanyProfile } from '@/lib/company'
 import type { PdfDocument, PdfDocumentCustomer, PdfProductItem, PdfDocumentItem, PdfFreeItem } from './PdfInvoiceLayout'
+import { displayProductItemName } from '@/lib/documentDisplayNames'
 
 export type { PdfDocument, PdfDocumentCustomer }
 
@@ -78,7 +79,8 @@ function buildDisplayRows(
                     !!estimateItem.productRow?.useForDescriptionLabel &&
                     estimateItem.sign !== -1
                 rows.push({
-                    label: isFirstRow ? product.name : '',
+                    // 品名は保存時点の控えを優先する（商品マスタで改名しても発行済み書類の文言を変えない）
+                    label: isFirstRow ? displayProductItemName(estimateItem, product.name) : '',
                     estimateItem,
                     showProductVariantName: isFirstRow && !!product.showProductVariantName,
                     hideDescription: !isFirstRow && !isDescriptionLabelRow,

@@ -1,0 +1,656 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>どの日の価格で請求しますか</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@500&family=Noto+Sans+JP:wght@400;500;700&family=Noto+Serif+JP:wght@500;600;700&display=swap">
+
+<style>
+:root {
+    --ground: #faf9f5;
+    --surface: #ffffff;
+    --sunk: #f3f1ea;
+    --ink: #1a1a1a;
+    --ink-muted: #6b6b6b;
+    --navy: #020e70;
+    --navy-wash: #eef0fb;
+    --gold: #c4ae6a;
+    --gold-soft: #8a7e5c;
+    --gold-wash: #f6f1e2;
+    --red: #9a1f28;
+    --red-wash: #f8eeef;
+    --rule: #e5e1d4;
+    --rule-strong: #d4cfc0;
+
+    --serif: "Noto Serif JP", "Yu Mincho", "游明朝", serif;
+    --sans: "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+    --garamond: "EB Garamond", "Noto Serif JP", serif;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --ground: #0b0d1a;
+        --surface: #141830;
+        --sunk: #0f1225;
+        --ink: #ece9e1;
+        --ink-muted: #a3a096;
+        --navy: #9aa4ff;
+        --navy-wash: #1b2047;
+        --gold: #dcc98d;
+        --gold-soft: #bcab7c;
+        --gold-wash: #26220f;
+        --red: #e58690;
+        --red-wash: #2d1519;
+        --rule: #2b2f4d;
+        --rule-strong: #3a3f63;
+    }
+}
+
+:root[data-theme="dark"] {
+    --ground: #0b0d1a;
+    --surface: #141830;
+    --sunk: #0f1225;
+    --ink: #ece9e1;
+    --ink-muted: #a3a096;
+    --navy: #9aa4ff;
+    --navy-wash: #1b2047;
+    --gold: #dcc98d;
+    --gold-soft: #bcab7c;
+    --gold-wash: #26220f;
+    --red: #e58690;
+    --red-wash: #2d1519;
+    --rule: #2b2f4d;
+    --rule-strong: #3a3f63;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 17px;
+    line-height: 1.9;
+    padding-inline: 20px;
+    padding-block: 0;
+    -webkit-font-smoothing: antialiased;
+}
+
+.page {
+    max-width: 880px;
+    margin-inline: auto;
+    padding-block: 48px 72px;
+    display: flex;
+    flex-direction: column;
+    gap: 56px;
+}
+
+.eyebrow {
+    font-family: var(--garamond);
+    font-size: 12px;
+    letter-spacing: 0.3em;
+    color: var(--gold-soft);
+    text-transform: uppercase;
+    margin: 0;
+}
+
+h1 {
+    font-family: var(--serif);
+    font-size: clamp(27px, 5.6vw, 38px);
+    font-weight: 600;
+    line-height: 1.45;
+    letter-spacing: 0.06em;
+    color: var(--navy);
+    margin: 14px 0 0;
+    text-wrap: balance;
+}
+
+h2 {
+    font-family: var(--serif);
+    font-size: clamp(21px, 4.2vw, 26px);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: var(--navy);
+    margin: 0;
+    text-wrap: balance;
+}
+
+p { margin: 0; }
+
+section { display: flex; flex-direction: column; gap: 22px; }
+
+.section-head {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-bottom: 14px;
+    border-bottom: 2px solid var(--rule);
+}
+
+.lede { font-size: 17px; color: var(--ink-muted); line-height: 2; }
+
+.note { font-size: 14.5px; color: var(--ink-muted); line-height: 1.85; }
+
+.num { font-variant-numeric: tabular-nums; }
+
+/* ---- 表紙 ---- */
+.cover { border-top: 5px solid var(--navy); padding-top: 30px; gap: 0; }
+
+.cover .meta {
+    margin-top: 26px;
+    padding: 20px 22px;
+    background: var(--sunk);
+    border-left: 4px solid var(--gold);
+    font-size: 16px;
+    line-height: 2;
+}
+
+.cover .meta strong { font-family: var(--serif); color: var(--navy); font-weight: 600; }
+
+/* ---- 価格表 ---- */
+.table-wrap { overflow-x: auto; }
+
+table { width: 100%; border-collapse: collapse; font-size: 16px; min-width: 420px; }
+
+caption { text-align: left; font-size: 14px; color: var(--ink-muted); padding-bottom: 10px; }
+
+th, td { border: 1px solid var(--rule); padding: 14px 16px; text-align: left; line-height: 1.8; }
+
+thead th {
+    background: var(--navy-wash);
+    font-family: var(--serif);
+    font-weight: 600;
+    color: var(--navy);
+    letter-spacing: 0.04em;
+}
+
+tbody th { background: var(--sunk); font-weight: 500; white-space: nowrap; }
+
+td { background: var(--surface); }
+
+.price {
+    font-family: var(--serif);
+    font-size: 21px;
+    font-weight: 700;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---- 出来事の時間軸 ---- */
+.events {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    padding: 26px 20px 22px;
+    position: relative;
+}
+
+.event {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 0 10px;
+    border-left: 2px solid var(--rule-strong);
+    position: relative;
+}
+
+.event:first-child { border-left: none; }
+
+.event::before {
+    content: "";
+    position: absolute;
+    left: -7px;
+    top: -14px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--gold);
+}
+
+.event:first-child::before { left: 0; }
+
+.event.is-change::before { background: var(--red); }
+
+.event .date {
+    font-family: var(--garamond);
+    font-size: 15px;
+    letter-spacing: 0.08em;
+    color: var(--gold-soft);
+    font-variant-numeric: tabular-nums;
+}
+
+.event .what {
+    font-family: var(--serif);
+    font-size: 16.5px;
+    font-weight: 600;
+    color: var(--ink);
+    line-height: 1.6;
+}
+
+.event .detail { font-size: 14px; color: var(--ink-muted); line-height: 1.8; }
+
+.event.is-change .what { color: var(--red); }
+
+@media (max-width: 680px) {
+    .events { flex-direction: column; gap: 20px; padding: 20px; }
+    .event { border-left: 2px solid var(--rule-strong); padding-left: 16px; }
+    .event:first-child { border-left: 2px solid var(--rule-strong); }
+    .event::before { left: -7px; top: 6px; }
+    .event:first-child::before { left: -7px; }
+}
+
+/* ---- 分岐 ---- */
+.fork { display: flex; flex-direction: column; gap: 14px; align-items: center; }
+
+.fork-question {
+    font-family: var(--serif);
+    font-size: clamp(19px, 4vw, 23px);
+    font-weight: 600;
+    color: var(--navy);
+    text-align: center;
+    letter-spacing: 0.06em;
+    line-height: 1.7;
+}
+
+.fork-options { display: flex; gap: 16px; width: 100%; }
+
+.fork-card {
+    flex: 1 1 0;
+    min-width: 0;
+    background: var(--surface);
+    border: 2px solid var(--rule-strong);
+    padding: 22px 18px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.fork-card .amount {
+    font-family: var(--serif);
+    font-size: clamp(30px, 8vw, 42px);
+    font-weight: 700;
+    color: var(--navy);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+}
+
+.fork-card .basis { font-size: 14.5px; color: var(--ink-muted); line-height: 1.8; }
+
+.fork-or {
+    align-self: center;
+    font-family: var(--serif);
+    font-size: 18px;
+    color: var(--gold-soft);
+    flex: 0 0 auto;
+}
+
+@media (max-width: 560px) {
+    .fork-options { flex-direction: column; }
+}
+
+/* ---- 選択肢 ---- */
+.choices { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
+
+.choices > li {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 4px solid var(--navy);
+    padding: 20px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.choice-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+
+.choice-key {
+    font-family: var(--garamond);
+    font-size: 20px;
+    font-weight: 500;
+    color: var(--gold-soft);
+    border: 1px solid var(--gold);
+    background: var(--gold-wash);
+    width: 34px;
+    height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+}
+
+.choice-name {
+    font-family: var(--serif);
+    font-size: 18.5px;
+    font-weight: 600;
+    color: var(--ink);
+    letter-spacing: 0.04em;
+}
+
+.choice-result {
+    font-family: var(--serif);
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--navy);
+    background: var(--navy-wash);
+    padding: 2px 12px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.choice-body { display: flex; flex-direction: column; gap: 8px; }
+
+.pro, .con { font-size: 15.5px; line-height: 1.9; padding-left: 26px; position: relative; }
+
+.pro::before, .con::before {
+    position: absolute;
+    left: 0;
+    top: 0;
+    font-family: var(--serif);
+    font-weight: 700;
+}
+
+.pro::before { content: "○"; color: var(--gold-soft); }
+.con::before { content: "△"; color: var(--red); }
+
+/* ---- 付随する確認 ---- */
+.extras { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; counter-reset: x; }
+
+.extras > li {
+    counter-increment: x;
+    background: var(--sunk);
+    border: 1px solid var(--rule);
+    padding: 18px 20px 18px 58px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.extras > li::before {
+    content: counter(x);
+    position: absolute;
+    left: 18px;
+    top: 18px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--red-wash);
+    border: 1px solid var(--red);
+    color: var(--red);
+    font-family: var(--garamond);
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-variant-numeric: tabular-nums;
+}
+
+.extras .ask {
+    font-family: var(--serif);
+    font-size: 17px;
+    font-weight: 600;
+    line-height: 1.85;
+    color: var(--ink);
+}
+
+.extras .why { font-size: 15px; color: var(--ink-muted); line-height: 1.9; }
+
+/* ---- 現状 ---- */
+.current {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-top: 3px solid var(--gold);
+    padding: 22px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.current .row { font-size: 16px; line-height: 1.95; padding-left: 22px; position: relative; }
+
+.current .row::before {
+    content: "・";
+    position: absolute;
+    left: 0;
+    color: var(--gold);
+    font-weight: 700;
+}
+
+.current b { color: var(--navy); font-weight: 700; }
+
+/* ---- 締め ---- */
+.closing {
+    background: var(--navy-wash);
+    border-top: 3px solid var(--navy);
+    padding: 26px 24px;
+    font-size: 16.5px;
+    line-height: 2.05;
+}
+
+.closing strong { font-family: var(--serif); color: var(--navy); }
+
+@media (max-width: 480px) {
+    body { font-size: 16px; padding-inline: 16px; }
+    .extras > li { padding: 18px 16px; }
+    .extras > li::before { position: static; margin-bottom: 4px; }
+}
+
+@media print {
+    body { background: #ffffff; font-size: 12pt; }
+    .page { gap: 34px; padding-block: 0; }
+    section, .choices > li, .extras > li, .events, .fork { break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+    <header class="cover">
+        <p class="eyebrow">Confirmation &middot; Price Effective Date</p>
+        <h1>価格を改定したとき<br>どの日の価格で請求しますか</h1>
+        <div class="meta">
+            商品やプランの価格に、<strong>「いつからいつまで」という期間</strong>を設定できるようにする予定です。<br>
+            そのとき決めていただきたいのが、<strong>どの日を基準にして価格を選ぶか</strong>です。<br>
+            お見積りの日と、実際のご葬儀の日が価格改定をまたぐと、金額が変わってしまうためです。
+        </div>
+    </header>
+
+    <section>
+        <div class="section-head">
+            <p class="eyebrow">Setting</p>
+            <h2>やろうとしている設定</h2>
+        </div>
+        <p class="lede">
+            ひとつの商品に対して、期間ごとに違う価格を持たせます。たとえば商品Aを、9月1日から値上げする場合はこうなります。
+        </p>
+
+        <div class="table-wrap">
+            <table>
+                <caption>※金額は説明のための例です</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">期間</th>
+                        <th scope="col">いつからいつまで</th>
+                        <th scope="col">商品Aの価格</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <th scope="row">期間①</th>
+                        <td class="num">～ 2026年8月31日</td>
+                        <td><span class="price">300円</span></td>
+                    </tr>
+                    <tr>
+                        <th scope="row">期間②</th>
+                        <td class="num">2026年9月1日 ～</td>
+                        <td><span class="price">500円</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section>
+        <div class="section-head">
+            <p class="eyebrow">The Question</p>
+            <h2>迷うのは、こういう案件です</h2>
+        </div>
+        <p class="lede">
+            お見積りは値上げ前、ご葬儀は値上げ後、という案件が必ず出てきます。
+        </p>
+
+        <div class="events">
+            <div class="event">
+                <span class="date">2026.08.15</span>
+                <span class="what">お見積りをお出しした</span>
+                <span class="detail">この時点の価格は300円。お客様には300円でご提示しています。</span>
+            </div>
+            <div class="event is-change">
+                <span class="date">2026.09.01</span>
+                <span class="what">価格を改定した</span>
+                <span class="detail">商品Aが300円から500円になりました。</span>
+            </div>
+            <div class="event">
+                <span class="date">2026.09.25</span>
+                <span class="what">お亡くなりになり、ご葬儀</span>
+                <span class="detail">改定後の期間に入っています。</span>
+            </div>
+        </div>
+
+        <div class="fork">
+            <p class="fork-question">このとき、請求書の商品Aは<br>いくらで出すべきでしょうか。</p>
+            <div class="fork-options">
+                <div class="fork-card">
+                    <span class="amount">300円</span>
+                    <span class="basis">お見積りのときの価格<br>（ご提示した金額のまま）</span>
+                </div>
+                <span class="fork-or">それとも</span>
+                <div class="fork-card">
+                    <span class="amount">500円</span>
+                    <span class="basis">ご葬儀のときの価格<br>（改定後の金額）</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <div class="section-head">
+            <p class="eyebrow">Options</p>
+            <h2>基準にできる日と、その結果</h2>
+        </div>
+        <p class="lede">
+            基準にする日の候補は4つあります。上の例だと、それぞれこうなります。
+        </p>
+
+        <ul class="choices">
+            <li>
+                <div class="choice-head">
+                    <span class="choice-key">A</span>
+                    <span class="choice-name">お見積りをお出しした日</span>
+                    <span class="choice-result">この例では 300円</span>
+                </div>
+                <div class="choice-body">
+                    <p class="pro">お客様にご提示した金額と、ご請求する金額が必ず一致します。「話が違う」が起きません。</p>
+                    <p class="con">値上げ前に出したお見積りが古いまま残っていると、いつまでも旧価格でご請求することになります。</p>
+                </div>
+            </li>
+            <li>
+                <div class="choice-head">
+                    <span class="choice-key">B</span>
+                    <span class="choice-name">お亡くなりになった日</span>
+                    <span class="choice-result">この例では 500円</span>
+                </div>
+                <div class="choice-body">
+                    <p class="pro">ご葬儀の実施時期と価格が一致します。同じ時期の施行なら、どの案件も同じ価格になります。</p>
+                    <p class="con">ご提示済みの金額から上がるため、お客様へのご説明が必要になります。加えて、<b>今のシステムには死亡日を入力する欄がありません</b>。項目の追加が必要です。</p>
+                </div>
+            </li>
+            <li>
+                <div class="choice-head">
+                    <span class="choice-key">C</span>
+                    <span class="choice-name">通夜・ご葬儀を行った日</span>
+                    <span class="choice-result">この例では 500円</span>
+                </div>
+                <div class="choice-body">
+                    <p class="pro">実際にお品物をお使いになった日と価格が一致します。日付はすでに案件に登録されています。</p>
+                    <p class="con">お亡くなりになった日と、ご葬儀の日が月をまたぐ場合（月末の逝去など）、BとCで価格が変わります。</p>
+                </div>
+            </li>
+            <li>
+                <div class="choice-head">
+                    <span class="choice-key">D</span>
+                    <span class="choice-name">請求書を作った日</span>
+                    <span class="choice-result">この例では 500円</span>
+                </div>
+                <div class="choice-body">
+                    <p class="pro">仕組みとしては一番単純です。請求書を作った時点の価格表をそのまま使います。</p>
+                    <p class="con">ご請求が遅れると価格が変わってしまいます。同じご葬儀でも、いつ請求書を作ったかで金額が違うことになります。</p>
+                </div>
+            </li>
+        </ul>
+
+        <p class="note">
+            この例ではB・C・Dはどれも500円になりますが、月末にお亡くなりになって翌月にご葬儀という場合や、ご請求が翌月以降になる場合には、それぞれ違う金額になります。
+        </p>
+    </section>
+
+    <section>
+        <div class="section-head">
+            <p class="eyebrow">Now</p>
+            <h2>ちなみに、今はどうなっているか</h2>
+        </div>
+        <div class="current">
+            <p class="row">価格表は<b>ひとつだけ</b>で、期間の区別がありません。価格を変えると、価格表は新しい金額に置き換わります。</p>
+            <p class="row">ただし、<b>作成済みのお見積り・ご請求書は、そのときの金額をそのまま持っています。</b>あとから価格表を変えても、すでに作った書類の金額は変わりません。</p>
+            <p class="row">ご請求書はお見積りの金額を引き継いで作られます。そのため<b>今は結果として「Aのお見積りの日の価格」で動いています。</b></p>
+        </div>
+        <p class="note">
+            つまりAを選ばれる場合、今の動きがそのまま正しいことになります。B・C・Dを選ばれる場合は、請求書を作るときに価格を引き直す仕組みを新しく入れることになります。
+        </p>
+    </section>
+
+    <section>
+        <div class="section-head">
+            <p class="eyebrow">Also</p>
+            <h2>あわせて決めておきたいこと</h2>
+        </div>
+        <p class="lede">
+            基準の日が決まると、次にこの3点が問題になります。
+        </p>
+
+        <ol class="extras">
+            <li>
+                <p class="ask">生前のご相談でお出ししたお見積りが、何年も前のものだった場合も、当時の価格でご請求しますか。</p>
+                <p class="why">事前相談から施行まで年単位で空くことがあります。Aを選ばれた場合、何年前の価格でもそのままご請求することになります。「◯年以上前のものは最新価格にする」といった線引きが必要かどうかを伺いたいです。</p>
+            </li>
+            <li>
+                <p class="ask">ご葬儀の当日に品目が増えた場合、その追加分だけ新しい価格になってもよろしいですか。</p>
+                <p class="why">お見積りに入っていた品目は旧価格、あとから足した品目は新価格、というように<b>一枚のご請求書の中で価格が混ざる</b>可能性があります。混ざってよいか、全品目をどちらかに揃えるかで作り方が変わります。</p>
+            </li>
+            <li>
+                <p class="ask">価格が上がる場合、お客様にはどのようにご説明されますか。</p>
+                <p class="why">B・C・Dではご提示額より高くなることがあります。書類にその旨を出すか、口頭でご説明されるかによって、帳票に注記欄が必要かどうかが変わります。</p>
+            </li>
+        </ol>
+    </section>
+
+    <section>
+        <div class="closing">
+            <strong>お願い</strong><br>
+            基準にする日を <strong>A・B・C・D</strong> のいずれかでお知らせください。<br>
+            あわせて、上の3点についてもお考えをお聞かせいただけますと助かります。<br>
+            いただいた内容に沿って、価格の期間設定の仕組みを作ってまいります。
+        </div>
+    </section>
+
+</div>
+</body>
+</html>

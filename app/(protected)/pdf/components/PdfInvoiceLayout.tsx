@@ -6,6 +6,7 @@ import { resolveProductImageUrl } from '@/lib/utils'
 import { scopeApplies } from '@/lib/productScope'
 import { computeMultiRowAmount } from '@/lib/expandMultiRow'
 import { buildSeparateFeesText, buildInvoiceFeeLines, SEPARATE_FEES_BLOCK_END } from '@/lib/separateFees'
+import { displayProductItemName, displayProductVariantName } from '@/lib/documentDisplayNames'
 import { useDateFormat } from '@/hooks/useDateFormat'
 import {
     A4_HEIGHT_MM,
@@ -44,6 +45,9 @@ export type PdfDocumentItem = {
     productVariant?: { name?: string; abbreviatedName?: string | null; unitLabel?: string | null; imageUrl?: string | null; isDefaultSet?: boolean; setPrice?: number } | null
     productRow?: { useForVariantLabel?: boolean; useForDescriptionLabel?: boolean } | null
     productRowVariant?: { label?: string; abbreviatedName?: string | null; unitLabel?: string | null } | null
+    /** 保存時点の商品名・種類名。商品マスタで改名されても発行済み書類の文言を保つための控え */
+    productItemName?: string | null
+    productVariantName?: string | null
     description?: string | null
     multiSelectVariantIds?: string | null
     qty: number
@@ -288,7 +292,8 @@ function buildDisplayRows(
                     !!estimateItem.productRow?.useForDescriptionLabel &&
                     estimateItem.sign !== -1
                 rows.push({
-                    label: isFirstRow ? product.name : '',
+                    // 品名は保存時点の控えを優先する（商品マスタで改名しても発行済み書類の文言を変えない）
+                    label: isFirstRow ? displayProductItemName(estimateItem, product.name) : '',
                     estimateItem,
                     showProductVariantName: isFirstRow && !!product.showProductVariantName,
                     hideDescription: isEachMode ? false : !isFirstRow,
@@ -654,7 +659,7 @@ export function PdfInvoiceLayout({
         return sum + (item.unitPriceMember * item.qty || 0)
     }, 0)
     const memberSubtotal = itemsMemberSubtotal + freeSubtotalMember
-    const memberTax = Math.floor(memberSubtotal * 0.1) // 消費税は10%で固定、端数は切り捨て
+    const memberTax = Math.round(memberSubtotal * 0.1) // 消費税は10%で固定、端数は四捨五入（画面・保存側と揃える）
     const memberTotal = memberSubtotal + memberTax
     // 一般価格（一般モード時に該当する行のみ除外）
     const itemsGeneralSubtotal = items.reduce((sum, item) => {
@@ -663,7 +668,7 @@ export function PdfInvoiceLayout({
         return sum + (item.unitPriceGeneral * item.qty || 0)
     }, 0)
     const generalSubtotal = itemsGeneralSubtotal + freeSubtotalGeneral
-    const generalTax = Math.floor(generalSubtotal * 0.1)
+    const generalTax = Math.round(generalSubtotal * 0.1)
     const generalTotal = generalSubtotal + generalTax
     // 差引合計: 解約手数料と値引（=解約手数料×-1）が相殺されるため、解約手数料分の影響は無い。
     // 会費入金額は互助会員のみ持つ事前積立なので、会員価格列のみ控除する。一般価格列は控除しない。
@@ -875,8 +880,11 @@ export function PdfInvoiceLayout({
                     ))}
                 </td>
                 )}
+                {/* 金額は align-top。2行以上を占める行で、金額が行の上下中央ではなく
+                    1行目（品名・摘要の1行目と同じ位置）に並ぶようにする。
+                    1行だけの行では上下中央と同じ位置になるため見た目は変わらない。 */}
                 <td
-                    className={`border border-black px-1 text-right ${mergeCls}`}
+                    className={`border border-black px-1 text-right align-top ${mergeCls}`}
                 >
                     {row.estimateItem && !row.isMaturity ? (
                         isServiceIncludedFor(row.estimateItem, false) ? (
@@ -899,7 +907,7 @@ export function PdfInvoiceLayout({
                     )}
                 </td>
                 <td
-                    className={`border border-r-0 border-black px-1 text-right ${mergeCls}`}
+                    className={`border border-r-0 border-black px-1 text-right align-top ${mergeCls}`}
                 >
                     {row.estimateItem ? (
                         isMaturityServiceIncludedFor(row.estimateItem) ? (
@@ -1444,7 +1452,11 @@ export function PdfInvoiceLayout({
                                 )}
                                 {showInvoiceFees && (
                                     <div>
-                                        {buildInvoiceFeeLines(doc.grandTotal, doc.flowerFee).map((line) => (
+                                        {/* 葬儀代金は明細表の差引合計額と同じ値。DB保存値を参照すると同じPDF内で金額が食い違う */}
+                                        {buildInvoiceFeeLines(
+                                            isMember ? memberGrandTotal : generalGrandTotal,
+                                            doc.flowerFee
+                                        ).map((line) => (
                                             <div
                                                 key={line.label}
                                                 // 生花代と支払合計の間だけ罫線を挟む。行を増やさず下線として引く
@@ -1659,7 +1671,7 @@ export function PdfInvoiceLayout({
                                         <div className="p-2 text-xs">
                                             <div className="flex items-baseline justify-between border-b border-black pb-1 mb-1">
                                                 <span className="font-bold tracking-wider">
-                                                    {it.productItem?.name ?? ''}
+                                                    {displayProductItemName(it, it.productItem?.name)}
                                                 </span>
                                                 {it.qty > 1 && (
                                                     <span className="text-[0.7rem]">
@@ -1669,7 +1681,7 @@ export function PdfInvoiceLayout({
                                             </div>
                                             <div className="flex items-center justify-between">
                                                 <span className="text-[0.8rem]">
-                                                    {it.productVariant?.name ?? ''}
+                                                    {displayProductVariantName(it, it.productVariant?.name)}
                                                 </span>
                                                 <span className="font-bold text-sm">
                                                     ¥{fmtAmount(unitPrice * it.qty)}
