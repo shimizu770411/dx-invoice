@@ -1,9 +1,18 @@
-import { calcDocumentItemAmount } from '@/lib/documentTotals'
+import {
+    calcDocumentItemAmount,
+    sumMembershipPaidAmount,
+    clearNoChargeSnapshot,
+    resolveNoChargeScope,
+    resolveNoChargeReason,
+} from '@/lib/documentTotals'
+import { EXECUTION_SURCHARGE_NAME, EXECUTION_SURCHARGE_AMOUNT } from '@/lib/documentFixedRows'
 
-export const MATURITY_SERVICE_NAME = '満期サービス'
-export const CANCELLATION_FEE_NAME = '解約手数料'
-export const EXECUTION_SURCHARGE_NAME = '施行割増券'
-export const EXECUTION_SURCHARGE_AMOUNT = -50000
+export {
+    MATURITY_SERVICE_NAME,
+    CANCELLATION_FEE_NAME,
+    EXECUTION_SURCHARGE_NAME,
+    EXECUTION_SURCHARGE_AMOUNT,
+} from '@/lib/documentFixedRows'
 
 type DocumentFreeItemBase = {
     parentProductItemId?: string | null
@@ -81,11 +90,17 @@ export function expandEachModeItems<T extends { qty: number; multiSelectVariantI
             return ids.flatMap((variantId: string) => {
                 const v = (pi.variants || []).find((v: any) => String(v.id) === variantId)
                 if (!v) return []
-                const expanded = { ...item, productVariantId: String(v.id), productVariant: v,
+                // セット扱い・サービス扱いの判定は展開後に選ばれている種類で行う。
+                // 親行の控えは別の種類のものなので、必ず外してから作り直す
+                const expanded = clearNoChargeSnapshot({ ...item, productVariantId: String(v.id), productVariant: v,
                     unitPriceGeneral: v.priceGeneral, unitPriceMember: v.priceMember,
-                    multiSelectVariantIds: null, description: v.name }
-                // セット扱い・サービス扱いの判定は、展開後に選ばれている種類で行う
-                return [{ ...expanded, amount: calcDocumentItemAmount(expanded, item.qty, isMember) }]
+                    multiSelectVariantIds: null, description: v.name })
+                return [{
+                    ...expanded,
+                    amount: calcDocumentItemAmount(expanded, item.qty, isMember),
+                    noChargeScope: resolveNoChargeScope(expanded),
+                    noChargeReason: resolveNoChargeReason(expanded, isMember),
+                }]
             })
         } catch { return [item] }
     }).map((item, i) => ({ ...item, sortNo: i }))
@@ -118,7 +133,7 @@ export function expandVariantGroupItems<T extends { qty: number; groupSelections
                     if (selectedVariants.length === 0) continue
                     const totalGeneral = selectedVariants.reduce((s: number, v: any) => s + v.priceGeneral, 0)
                     const totalMember = selectedVariants.reduce((s: number, v: any) => s + v.priceMember, 0)
-                    const mergedRow = {
+                    const mergedRow = clearNoChargeSnapshot({
                         ...item,
                         productVariantId: String(selectedVariants[0].id),
                         productVariant: selectedVariants[0],
@@ -129,14 +144,19 @@ export function expandVariantGroupItems<T extends { qty: number; groupSelections
                         qty: 1,
                         description: selectedVariants.map((v: any) => v.name).join('、'),
                         groupSelections: null,
-                    }
-                    rows.push({ ...mergedRow, amount: calcDocumentItemAmount(mergedRow, 1, isMember) })
+                    })
+                    rows.push({
+                        ...mergedRow,
+                        amount: calcDocumentItemAmount(mergedRow, 1, isMember),
+                        noChargeScope: resolveNoChargeScope(mergedRow),
+                        noChargeReason: resolveNoChargeReason(mergedRow, isMember),
+                    })
                     continue
                 }
                 for (const variantId of selectedIds) {
                     const v = (group.variants || []).find((vv: any) => String(vv.id) === variantId)
                     if (!v) continue
-                    const groupRow = {
+                    const groupRow = clearNoChargeSnapshot({
                         ...item,
                         productVariantId: String(v.id),
                         productVariant: v,
@@ -146,8 +166,13 @@ export function expandVariantGroupItems<T extends { qty: number; groupSelections
                         qty: 1,
                         description: v.name,
                         groupSelections: null,
-                    }
-                    rows.push({ ...groupRow, amount: calcDocumentItemAmount(groupRow, 1, isMember) })
+                    })
+                    rows.push({
+                        ...groupRow,
+                        amount: calcDocumentItemAmount(groupRow, 1, isMember),
+                        noChargeScope: resolveNoChargeScope(groupRow),
+                        noChargeReason: resolveNoChargeReason(groupRow, isMember),
+                    })
                 }
             }
             return rows.length > 0 ? rows : []
@@ -238,4 +263,26 @@ export function toNullableAmount(value: unknown): number | null {
     if (normalized === '') return null
     const num = Number(normalized)
     return Number.isFinite(num) ? Math.trunc(num) : null
+}
+
+/**
+ * 会費入金があるのに会員区分が「一般」のまま保存しようとしたときの確認メッセージ。
+ *
+ * 会費を入金した時点で互助会員になるため、この組み合わせは運用上ありえない。
+ * 区分の設定漏れに気づかないまま保存すると、会費入金が差し引かれない金額で請求額が確定する。
+ * 問題が無ければ null を返す。
+ */
+export function buildMembershipMismatchWarning(
+    customer: { memberships?: { paymentAmount?: number | null }[] } | null | undefined,
+    isMember: boolean,
+    actionLabel: string
+): string | null {
+    if (isMember) return null
+    const paidAmount = sumMembershipPaidAmount(customer?.memberships)
+    if (paidAmount <= 0) return null
+    return (
+        `この案件には会費入金 ¥${paidAmount.toLocaleString()} が登録されていますが、会員区分が「一般」になっています。\n\n` +
+        '一般のままでは会費入金が差し引かれません。区分の設定漏れでないか確認してください。\n\n' +
+        `このまま${actionLabel}してよろしいですか？`
+    )
 }

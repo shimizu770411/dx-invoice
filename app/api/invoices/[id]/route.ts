@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-middleware'
 import { serializeBigInt } from '@/lib/prisma-utils'
-import { calculateDocumentTotals } from '@/lib/documentTotals'
+import { calculateDocumentTotals, sumMembershipPaidAmount } from '@/lib/documentTotals'
 import { isValidDocNo, toNullableAmount } from '@/lib/documentUtils'
 import { recordOperationLog } from '@/lib/operationLog'
 import { loadProductNameLookup, pickProductItemName, pickProductVariantName } from '@/lib/documentItemNames'
 import { OperationAction, OperationEntityType } from '@phoenix-jpn/db'
-import { VALID_CREMATION_PROCESS_TYPES, VALID_ALTAR_PLACE_TYPES, VALID_ALTAR_TYPES } from '@/lib/documentEnums'
+import { VALID_CREMATION_PROCESS_TYPES, VALID_ALTAR_PLACE_TYPES, VALID_ALTAR_TYPES, sanitizeNoChargeScope, sanitizeNoChargeReason } from '@/lib/documentEnums'
 
 export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
     const params = await props.params
@@ -71,10 +71,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
         const isPaid = invoice.payments[0]?.status === 'PAID'
 
         // 会費入金額を計算
-        const membershipPaidAmount = invoice.customer.memberships.reduce(
-            (sum: number, m: any) => sum + (m.paymentAmount || 0),
-            0
-        )
+        const membershipPaidAmount = sumMembershipPaidAmount(invoice.customer.memberships)
 
         // レスポンスを返す
         const allFreeItems = invoice.items.flatMap((item: any) =>
@@ -165,12 +162,15 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
             return NextResponse.json({ error: '請求書が見つかりません' }, { status: 404 })
         }
 
-        const membershipPaidAmount = invoice.customer.memberships.reduce(
-            (sum: number, m: any) => sum + (m.paymentAmount || 0),
-            0
-        )
+        const membershipPaidAmount = sumMembershipPaidAmount(invoice.customer.memberships)
 
-        const totals = calculateDocumentTotals(data.items || [], membershipPaidAmount, data.freeItems || [])
+        const isMember = data.isMember === true || data.isMember === 'true'
+        const totals = calculateDocumentTotals(
+            data.items || [],
+            membershipPaidAmount,
+            data.freeItems || [],
+            isMember
+        )
 
         // enum型の値を検証・変換
         const cremationProcessType =
@@ -198,7 +198,7 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
                 data: {
                     docNo: data.docNo || null,
                     status: data.status,
-                    isMember: data.isMember === true || data.isMember === 'true',
+                    isMember,
                     subtotal: totals.subtotal,
                     tax: totals.tax,
                     total: totals.total,
@@ -243,6 +243,9 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
                             isService: Boolean(item.isService),
                             isMaturityService: Boolean(item.isMaturityService),
                             adhocSetScope: item.adhocSetScope ?? 'NONE',
+                            // 保存時点で 0 円扱いだったかの控え。未指定は null のまま保つ（NONE に倒さない）
+                            noChargeScope: sanitizeNoChargeScope(item.noChargeScope),
+                            noChargeReason: sanitizeNoChargeReason(item.noChargeReason),
                             multiSelectVariantIds: item.multiSelectVariantIds || null,
                             // 親祭壇の増額。各単価には上乗せ済みのため、記録として保存する
                             surchargeAmount: toNullableAmount(item.surchargeAmount),

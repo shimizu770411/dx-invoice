@@ -12,7 +12,7 @@ import { ImageOff, X } from 'lucide-react'
 import { ProductVariant } from '@/lib/products'
 import { resolveProductImageUrl } from '@/lib/utils'
 import { scopeApplies } from '@/lib/productScope'
-import { computeMultiRowAmount } from '@/lib/expandMultiRow'
+import { calcDocumentItemAmount, noChargeReasonFor, NO_CHARGE_LABELS } from '@/lib/documentTotals'
 import { EXECUTION_SURCHARGE_NAME } from '@/lib/documentUtils'
 import { PlanSurcharge, canApplySurcharge } from '@/lib/planSurcharges'
 import { MISSING_FROM_MASTER_LABEL } from '@/lib/documentMissingProducts'
@@ -591,41 +591,9 @@ export function DocumentItemTable({
                                 }
                                 const isParent = item?.productItem?.isSetParent
                                 const isChild = item?.productItem?.isSetChild
-                                // 任意セット扱い (adhocSetScope) が現在モードに該当
-                                // adhocSetScope は非子商品専用。isSetChild=true の商品には適用しない
-                                const adhocScope = (item as any)?.adhocSetScope
-                                const isAdhocSetIncluded =
-                                    !isChild && (
-                                        adhocScope === 'BOTH' ||
-                                        (adhocScope === 'MEMBER_ONLY' && isMember) ||
-                                        (adhocScope === 'GENERAL_ONLY' && !isMember)
-                                    )
-                                // 複数行構成商品(車種行+距離加算行等)は、固定料金の加算行のみセット対象とする
-                                const isMultiRowFixedSetIncluded =
-                                    !!(
-                                        isChild &&
-                                        item?.productRowId &&
-                                        item?.calcType === 'FIXED' &&
-                                        (item?.sign ?? 1) === 1 &&
-                                        scopeApplies(item?.productItem?.setableScope, isMember)
-                                    )
-                                // 子商品 + 初期セット種類 + setableScope が現在モードに適用: セット扱い
-                                const isSetIncluded =
-                                    !!(
-                                        isChild &&
-                                        item?.productVariant?.isDefaultSet &&
-                                        scopeApplies(item?.productItem?.setableScope, isMember)
-                                    ) || isMultiRowFixedSetIncluded || isAdhocSetIncluded
-                                // サービス品フラグON + serviceableScope が現在モードに適用: サービス扱い
-                                const isServiceIncluded = !!(
-                                    item?.isService &&
-                                    scopeApplies(item?.productItem?.serviceableScope, isMember)
-                                )
-                                // 満期サービスフラグON + 商品の満期サービス可否が「可」: 満期サービス扱い
-                                const isMaturityServiceIncluded = !!(
-                                    item?.isMaturityService && item?.productItem?.isMaturityServiceable
-                                )
-                                const isExcluded = isSetIncluded || isServiceIncluded || isMaturityServiceIncluded
+                                // セット扱い・サービス扱い・満期サービス扱いの判定は共通処理に任せる。
+                                // ここで条件を書くと、画面・保存値・PDFで金額が食い違う
+                                const noChargeReason = item != null ? noChargeReasonFor(item, isMember) : null
                                 // 選択中の親祭壇に紐づく子セット行は qty=0 でも種類選択を許可（一般/会員共通）
                                 const isLinkedChildOfSelectedParent =
                                     !!isChild &&
@@ -635,21 +603,11 @@ export function DocumentItemTable({
                                 const isMissingFromMaster = !!item?.productItem?.isMissingFromMaster
                                 const canSelectVariant =
                                     !isMissingFromMaster && (checkedItems[index] || isLinkedChildOfSelectedParent)
-                                const unitPrice =
-                                    item != null ? (isMember ? item.unitPriceMember : item.unitPriceGeneral) : 0
                                 const liveQty = watchedItems?.[index]?.qty ?? item?.qty ?? 0
                                 // 複数行構成商品: calcType と sign を考慮
                                 const isMultiRowItem = !!(item?.productRowId && item?.calcType)
-                                const amount = isExcluded
-                                    ? 0
-                                    : isMultiRowItem
-                                      ? computeMultiRowAmount({
-                                            calcType: item?.calcType,
-                                            sign: item?.sign,
-                                            unitPrice,
-                                            qty: liveQty,
-                                        })
-                                      : unitPrice * liveQty
+                                // 金額も共通処理で算出する（入力中の数量を反映させるため liveQty を渡す）
+                                const amount = item != null ? calcDocumentItemAmount(item, liveQty, isMember) : 0
                                 // 複数行構成商品グループの先頭か判定
                                 const groupStart = groupStartIndexOf(index)
                                 const isGroupStart = groupStart === index
@@ -977,32 +935,14 @@ export function DocumentItemTable({
                                                               })()
                                                             : item?.productVariant?.name ?? '-'}
                                                     </div>
-                                                    {isMaturityServiceIncluded ? (
+                                                    {noChargeReason ? (
                                                         <div
                                                             style={{
                                                                 color: 'var(--brand-gold-soft)',
                                                                 fontWeight: 600,
                                                             }}
                                                         >
-                                                            満期サービス
-                                                        </div>
-                                                    ) : isServiceIncluded ? (
-                                                        <div
-                                                            style={{
-                                                                color: 'var(--brand-gold-soft)',
-                                                                fontWeight: 600,
-                                                            }}
-                                                        >
-                                                            サービス
-                                                        </div>
-                                                    ) : isSetIncluded ? (
-                                                        <div
-                                                            style={{
-                                                                color: 'var(--brand-gold-soft)',
-                                                                fontWeight: 600,
-                                                            }}
-                                                        >
-                                                            セット
+                                                            {NO_CHARGE_LABELS[noChargeReason]}
                                                         </div>
                                                     ) : (
                                                         <div>¥{amount.toLocaleString()}</div>
@@ -1104,7 +1044,6 @@ export function DocumentItemTable({
                                     freeItems[index]?.unitPriceGeneral ??
                                     0
                                 const isChecked = freeCheckedItems[index] ?? false
-                                const inputsDisabled = readOnly || !isChecked
                                 const itemName =
                                     freeItems[index]?.productItemName ??
                                     watchedFreeItems?.[index]?.productItemName ??
@@ -1113,6 +1052,10 @@ export function DocumentItemTable({
                                 const isCancellationFee = itemName === '解約手数料'
                                 const isExecutionSurcharge = itemName === EXECUTION_SURCHARGE_NAME
                                 const isFixedRow = isMaturity || isCancellationFee || isExecutionSurcharge
+                                // 満期サービス・施行割増券は互助会員だけに効く割引なので、
+                                // 一般の書類では入力させない（入れても合計には反映されない）
+                                const memberBenefitBlocked = (isMaturity || isExecutionSurcharge) && !isMember
+                                const inputsDisabled = readOnly || !isChecked || memberBenefitBlocked
                                 const amount = isChecked
                                     ? isFixedRow
                                         ? liveUnitPrice
@@ -1128,7 +1071,7 @@ export function DocumentItemTable({
                                 return (
                                     <tr key={field.id} className={rowBgClass}>
                                         <td className="border border-gray-300 p-1 text-center">
-                                            {!readOnly && (
+                                            {!readOnly && !memberBenefitBlocked && (
                                                 <input
                                                     type="checkbox"
                                                     checked={isChecked}
@@ -1165,7 +1108,7 @@ export function DocumentItemTable({
                                                     </span>
                                                 </td>
                                                 <td className="border border-gray-300 p-3 text-center text-sm text-gray-500">
-                                                    固定
+                                                    {memberBenefitBlocked ? '会員のみ' : '固定'}
                                                 </td>
                                                 <td className="border border-gray-300 p-3" />
                                                 <td className="border border-gray-300 p-3">
@@ -1301,8 +1244,9 @@ export function DocumentItemTable({
                                 item?.productItem?.serviceableScope,
                                 isMember
                             )
-                            // 満期サービス可否が「可」の商品のみチェック可能
-                            const canBeMaturityService = !!item?.productItem?.isMaturityServiceable
+                            // 満期サービス可否が「可」の商品のみチェック可能。
+                            // 互助会の積立満期に対する特典なので、一般の書類ではチェックを出さない
+                            const canBeMaturityService = !!item?.productItem?.isMaturityServiceable && isMember
                             return (
                                 <div className="min-h-0 flex-1 overflow-y-auto pr-1">
                                     <p className="mb-4 text-lg font-medium">{item?.productItem?.name}</p>

@@ -217,6 +217,13 @@ enum AppliesTo {
   BOTH
 }
 
+// 明細が 0 円扱いになった理由。帳票の金額欄には、金額の代わりにこの区分の文言を印字する
+enum NoChargeReason {
+  SET
+  SERVICE
+  MATURITY_SERVICE
+}
+
 enum RowCalcType {
   FIXED            // 数量無視・固定額（例: 礼状版代）
   UNIT_PRICE_X_QTY // 単価 × 数量
@@ -524,6 +531,12 @@ model EstimateItem {
   isService            Boolean       @default(false) @map("is_service")
   isMaturityService    Boolean       @default(false) @map("is_maturity_service")
   adhocSetScope        AppliesTo     @default(NONE) @map("adhoc_set_scope")
+  // 保存時点で「この行が 0 円扱いだったか」と、その理由の控え。
+  // 0円扱いの判定には商品マスタとプラン別設定の現在値が要るため、控えが無いと
+  // 発行済み書類の金額が後からの設定変更で動いてしまう。表示・PDF・合計はこの控えを優先する。
+  // null は「この列を追加する前に作られた書類＝未記録」を意味し、NONE（課金と記録済み）とは区別する。
+  noChargeScope        AppliesTo?    @map("no_charge_scope")
+  noChargeReason       NoChargeReason? @map("no_charge_reason")
   multiSelectVariantIds String?      @map("multi_select_variant_ids")
   // 親祭壇の増額。unitPriceGeneral と unitPriceMember は既にこの額を上乗せした金額で保存されているため、
   // 金額計算には使わない。増額前の金額を追えるようにするためと、再編集時の復元用に持つ
@@ -634,6 +647,12 @@ model InvoiceItem {
   isService            Boolean       @default(false) @map("is_service")
   isMaturityService    Boolean       @default(false) @map("is_maturity_service")
   adhocSetScope        AppliesTo     @default(NONE) @map("adhoc_set_scope")
+  // 保存時点で「この行が 0 円扱いだったか」と、その理由の控え。
+  // 0円扱いの判定には商品マスタとプラン別設定の現在値が要るため、控えが無いと
+  // 発行済み書類の金額が後からの設定変更で動いてしまう。表示・PDF・合計はこの控えを優先する。
+  // null は「この列を追加する前に作られた書類＝未記録」を意味し、NONE（課金と記録済み）とは区別する。
+  noChargeScope        AppliesTo?    @map("no_charge_scope")
+  noChargeReason       NoChargeReason? @map("no_charge_reason")
   multiSelectVariantIds String?      @map("multi_select_variant_ids")
   // 親祭壇の増額。unitPriceGeneral と unitPriceMember は既にこの額を上乗せした金額で保存されているため、
   // 金額計算には使わない。増額前の金額を追えるようにするためと、再編集時の復元用に持つ

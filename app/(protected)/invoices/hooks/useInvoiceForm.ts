@@ -5,10 +5,16 @@ import { getInvoice, updateInvoice } from '@/lib/invoices'
 import { getCustomer } from '@/lib/customers'
 import { getProducts } from '@/lib/products'
 import { withProductsMissingFromMaster } from '@/lib/documentMissingProducts'
+import { getProductPlanSettings, applyPlanOverrides, BASE_PLAN_ID } from '@/lib/plans'
 import { InvoiceItem, InvoiceFreeItem } from '@/lib/invoices'
 import { toast } from '@/hooks/use-toast'
 import { handleLoadError, handleSaveError } from '@/lib/errorHandler'
-import { calculateDocumentFormTotals, calcDocumentItemAmount } from '@/lib/documentTotals'
+import {
+    calculateDocumentFormTotals,
+    calcDocumentItemAmount,
+    resolveNoChargeScope,
+    resolveNoChargeReason,
+} from '@/lib/documentTotals'
 import { useDocumentItems } from '@/hooks/useDocumentItems'
 import { expandEachModeItems, expandVariantGroupItems, buildDocumentFreeItems, MATURITY_SERVICE_NAME, CANCELLATION_FEE_NAME, EXECUTION_SURCHARGE_NAME, EXECUTION_SURCHARGE_AMOUNT } from '@/lib/documentUtils'
 import { useDocumentProductSearch } from '@/hooks/useDocumentProductSearch'
@@ -40,17 +46,23 @@ export function useInvoiceEdit(invoiceId: string, reset: UseFormReset<InvoiceFor
 
             // 顧客の担当店舗でvariantを絞り込み（該当店舗 + 全店舗共通）
             const storeId = customerData?.storeId ? String(customerData.storeId) : null
-            // 商品マスタから消えた商品（無効化された商品など）の明細を落とさないよう、
-            // 保存済み明細が参照している商品を補ってからマージする
-            const filteredProducts = withProductsMissingFromMaster(
-                allProducts.map((product) => ({
-                    ...product,
-                    variants: product.variants.filter(
-                        (v) => !v.storeId || (storeId && String(v.storeId) === storeId)
-                    ),
-                })),
-                existingItems
+            const storeFilteredProducts = allProducts.map((product) => ({
+                ...product,
+                variants: product.variants.filter(
+                    (v) => !v.storeId || (storeId && String(v.storeId) === storeId)
+                ),
+            }))
+            // プラン別商品設定（非表示商品の除外・セット可否の上書き・初期セット種類の差し替え）を反映する。
+            // これを通さないと、プランでセット扱いにした商品がこの画面でだけ満額で計上され、
+            // 請求書PDF（プラン適用済み）や元になった見積と金額が食い違う。
+            const planSettings = await getProductPlanSettings(
+                String((invoiceData as any).planId || BASE_PLAN_ID)
             )
+            const planAppliedProducts = applyPlanOverrides(storeFilteredProducts, planSettings)
+            // 商品マスタから消えた商品（無効化された商品など）の明細を落とさないよう、
+            // 保存済み明細が参照している商品を補ってからマージする。
+            // プラン適用より後に補うことで、補った商品がプランの非表示設定で消えるのを防ぐ
+            const filteredProducts = withProductsMissingFromMaster(planAppliedProducts, existingItems)
 
             // 全アクティブ品目と既存請求明細をマージ
             const mergedItems: InvoiceItem[] = []
@@ -179,7 +191,20 @@ export function useInvoiceEdit(invoiceId: string, reset: UseFormReset<InvoiceFor
                             unitPriceMember: totalMember,
                         } as any)
                     } else {
-                        mergedItems.push({ ...allExisting[0], productItem: { ...product } })
+                        const existing = allExisting[0]
+                        // セット扱いの判定は種類側の初期セット品フラグを見るため、選択中の種類も
+                        // プラン適用後のものに引き直す。保存値のままだと、プランでセット化した
+                        // 商品がこの画面でだけ満額で計上される
+                        const planAppliedVariant = existing.productVariantId
+                            ? (product.variants ?? []).find(
+                                  (v: any) => String(v.id) === String(existing.productVariantId)
+                              )
+                            : undefined
+                        mergedItems.push({
+                            ...existing,
+                            productItem: { ...product },
+                            productVariant: planAppliedVariant ?? existing.productVariant,
+                        })
                     }
                     continue
                 }
@@ -260,9 +285,12 @@ export function useInvoiceEdit(invoiceId: string, reset: UseFormReset<InvoiceFor
                 const qty = formValues.items[i]?.qty ?? item.qty
                 const description = formValues.items[i]?.description ?? item.description ?? ''
                 // セット扱い・サービス扱いの行は 0 円になる。ここで単価×数量をそのまま入れると、
-                // 0円扱いのはずの行まで積み上がった合計がサーバー側で算出され保存されてしまう
+                // 0円扱いのはずの行まで積み上がった合計がサーバー側で算出され保存されてしまう。
+                // 金額と 0 円扱いの控えは、必ず同じ明細から同時に作る（片方だけ古いと食い違う）
                 const amount = calcDocumentItemAmount(item, qty, isMember)
-                return { ...item, qty, description, amount }
+                const noChargeScope = resolveNoChargeScope(item)
+                const noChargeReason = resolveNoChargeReason(item, isMember)
+                return { ...item, qty, description, amount, noChargeScope, noChargeReason }
             })
             const activeItems = allMergedItems.filter((item) => item.qty > 0).map((item, i) => ({ ...item, sortNo: i }))
             if (activeItems.length === 0) {

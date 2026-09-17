@@ -13,7 +13,13 @@ import { resolveUnitPriceGeneral, resolveUnitPriceMember } from '@/lib/itemPrici
 import { expandMultiRowToItems } from '@/lib/expandMultiRow'
 import { toast } from '@/hooks/use-toast'
 import { handleLoadError, handleSaveError } from '@/lib/errorHandler'
-import { calculateDocumentFormTotals, calcDocumentItemAmount } from '@/lib/documentTotals'
+import {
+    calculateDocumentFormTotals,
+    calcDocumentItemAmount,
+    clearNoChargeSnapshot,
+    resolveNoChargeScope,
+    resolveNoChargeReason,
+} from '@/lib/documentTotals'
 import { useDocumentItems } from '@/hooks/useDocumentItems'
 import { expandEachModeItems, expandVariantGroupItems, buildDocumentFreeItems, MATURITY_SERVICE_NAME, EXECUTION_SURCHARGE_NAME, EXECUTION_SURCHARGE_AMOUNT } from '@/lib/documentUtils'
 import { useDocumentProductSearch } from '@/hooks/useDocumentProductSearch'
@@ -216,6 +222,16 @@ function buildEstimateItemsForProduct(
         // 商品マスタから消えた商品を補った場合、種類一覧が無いこともある
         const productVariants: any[] = product.variants ?? []
         const newDefaultVariant = productVariants.find((v: any) => v.isDefaultSet) ?? productVariants[0] ?? null
+        // セット扱いの判定は種類側の初期セット品フラグを見るため、選択中の種類も
+        // プラン適用後のものに引き直す。保存値のままだと、プランでセット化した
+        // 商品がこの画面でだけ満額で計上される。
+        // 探すのは保存済みの種類IDなので、担当者が選んだ種類そのものは変わらない
+        const planAppliedVariant =
+            ((existing as any).productVariantId
+                ? productVariants.find(
+                      (v: any) => String(v.id) === String((existing as any).productVariantId)
+                  )
+                : undefined) ?? (existing as any).productVariant
         // プラン別のデフォルト種類は、プランを切り替えると変わりうる。
         // 切替後はそのプランの初期種類に必ず揃える（チェック済みでも、担当者が選び直した後でも上書きする）。
         // 以前は「まだチェックしていない商品だけ」追従させていたが、
@@ -242,6 +258,7 @@ function buildEstimateItemsForProduct(
             return [{
                 ...existing,
                 productItem: { ...product },
+                productVariant: planAppliedVariant,
                 ...(isPlanChange && newDefaultVariant
                     ? {
                           productVariantId: newDefaultVariant.id,
@@ -255,12 +272,23 @@ function buildEstimateItemsForProduct(
         }
         if (!isForcedSet && wasForcedSet && existing.qty === 1) {
             // 疑似セット子化 / 唯一の親商品状態が解除された瞬間(かつ自動チェック時の数量から変更されていない): 自動チェックを解除する
-            return [{ ...existing, productItem: { ...product }, ...planDefaultVariantPatch, qty: 0 } as EstimateItem]
+            return [{
+                ...existing,
+                productItem: { ...product },
+                productVariant: planAppliedVariant,
+                ...planDefaultVariantPatch,
+                qty: 0,
+            } as EstimateItem]
         }
         if (defaultVariantChanged) {
-            return [{ ...existing, productItem: { ...product }, ...planDefaultVariantPatch } as EstimateItem]
+            return [{
+                ...existing,
+                productItem: { ...product },
+                productVariant: planAppliedVariant,
+                ...planDefaultVariantPatch,
+            } as EstimateItem]
         }
-        return [{ ...existing, productItem: { ...product } }]
+        return [{ ...existing, productItem: { ...product }, productVariant: planAppliedVariant }]
     }
     const defaultVariant =
         (product.variants ?? []).find((v: any) => v.isDefaultSet) ?? (product.variants ?? [])[0] ?? null
@@ -383,11 +411,15 @@ export function useEstimateCreate(customerId: string, reset: UseFormReset<Estima
         ): Promise<EstimateItem[] | null> => {
             const planSettings = await getProductPlanSettings(newPlanId)
             const newFilteredProducts = applyPlanOverrides(storeFilteredProducts, planSettings)
-            const snapshot = items.map((item, i) => ({
-                ...item,
-                qty: currentFormItems?.[i]?.qty ?? item.qty,
-                description: currentFormItems?.[i]?.description ?? item.description,
-            }))
+            // プランを切り替えるとセット可否と初期セット種類が変わるため、
+            // 全行の 0 円扱いの控えを外して新しいプランで判定し直させる
+            const snapshot = items.map((item, i) =>
+                clearNoChargeSnapshot({
+                    ...item,
+                    qty: currentFormItems?.[i]?.qty ?? item.qty,
+                    description: currentFormItems?.[i]?.description ?? item.description,
+                })
+            )
             const disappearingNames = findItemsDisappearingOnPlanChange(snapshot, newFilteredProducts)
             if (disappearingNames.length > 0) {
                 const ok = confirm(
@@ -421,9 +453,12 @@ export function useEstimateCreate(customerId: string, reset: UseFormReset<Estima
                 const qty = formValues.items[i]?.qty ?? item.qty
                 const description = formValues.items[i]?.description ?? item.description ?? ''
                 // セット扱い・サービス扱いの行は 0 円になる。ここで単価×数量をそのまま入れると、
-                // 0円扱いのはずの行まで積み上がった合計がサーバー側で算出され保存されてしまう
+                // 0円扱いのはずの行まで積み上がった合計がサーバー側で算出され保存されてしまう。
+                // 金額と 0 円扱いの控えは、必ず同じ明細から同時に作る（片方だけ古いと食い違う）
                 const amount = calcDocumentItemAmount(item, qty, isMember)
-                return { ...item, qty, description, amount }
+                const noChargeScope = resolveNoChargeScope(item)
+                const noChargeReason = resolveNoChargeReason(item, isMember)
+                return { ...item, qty, description, amount, noChargeScope, noChargeReason }
             })
             const activeItems = allMergedItems.filter((item) => item.qty > 0).map((item, i) => ({ ...item, sortNo: i }))
             if (activeItems.length === 0) {
@@ -570,11 +605,15 @@ export function useEstimateEdit(estimateId: string, reset: UseFormReset<Estimate
         ): Promise<EstimateItem[] | null> => {
             const planSettings = await getProductPlanSettings(newPlanId)
             const newFilteredProducts = applyPlanOverrides(storeFilteredProducts, planSettings)
-            const snapshot = items.map((item, i) => ({
-                ...item,
-                qty: currentFormItems?.[i]?.qty ?? item.qty,
-                description: currentFormItems?.[i]?.description ?? item.description,
-            }))
+            // プランを切り替えるとセット可否と初期セット種類が変わるため、
+            // 全行の 0 円扱いの控えを外して新しいプランで判定し直させる
+            const snapshot = items.map((item, i) =>
+                clearNoChargeSnapshot({
+                    ...item,
+                    qty: currentFormItems?.[i]?.qty ?? item.qty,
+                    description: currentFormItems?.[i]?.description ?? item.description,
+                })
+            )
             const disappearingNames = findItemsDisappearingOnPlanChange(snapshot, newFilteredProducts)
             if (disappearingNames.length > 0) {
                 const ok = confirm(
@@ -597,9 +636,12 @@ export function useEstimateEdit(estimateId: string, reset: UseFormReset<Estimate
                 const qty = formValues.items[i]?.qty ?? item.qty
                 const description = formValues.items[i]?.description ?? item.description ?? ''
                 // セット扱い・サービス扱いの行は 0 円になる。ここで単価×数量をそのまま入れると、
-                // 0円扱いのはずの行まで積み上がった合計がサーバー側で算出され保存されてしまう
+                // 0円扱いのはずの行まで積み上がった合計がサーバー側で算出され保存されてしまう。
+                // 金額と 0 円扱いの控えは、必ず同じ明細から同時に作る（片方だけ古いと食い違う）
                 const amount = calcDocumentItemAmount(item, qty, isMember)
-                return { ...item, qty, description, amount }
+                const noChargeScope = resolveNoChargeScope(item)
+                const noChargeReason = resolveNoChargeReason(item, isMember)
+                return { ...item, qty, description, amount, noChargeScope, noChargeReason }
             })
             const activeItems = allMergedItems.filter((item) => item.qty > 0).map((item, i) => ({ ...item, sortNo: i }))
             if (activeItems.length === 0) {

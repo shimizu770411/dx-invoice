@@ -62,66 +62,77 @@ export async function POST(request: NextRequest, props: { params: Promise<{ cust
         const { customerId } = params
         const data = await request.json()
 
-        let target
+        // 請求先の作成・供花の作成・両者の紐付けは必ずまとめて行う。
+        // 紐付けだけ失敗すると、どの請求先にも属さない供花が残る
+        const result = await prisma.$transaction(async (tx) => {
+            let target
 
-        if (data.flowerBillingTargetId) {
-            // 請求先が選択された場合: 同一 customer に属するか確認
-            target = await prisma.flowerBillingTarget.findFirst({
-                where: {
-                    id: BigInt(data.flowerBillingTargetId),
-                    customerId: BigInt(customerId),
-                },
-            })
-            if (!target) {
-                return NextResponse.json({ error: '請求先が見つかりません' }, { status: 404 })
-            }
-        } else {
-            // 請求先未選択時: 入力情報から自動作成（同一キーがあれば upsert）
-            const billToKey = generateBillToKey(data.billToName, data.billToAddress, data.billToTel)
-            target = await prisma.flowerBillingTarget.upsert({
-                where: {
-                    customerId_billToKey: {
+            if (data.flowerBillingTargetId) {
+                // 請求先が選択された場合: 同一 customer に属するか確認
+                target = await tx.flowerBillingTarget.findFirst({
+                    where: {
+                        id: BigInt(data.flowerBillingTargetId),
                         customerId: BigInt(customerId),
+                    },
+                })
+                if (!target) {
+                    // 書き込み前なのでこの時点で抜けても影響はない。呼び出し元で 404 を返す
+                    return null
+                }
+            } else {
+                // 請求先未選択時: 入力情報から自動作成（同一キーがあれば upsert）
+                const billToKey = generateBillToKey(data.billToName, data.billToAddress, data.billToTel)
+                target = await tx.flowerBillingTarget.upsert({
+                    where: {
+                        customerId_billToKey: {
+                            customerId: BigInt(customerId),
+                            billToKey,
+                        },
+                    },
+                    update: {
+                        billToName: data.billToName,
+                        billToAddress: data.billToAddress,
+                        billToTel: data.billToTel ?? null,
+                    },
+                    create: {
+                        customerId: BigInt(customerId),
+                        billToName: data.billToName,
+                        billToAddress: data.billToAddress,
+                        billToTel: data.billToTel ?? null,
                         billToKey,
                     },
-                },
-                update: {
-                    billToName: data.billToName,
-                    billToAddress: data.billToAddress,
-                    billToTel: data.billToTel ?? null,
-                },
-                create: {
+                })
+            }
+
+            // 供花を作成
+            const created = await tx.flower.create({
+                data: {
                     customerId: BigInt(customerId),
-                    billToName: data.billToName,
-                    billToAddress: data.billToAddress,
-                    billToTel: data.billToTel ?? null,
-                    billToKey,
+                    requesterName: data.requesterName,
+                    labelName: data.labelName || null,
+                    jointNames: data.jointNames || null,
+                    billToName: data.billToName ?? target.billToName,
+                    billToAddress: data.billToAddress ?? target.billToAddress,
+                    billToTel: data.billToTel ?? target.billToTel,
+                    deliveryTo: data.deliveryTo || null,
+                    amount: data.amount || 0,
                 },
             })
+
+            // 中間テーブルに紐付け
+            await tx.flowerBillingTargetItem.create({
+                data: {
+                    flowerBillingTargetId: target.id,
+                    flowerId: created.id,
+                },
+            })
+
+            return { flower: created, target }
+        })
+        if (!result) {
+            return NextResponse.json({ error: '請求先が見つかりません' }, { status: 404 })
         }
-
-        // 供花を作成
-        const flower = await prisma.flower.create({
-            data: {
-                customerId: BigInt(customerId),
-                requesterName: data.requesterName,
-                labelName: data.labelName || null,
-                jointNames: data.jointNames || null,
-                billToName: data.billToName ?? target.billToName,
-                billToAddress: data.billToAddress ?? target.billToAddress,
-                billToTel: data.billToTel ?? target.billToTel,
-                deliveryTo: data.deliveryTo || null,
-                amount: data.amount || 0,
-            },
-        })
-
-        // 中間テーブルに紐付け
-        await prisma.flowerBillingTargetItem.create({
-            data: {
-                flowerBillingTargetId: target.id,
-                flowerId: flower.id,
-            },
-        })
+        const { flower, target } = result
 
         await recordOperationLog({
             userId: authResult.payload.sub,

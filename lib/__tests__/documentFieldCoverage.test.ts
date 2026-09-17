@@ -168,6 +168,11 @@ const DOCUMENTS: DocumentSpec[] = [
             'isService',
             'isMaturityService',
             'adhocSetScope',
+            // 保存時点で「この行が 0 円扱いだったか」と、その理由の控え。
+            // 判定にはプラン別設定を反映した商品マスタが要るためサーバー側では引き直せない。
+            // 画面側が算出して送るので、保存経路すべてに通す必要がある
+            'noChargeScope',
+            'noChargeReason',
             'multiSelectVariantIds',
             // 親祭壇の増額。unitPriceMember に上乗せ済みだが、再編集時の復元と
             // 増額前の金額を追うために明細行にも持つ
@@ -205,6 +210,11 @@ const DOCUMENTS: DocumentSpec[] = [
             'isService',
             'isMaturityService',
             'adhocSetScope',
+            // 保存時点で「この行が 0 円扱いだったか」と、その理由の控え。
+            // 判定にはプラン別設定を反映した商品マスタが要るためサーバー側では引き直せない。
+            // 画面側が算出して送るので、保存経路すべてに通す必要がある
+            'noChargeScope',
+            'noChargeReason',
             'multiSelectVariantIds',
             'surchargeAmount',
             'planSurchargeId',

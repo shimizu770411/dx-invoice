@@ -3,8 +3,16 @@ import { PdfCompanyAd } from './PdfCompanyAd'
 import { PdfMembershipTable } from './PdfMembershipTable'
 import { AutoFitOneLineText } from './AutoFitOneLineText'
 import { resolveProductImageUrl } from '@/lib/utils'
-import { scopeApplies } from '@/lib/productScope'
-import { computeMultiRowAmount } from '@/lib/expandMultiRow'
+import {
+    buildMembershipPaymentRows,
+    KEYAKI_ROW_INDEX,
+    calcDocumentItemAmount,
+    calcFreeItemsSubtotal,
+    calcGrandTotal,
+    isCancellationFeeRow,
+    noChargeReasonFor,
+    NO_CHARGE_LABELS,
+} from '@/lib/documentTotals'
 import { buildSeparateFeesText, buildInvoiceFeeLines, SEPARATE_FEES_BLOCK_END } from '@/lib/separateFees'
 import { displayProductItemName, displayProductVariantName } from '@/lib/documentDisplayNames'
 import { useDateFormat } from '@/hooks/useDateFormat'
@@ -57,6 +65,9 @@ export type PdfDocumentItem = {
     isService?: boolean
     isMaturityService?: boolean
     adhocSetScope?: 'NONE' | 'MEMBER_ONLY' | 'GENERAL_ONLY' | 'BOTH'
+    /** 保存時点で 0 円扱いだったかの控えと、その理由。null / 未設定 は未記録 */
+    noChargeScope?: 'NONE' | 'MEMBER_ONLY' | 'GENERAL_ONLY' | 'BOTH' | null
+    noChargeReason?: 'SET' | 'SERVICE' | 'MATURITY_SERVICE' | null
     productRowId?: string | null
     calcType?: 'FIXED' | 'UNIT_PRICE_X_QTY' | null
     sign?: number | null
@@ -361,7 +372,7 @@ function buildDisplayRows(
     for (const fi of freeItems ?? []) {
         if (fi.parentProductItemId) continue
         if ((fi.qty ?? 0) <= 0) continue
-        if (fi.productItemName === '解約手数料') continue
+        if (isCancellationFeeRow(fi.productItemName)) continue
         // 施行割増券は満期サービスと同様に明細欄の最終行（小計の直前）に固定表示する
         const isMaturity = fi.productItemName === '満期サービス' || fi.productItemName === '施行割増券'
         const isCancellationFee = false
@@ -599,81 +610,35 @@ export function PdfInvoiceLayout({
     // 解約手数料: qty>0 で登録されていれば、合計欄に「解約手数料」「値引」の2行を表示。
     // 解約手数料は小計に含めない（消費税対象外）。値引で相殺するため差引合計にも影響しない。
     const cancellationFee = (doc.freeItems ?? [])
-        .filter((fi) => fi.productItemName === '解約手数料' && (fi.qty ?? 0) > 0)
+        .filter((fi) => isCancellationFeeRow(fi.productItemName) && (fi.qty ?? 0) > 0)
         .reduce((sum, fi) => sum + fi.unitPriceGeneral * fi.qty, 0)
     const showCancellationFee = cancellationFee >= 1
-    // フリー項目の小計（解約手数料を除く）。満期サービス・施行割増券は会員価格のみの割引のため、一般価格には含めない。
-    const isMaturityFreeItem = (fi: PdfFreeItem) =>
-        fi.productItemName === '満期サービス' || fi.productItemName === '施行割増券'
-    const freeSubtotalMember = (doc.freeItems ?? [])
-        .filter((fi) => fi.productItemName !== '解約手数料')
-        .reduce((sum, fi) => sum + fi.unitPriceGeneral * fi.qty, 0)
-    const freeSubtotalGeneral = (doc.freeItems ?? [])
-        .filter((fi) => fi.productItemName !== '解約手数料' && !isMaturityFreeItem(fi))
-        .reduce((sum, fi) => sum + fi.unitPriceGeneral * fi.qty, 0)
-    // 見積/請求書単位の任意セット扱い（adhocSetScope）。
-    // 'BOTH' は一般・会員ともにセット、'MEMBER_ONLY' は会員のみ、'GENERAL_ONLY' は一般のみ。
-    const isAdhocSetFor = (item: PdfDocumentItem, isMember: boolean): boolean => {
-        const scope = (item as any).adhocSetScope
-        if (scope === 'BOTH') return true
-        if (scope === 'MEMBER_ONLY' && isMember) return true
-        if (scope === 'GENERAL_ONLY' && !isMember) return true
-        return false
-    }
-    // 複数行構成商品(車種行+距離加算行等)は、固定料金の加算行のみセット対象とする
-    const isMultiRowFixedSetIncludedFor = (item: PdfDocumentItem, isMember: boolean): boolean =>
-        !!(
-            item.productItem?.isSetChild &&
-            item.productRowId &&
-            item.calcType === 'FIXED' &&
-            (item.sign ?? 1) === 1 &&
-            scopeApplies(item.productItem?.setableScope, isMember)
-        )
-    // 列ごとに「セット」「サービス」として 0 円扱いか判定するヘルパー
-    const isSetIncludedFor = (item: PdfDocumentItem, isMember: boolean): boolean =>
-        !!(
-            (item.productItem?.isSetChild &&
-                item.productVariant?.isDefaultSet &&
-                scopeApplies(item.productItem?.setableScope, isMember)) ||
-            isMultiRowFixedSetIncludedFor(item, isMember) ||
-            isAdhocSetFor(item, isMember)
-        )
-    const isServiceIncludedFor = (item: PdfDocumentItem, isMember: boolean): boolean =>
-        !!(item.isService && scopeApplies(item.productItem?.serviceableScope, isMember))
-    const isMaturityServiceIncludedFor = (item: PdfDocumentItem): boolean =>
-        !!(item.isMaturityService && item.productItem?.isMaturityServiceable)
-    const isExcludedFor = (item: PdfDocumentItem, isMember: boolean): boolean =>
-        isSetIncludedFor(item, isMember) ||
-        isServiceIncludedFor(item, isMember) ||
-        (isMaturityServiceIncludedFor(item) && isMember)
-
-    // 複数行構成商品（親子セットの加算/返品ペア等）は sign（符号）を考慮して計算する
+    // フリー項目の小計。解約手数料の除外と、会員だけに効く割引（満期サービス・施行割増券）の
+    // 扱いは共通処理に任せる
+    const freeSubtotalMember = calcFreeItemsSubtotal(doc.freeItems, true)
+    const freeSubtotalGeneral = calcFreeItemsSubtotal(doc.freeItems, false)
+    // 複数行構成商品（親子セットの加算/返品ペア等）かどうか
     const isMultiRowItem = (item: PdfDocumentItem): boolean => !!(item.productRowId && item.calcType)
-    const multiRowAmount = (item: PdfDocumentItem, unitPrice: number): number =>
-        computeMultiRowAmount({ calcType: item.calcType, sign: item.sign ?? 1, unitPrice, qty: item.qty })
+    // 明細1行の金額と 0 円扱いの判定は共通処理に任せる。ここで条件を書き足すと、
+    // 画面・保存値・PDFで金額が食い違う。
+    // PDFは会員価格列と一般価格列の両方を印字するため、同じ明細を会員・一般それぞれの条件で判定する。
+    const itemAmountFor = (item: PdfDocumentItem, isMember: boolean): number =>
+        calcDocumentItemAmount(item, item.qty, isMember)
 
-    // 会員価格（セット扱い / サービス扱いの行は除外）
-    const itemsMemberSubtotal = items.reduce((sum, item) => {
-        if (isExcludedFor(item, true)) return sum
-        if (isMultiRowItem(item)) return sum + multiRowAmount(item, item.unitPriceMember)
-        return sum + (item.unitPriceMember * item.qty || 0)
-    }, 0)
+    // 会員価格（0円扱いの行は共通処理側で 0 になる）
+    const itemsMemberSubtotal = items.reduce((sum, item) => sum + itemAmountFor(item, true), 0)
     const memberSubtotal = itemsMemberSubtotal + freeSubtotalMember
     const memberTax = Math.round(memberSubtotal * 0.1) // 消費税は10%で固定、端数は四捨五入（画面・保存側と揃える）
     const memberTotal = memberSubtotal + memberTax
-    // 一般価格（一般モード時に該当する行のみ除外）
-    const itemsGeneralSubtotal = items.reduce((sum, item) => {
-        if (isExcludedFor(item, false)) return sum
-        if (isMultiRowItem(item)) return sum + multiRowAmount(item, item.unitPriceGeneral)
-        return sum + (item.unitPriceGeneral * item.qty || 0)
-    }, 0)
+    // 一般価格
+    const itemsGeneralSubtotal = items.reduce((sum, item) => sum + itemAmountFor(item, false), 0)
     const generalSubtotal = itemsGeneralSubtotal + freeSubtotalGeneral
     const generalTax = Math.round(generalSubtotal * 0.1)
     const generalTotal = generalSubtotal + generalTax
     // 差引合計: 解約手数料と値引（=解約手数料×-1）が相殺されるため、解約手数料分の影響は無い。
-    // 会費入金額は互助会員のみ持つ事前積立なので、会員価格列のみ控除する。一般価格列は控除しない。
-    const generalGrandTotal = Math.max(0, generalTotal)
-    const memberGrandTotal = Math.max(0, memberTotal - membershipPaidAmount)
+    // 会費入金額は互助会員が事前に積み立てたお金なので、会員価格列のみ控除する。
+    const generalGrandTotal = calcGrandTotal(generalTotal, membershipPaidAmount, false)
+    const memberGrandTotal = calcGrandTotal(memberTotal, membershipPaidAmount, true)
     const customer: PdfDocumentCustomer | undefined = docAny.customer
         ? {
               ...docAny.customer,
@@ -785,9 +750,7 @@ export function PdfInvoiceLayout({
     // 行間(ITEM_TABLE_LINE_HEIGHT)は全書類共通の固定値。フッター変動行数が
     // 最大パターンより少ない書類は、その分だけ通常サイズの空白行が増える
     // （39行が最低保証、それ以上は書類ごとの余裕次第）。
-    const displayedMembershipCount = (customer?.memberships ?? []).filter((m, idx) =>
-        idx === 2 ? m.paymentAmount != null : m.paymentAmountOnce != null && m.paymentTimes != null
-    ).length
+    const displayedMembershipCount = buildMembershipPaymentRows(customer?.memberships).length
     const itemTableFooterExtraRows = displayedMembershipCount + (showCancellationFee ? 2 : 0)
     const itemTableLineHeight = ITEM_TABLE_LINE_HEIGHT
     const { targetBodyRows, grandTotalExtraPx } = computeItemTableRowPlan(
@@ -887,20 +850,12 @@ export function PdfInvoiceLayout({
                     className={`border border-black px-1 text-right align-top ${mergeCls}`}
                 >
                     {row.estimateItem && !row.isMaturity ? (
-                        isServiceIncludedFor(row.estimateItem, false) ? (
+                        noChargeReasonFor(row.estimateItem, false) ? (
                             <span style={{ fontWeight: 600 }}>
-                                サービス
-                            </span>
-                        ) : isSetIncludedFor(row.estimateItem, false) ? (
-                            <span style={{ fontWeight: 600 }}>
-                                セット
+                                {NO_CHARGE_LABELS[noChargeReasonFor(row.estimateItem, false)!]}
                             </span>
                         ) : (
-                            fmtAmount(
-                                isMultiRowItem(row.estimateItem)
-                                    ? multiRowAmount(row.estimateItem, row.estimateItem.unitPriceGeneral)
-                                    : row.estimateItem.unitPriceGeneral * row.estimateItem.qty
-                            )
+                            fmtAmount(itemAmountFor(row.estimateItem, false))
                         )
                     ) : (
                         ''
@@ -910,24 +865,12 @@ export function PdfInvoiceLayout({
                     className={`border border-r-0 border-black px-1 text-right align-top ${mergeCls}`}
                 >
                     {row.estimateItem ? (
-                        isMaturityServiceIncludedFor(row.estimateItem) ? (
+                        noChargeReasonFor(row.estimateItem, true) ? (
                             <span style={{ fontWeight: 600 }}>
-                                満期サービス
-                            </span>
-                        ) : isServiceIncludedFor(row.estimateItem, true) ? (
-                            <span style={{ fontWeight: 600 }}>
-                                サービス
-                            </span>
-                        ) : isSetIncludedFor(row.estimateItem, true) ? (
-                            <span style={{ fontWeight: 600 }}>
-                                セット
+                                {NO_CHARGE_LABELS[noChargeReasonFor(row.estimateItem, true)!]}
                             </span>
                         ) : (
-                            fmtAmount(
-                                isMultiRowItem(row.estimateItem)
-                                    ? multiRowAmount(row.estimateItem, row.estimateItem.unitPriceMember)
-                                    : row.estimateItem.unitPriceMember * row.estimateItem.qty
-                            )
+                            fmtAmount(itemAmountFor(row.estimateItem, true))
                         )
                     ) : (
                         ''
@@ -1194,19 +1137,12 @@ export function PdfInvoiceLayout({
                                     </td>
                                 </tr>
                                 {(() => {
-                                    const displayedMemberships = (customer?.memberships ?? [])
-                                        .map((m, originalIdx) => ({ m, originalIdx }))
-                                        // けやき（3行目）は「1回の入金額×回数」ではなく入金額を直接入力する仕様のため、判定を分ける
-                                        .filter(({ m, originalIdx }) =>
-                                            originalIdx === 2
-                                                ? m.paymentAmount != null
-                                                : m.paymentAmountOnce != null && m.paymentTimes != null
-                                        )
-                                    return displayedMemberships.map(({ m, originalIdx }, idx) => {
-                                        const isKeyaki = originalIdx === 2
-                                        const subtotal = isKeyaki
-                                            ? m.paymentAmount ?? 0
-                                            : (m.paymentAmountOnce ?? 0) * (m.paymentTimes ?? 0)
+                                    // 行の有無も金額も共通処理に任せる。ここで別の式を書くと、
+                                    // 書類に出ている内訳の合計と差引合計から引いた額が食い違う
+                                    const displayedMemberships = buildMembershipPaymentRows(customer?.memberships)
+                                    return displayedMemberships.map(({ membership: m, rowIndex: originalIdx, amount: subtotal }, idx) => {
+                                        // けやきは割引額を直接入力する仕様で、1回の入金額×回数では出せない
+                                        const isKeyaki = originalIdx === KEYAKI_ROW_INDEX
                                         // 「会費入金額」ラベル列（品名列）のみ、複数行にわたる場合の行間境界線を消して1ブロックに見せる。
                                         // border-collapse下では隣接セルの border-bottom/border-top が競合表示されるため両方消す
                                         const isLast = idx === displayedMemberships.length - 1

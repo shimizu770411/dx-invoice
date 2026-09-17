@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-middleware'
 import { serializeBigInt } from '@/lib/prisma-utils'
-import { calculateDocumentTotals } from '@/lib/documentTotals'
+import { calculateDocumentTotals, sumMembershipPaidAmount } from '@/lib/documentTotals'
 import { buildDocNoPrefix, buildDocNo, isValidDocNo, pickLatestValidDocNo, toNullableAmount } from '@/lib/documentUtils'
 import { recordOperationLog } from '@/lib/operationLog'
 import { loadProductNameLookup, pickProductItemName, pickProductVariantName } from '@/lib/documentItemNames'
 import { OperationAction, OperationEntityType } from '@phoenix-jpn/db'
-import { VALID_CREMATION_PROCESS_TYPES, VALID_ALTAR_PLACE_TYPES, VALID_ALTAR_TYPES } from '@/lib/documentEnums'
+import { VALID_CREMATION_PROCESS_TYPES, VALID_ALTAR_PLACE_TYPES, VALID_ALTAR_TYPES, sanitizeNoChargeScope, sanitizeNoChargeReason } from '@/lib/documentEnums'
 
 export async function GET(request: NextRequest) {
     try {
@@ -136,13 +136,16 @@ export async function POST(request: NextRequest) {
         }
 
         // 会費入金額を計算
-        const membershipPaidAmount = customer.memberships.reduce(
-            (sum: number, m: any) => sum + (m.paymentAmount || 0),
-            0
-        )
+        const membershipPaidAmount = sumMembershipPaidAmount(customer.memberships)
 
         // 合計を計算
-        const totals = calculateDocumentTotals(data.items || [], membershipPaidAmount, data.freeItems || [])
+        const isMember = data.isMember === true || data.isMember === 'true'
+        const totals = calculateDocumentTotals(
+            data.items || [],
+            membershipPaidAmount,
+            data.freeItems || [],
+            isMember
+        )
 
         // enum型の値を検証・変換
         const cremationProcessType =
@@ -170,130 +173,139 @@ export async function POST(request: NextRequest) {
         const nameLookup = await loadProductNameLookup(data.items || [])
 
         // 見積を作成
-        const estimate = await prisma.estimate.create({
-            data: {
-                customerId: BigInt(customerId),
-                planId: data.planId ? BigInt(data.planId) : undefined,
-                docNo,
-                status: data.status || 'DRAFT',
-                isMember: data.isMember === true || data.isMember === 'true',
-                subtotal: totals.subtotal,
-                tax: totals.tax,
-                total: totals.total,
-                membershipPaidAmount,
-                grandTotal: totals.grandTotal,
-                cremationProcessType,
-                altarPlaceType,
-                altarPlaceOther: data.altarPlaceOther || null,
-                altarType,
-                ceilingHeight: data.ceilingHeight || null,
-                preConsultStaff: data.preConsultStaff || null,
-                estimateStaff: data.estimateStaff || null,
-                ceremonyStaff: data.ceremonyStaff || null,
-                transportStaff: data.transportStaff || null,
-                decorationStaff: data.decorationStaff || null,
-                returnStaff: data.returnStaff || null,
-                remarks: data.remarks || null,
-                cremationFee: toNullableAmount(data.cremationFee),
-                offeringFee: toNullableAmount(data.offeringFee),
-                newspaperAdFee: toNullableAmount(data.newspaperAdFee),
-                issuedAt: data.issuedAt ? new Date(data.issuedAt) : null,
-                items: {
-                    create: (data.items || []).map((item: any, index: number) => ({
-                        productItemId: item.productItemId ? BigInt(item.productItemId) : null,
-                        productVariantId: item.productVariantId ? BigInt(item.productVariantId) : null,
-                        productRowId: item.productRowId ? BigInt(item.productRowId) : null,
-                        productRowVariantId: item.productRowVariantId
-                            ? BigInt(item.productRowVariantId)
-                            : null,
-                        productVariantGroupId: item.productVariantGroupId
-                            ? BigInt(item.productVariantGroupId)
-                            : null,
-                        productItemName: pickProductItemName(item, nameLookup),
-                        productVariantName: pickProductVariantName(item, nameLookup),
-                        calcType:
-                            item.calcType === 'FIXED' || item.calcType === 'UNIT_PRICE_X_QTY'
-                                ? item.calcType
+        // 見積本体・明細・フリー項目・顧客の会員証欄は必ずまとめて保存する。
+        // 途中で失敗すると、フリー項目の無い見積や会員証欄だけ未反映の状態が残る
+        const estimate = await prisma.$transaction(async (tx) => {
+            const created = await tx.estimate.create({
+                data: {
+                    customerId: BigInt(customerId),
+                    planId: data.planId ? BigInt(data.planId) : undefined,
+                    docNo,
+                    status: data.status || 'DRAFT',
+                    isMember,
+                    subtotal: totals.subtotal,
+                    tax: totals.tax,
+                    total: totals.total,
+                    membershipPaidAmount,
+                    grandTotal: totals.grandTotal,
+                    cremationProcessType,
+                    altarPlaceType,
+                    altarPlaceOther: data.altarPlaceOther || null,
+                    altarType,
+                    ceilingHeight: data.ceilingHeight || null,
+                    preConsultStaff: data.preConsultStaff || null,
+                    estimateStaff: data.estimateStaff || null,
+                    ceremonyStaff: data.ceremonyStaff || null,
+                    transportStaff: data.transportStaff || null,
+                    decorationStaff: data.decorationStaff || null,
+                    returnStaff: data.returnStaff || null,
+                    remarks: data.remarks || null,
+                    cremationFee: toNullableAmount(data.cremationFee),
+                    offeringFee: toNullableAmount(data.offeringFee),
+                    newspaperAdFee: toNullableAmount(data.newspaperAdFee),
+                    issuedAt: data.issuedAt ? new Date(data.issuedAt) : null,
+                    items: {
+                        create: (data.items || []).map((item: any, index: number) => ({
+                            productItemId: item.productItemId ? BigInt(item.productItemId) : null,
+                            productVariantId: item.productVariantId ? BigInt(item.productVariantId) : null,
+                            productRowId: item.productRowId ? BigInt(item.productRowId) : null,
+                            productRowVariantId: item.productRowVariantId
+                                ? BigInt(item.productRowVariantId)
                                 : null,
-                        sign: Number(item.sign) === -1 ? -1 : 1,
-                        description: item.description,
+                            productVariantGroupId: item.productVariantGroupId
+                                ? BigInt(item.productVariantGroupId)
+                                : null,
+                            productItemName: pickProductItemName(item, nameLookup),
+                            productVariantName: pickProductVariantName(item, nameLookup),
+                            calcType:
+                                item.calcType === 'FIXED' || item.calcType === 'UNIT_PRICE_X_QTY'
+                                    ? item.calcType
+                                    : null,
+                            sign: Number(item.sign) === -1 ? -1 : 1,
+                            description: item.description,
+                            unitPriceGeneral: item.unitPriceGeneral || 0,
+                            unitPriceMember: item.unitPriceMember || 0,
+                            qty: item.qty || 0,
+                            amount: item.amount || 0,
+                            isService: Boolean(item.isService),
+                            isMaturityService: Boolean(item.isMaturityService),
+                            adhocSetScope: item.adhocSetScope ?? 'NONE',
+                            // 保存時点で 0 円扱いだったかの控え。未指定は null のまま保つ（NONE に倒さない）
+                            noChargeScope: sanitizeNoChargeScope(item.noChargeScope),
+                            noChargeReason: sanitizeNoChargeReason(item.noChargeReason),
+                            multiSelectVariantIds: item.multiSelectVariantIds || null,
+                            // 親祭壇の増額。各単価には上乗せ済みのため、記録として保存する
+                            surchargeAmount: toNullableAmount(item.surchargeAmount),
+                            planSurchargeId: item.planSurchargeId ? BigInt(item.planSurchargeId) : null,
+                            sortNo: item.sortNo ?? index,
+                        })),
+                    },
+                },
+                include: {
+                    customer: true,
+                    items: {
+                        include: {
+                            productItem: {
+                                include: {
+                                    rows: { include: { variants: true } },
+                                    variantGroups: { include: { variants: true } },
+                                },
+                            },
+                            productVariant: true,
+                        },
+                    },
+                },
+            })
+
+            // フリー項目を保存
+            const freeItems: any[] = data.freeItems || []
+            if (freeItems.length > 0) {
+                let anchorItemId: bigint
+                if (created.items.length > 0) {
+                    anchorItemId = created.items[0].id
+                } else {
+                    const dummyItem = await tx.estimateItem.create({
+                        data: {
+                            estimateId: created.id,
+                            unitPriceGeneral: 0,
+                            unitPriceMember: 0,
+                            qty: 0,
+                            amount: 0,
+                            sortNo: 9999,
+                        },
+                    })
+                    anchorItemId = dummyItem.id
+                }
+                await tx.estimateItemFree.createMany({
+                    data: freeItems.map((item: any, index: number) => ({
+                        estimateItemId: anchorItemId,
+                        parentProductItemId: item.parentProductItemId
+                            ? BigInt(item.parentProductItemId)
+                            : null,
+                        productItemName: item.productItemName || '',
+                        description: item.description || '',
                         unitPriceGeneral: item.unitPriceGeneral || 0,
-                        unitPriceMember: item.unitPriceMember || 0,
-                        qty: item.qty || 0,
-                        amount: item.amount || 0,
-                        isService: Boolean(item.isService),
-                        isMaturityService: Boolean(item.isMaturityService),
-                        adhocSetScope: item.adhocSetScope ?? 'NONE',
-                        multiSelectVariantIds: item.multiSelectVariantIds || null,
-                        // 親祭壇の増額。各単価には上乗せ済みのため、記録として保存する
-                        surchargeAmount: toNullableAmount(item.surchargeAmount),
-                        planSurchargeId: item.planSurchargeId ? BigInt(item.planSurchargeId) : null,
+                        qty: item.qty || 1,
+                        amount: (item.unitPriceGeneral || 0) * (item.qty || 1),
                         sortNo: item.sortNo ?? index,
                     })),
-                },
-            },
-            include: {
-                customer: true,
-                items: {
-                    include: {
-                        productItem: {
-                            include: {
-                                rows: { include: { variants: true } },
-                                variantGroups: { include: { variants: true } },
-                            },
-                        },
-                        productVariant: true,
-                    },
-                },
-            },
-        })
-
-        // フリー項目を保存
-        const freeItems: any[] = data.freeItems || []
-        if (freeItems.length > 0) {
-            let anchorItemId: bigint
-            if (estimate.items.length > 0) {
-                anchorItemId = estimate.items[0].id
-            } else {
-                const dummyItem = await prisma.estimateItem.create({
-                    data: {
-                        estimateId: estimate.id,
-                        unitPriceGeneral: 0,
-                        unitPriceMember: 0,
-                        qty: 0,
-                        amount: 0,
-                        sortNo: 9999,
-                    },
                 })
-                anchorItemId = dummyItem.id
             }
-            await prisma.estimateItemFree.createMany({
-                data: freeItems.map((item: any, index: number) => ({
-                    estimateItemId: anchorItemId,
-                    parentProductItemId: item.parentProductItemId
-                        ? BigInt(item.parentProductItemId)
-                        : null,
-                    productItemName: item.productItemName || '',
-                    description: item.description || '',
-                    unitPriceGeneral: item.unitPriceGeneral || 0,
-                    qty: item.qty || 1,
-                    amount: (item.unitPriceGeneral || 0) * (item.qty || 1),
-                    sortNo: item.sortNo ?? index,
-                })),
-            })
-        }
 
-        // 会員証欄（顧客レコード）も見積の新規作成時に保存する
-        if (data.memberCardNote !== undefined) {
-            const validMemberCardStatuses = ['COLLECTED', 'NOT_COLLECTED', 'LOST']
-            const memberCardNote = validMemberCardStatuses.includes(data.memberCardNote)
-                ? data.memberCardNote
-                : null
-            await prisma.customer.update({
-                where: { id: BigInt(customerId) },
-                data: { memberCardNote },
-            })
-        }
+            // 会員証欄（顧客レコード）も見積の新規作成時に保存する
+            if (data.memberCardNote !== undefined) {
+                const validMemberCardStatuses = ['COLLECTED', 'NOT_COLLECTED', 'LOST']
+                const memberCardNote = validMemberCardStatuses.includes(data.memberCardNote)
+                    ? data.memberCardNote
+                    : null
+                await tx.customer.update({
+                    where: { id: BigInt(customerId) },
+                    data: { memberCardNote },
+                })
+            }
+
+            return created
+        })
 
         await recordOperationLog({
             userId: authResult.payload.sub,

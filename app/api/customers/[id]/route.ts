@@ -144,47 +144,49 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
             // 見積・請求書の保存（PUT /api/estimates/[id] 等）でのみ更新する
         }
 
-        // 顧客を更新
-        const customer = await prisma.customer.update({
-            where: { id: BigInt(id) },
-            data: customerData,
-            include: {
-                chiefMournerCity: true,
-                chiefMournerTown: true,
-            },
-        })
-
-        // 会員情報を更新
-        if (data.memberships) {
-            // 既存の会員情報を削除
-            await prisma.customerMembership.deleteMany({
-                where: { customerId: BigInt(id) },
+        // 顧客本体と会員情報は必ずまとめて更新する。
+        // 会員情報は「全削除してから作り直す」作りなので、削除が済んだあとに作成が失敗すると
+        // その案件の会員情報が消えたまま残る。会員情報は会費入金額の元データなので、
+        // 消えるとそれ以降その案件の見積・請求書が会費入金を控除しない金額で計算される。
+        const customer = await prisma.$transaction(async (tx) => {
+            const updated = await tx.customer.update({
+                where: { id: BigInt(id) },
+                data: customerData,
+                include: {
+                    chiefMournerCity: true,
+                    chiefMournerTown: true,
+                },
             })
 
-            // 新しい会員情報を作成
-            await Promise.all(
-                data.memberships
-                    .filter((m: any) => m.rowNo >= 1 && m.rowNo <= 3)
-                    .map((membership: any) =>
-                        prisma.customerMembership.create({
-                            data: {
-                                customerId: BigInt(id),
-                                rowNo: membership.rowNo,
-                                memberNo: toNullIfEmpty(membership.memberNo),
-                                joinedAt: membership.joinedAt ? new Date(membership.joinedAt) : null,
-                                memberName: toNullIfEmpty(membership.memberName),
-                                courseUnits: toIntOrNull(membership.courseUnits),
-                                maturityAmount: toIntOrNull(membership.maturityAmount),
-                                paymentAmountOnce: toIntOrNull(membership.paymentAmountOnce),
-                                paymentTimes: toIntOrNull(membership.paymentTimes),
-                                paymentAmount: toIntOrNull(membership.paymentAmount),
-                                salesStaffName: toNullIfEmpty(membership.salesStaffName),
-                                relationToDeceased: toNullIfEmpty(membership.relationToDeceased),
-                            },
-                        })
-                    )
-            )
-        }
+            if (data.memberships) {
+                await tx.customerMembership.deleteMany({
+                    where: { customerId: BigInt(id) },
+                })
+
+                // トランザクション内は1件ずつ順に流す（並行実行すると接続を奪い合う）
+                const rows = data.memberships.filter((m: any) => m.rowNo >= 1 && m.rowNo <= 3)
+                for (const membership of rows) {
+                    await tx.customerMembership.create({
+                        data: {
+                            customerId: BigInt(id),
+                            rowNo: membership.rowNo,
+                            memberNo: toNullIfEmpty(membership.memberNo),
+                            joinedAt: membership.joinedAt ? new Date(membership.joinedAt) : null,
+                            memberName: toNullIfEmpty(membership.memberName),
+                            courseUnits: toIntOrNull(membership.courseUnits),
+                            maturityAmount: toIntOrNull(membership.maturityAmount),
+                            paymentAmountOnce: toIntOrNull(membership.paymentAmountOnce),
+                            paymentTimes: toIntOrNull(membership.paymentTimes),
+                            paymentAmount: toIntOrNull(membership.paymentAmount),
+                            salesStaffName: toNullIfEmpty(membership.salesStaffName),
+                            relationToDeceased: toNullIfEmpty(membership.relationToDeceased),
+                        },
+                    })
+                }
+            }
+
+            return updated
+        })
 
         // レスポンスを返す
         return NextResponse.json(

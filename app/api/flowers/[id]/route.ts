@@ -63,40 +63,46 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
             return NextResponse.json({ error: '供花が見つかりません' }, { status: 404 })
         }
 
-        // 供花を更新
-        const updated = await prisma.flower.update({
-            where: { id: BigInt(id) },
-            data: {
-                requesterName: data.requesterName,
-                labelName: data.labelName || null,
-                jointNames: data.jointNames || null,
-                billToName: data.billToName,
-                billToAddress: data.billToAddress,
-                billToTel: data.billToTel || null,
-                deliveryTo: data.deliveryTo || null,
-                amount: data.amount || 0,
-            },
-        })
+        // 供花の更新と請求先の紐付け替えは必ずまとめて行う。紐付けは「削除してから作り直す」ため、
+        // 途中で失敗するとどの請求先にも属さない供花が残る
+        const updated = await prisma.$transaction(async (tx) => {
+            // 供花を更新
+            const saved = await tx.flower.update({
+                where: { id: BigInt(id) },
+                data: {
+                    requesterName: data.requesterName,
+                    labelName: data.labelName || null,
+                    jointNames: data.jointNames || null,
+                    billToName: data.billToName,
+                    billToAddress: data.billToAddress,
+                    billToTel: data.billToTel || null,
+                    deliveryTo: data.deliveryTo || null,
+                    amount: data.amount || 0,
+                },
+            })
 
-        // 請求先が変更された場合、中間テーブルを更新
-        if (data.flowerBillingTargetId) {
-            const newTargetId = BigInt(data.flowerBillingTargetId)
-            const currentTargetId = flower.billingTargetItems[0]?.flowerBillingTargetId
+            // 請求先が変更された場合、中間テーブルを更新
+            if (data.flowerBillingTargetId) {
+                const newTargetId = BigInt(data.flowerBillingTargetId)
+                const currentTargetId = flower.billingTargetItems[0]?.flowerBillingTargetId
 
-            if (!currentTargetId || currentTargetId !== newTargetId) {
-                // 既存の紐付けを削除
-                await prisma.flowerBillingTargetItem.deleteMany({
-                    where: { flowerId: BigInt(id) },
-                })
-                // 新しい紐付けを作成
-                await prisma.flowerBillingTargetItem.create({
-                    data: {
-                        flowerBillingTargetId: newTargetId,
-                        flowerId: BigInt(id),
-                    },
-                })
+                if (!currentTargetId || currentTargetId !== newTargetId) {
+                    // 既存の紐付けを削除
+                    await tx.flowerBillingTargetItem.deleteMany({
+                        where: { flowerId: BigInt(id) },
+                    })
+                    // 新しい紐付けを作成
+                    await tx.flowerBillingTargetItem.create({
+                        data: {
+                            flowerBillingTargetId: newTargetId,
+                            flowerId: BigInt(id),
+                        },
+                    })
+                }
             }
-        }
+
+            return saved
+        })
 
         await recordOperationLog({
             userId: authResult.payload.sub,
@@ -140,14 +146,15 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
             return NextResponse.json({ error: '供花が見つかりません' }, { status: 404 })
         }
 
-        // 紐付けを削除
-        await prisma.flowerBillingTargetItem.deleteMany({
-            where: { flowerId: BigInt(id) },
-        })
-
-        // 供花を削除
-        await prisma.flower.delete({
-            where: { id: BigInt(id) },
+        // 紐付けの削除と供花の削除は必ずまとめて行う。
+        // 紐付けだけ消えて供花が残ると、どの請求先にも属さない供花になり請求から漏れる
+        await prisma.$transaction(async (tx) => {
+            await tx.flowerBillingTargetItem.deleteMany({
+                where: { flowerId: BigInt(id) },
+            })
+            await tx.flower.delete({
+                where: { id: BigInt(id) },
+            })
         })
 
         // レスポンスを返す

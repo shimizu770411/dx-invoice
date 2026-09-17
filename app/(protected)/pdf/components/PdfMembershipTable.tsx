@@ -55,12 +55,12 @@ export function PdfMembershipTable({ memberships = [], formatDate }: Props) {
                                 : m.paymentTimes != null
                                   ? `${m.paymentTimes} 回`
                                   : BLANK_CELL
+                        // この表の入金額は、けやきの行も含めて 1回の入金額 × 入金回数 で出す。
+                        // けやきの割引額（手入力）は合計欄の「会費入金額」の内訳にだけ出る
                         const paymentAmountText =
                             m.paymentTimes != null && m.paymentAmountOnce != null
                                 ? `¥ ${(m.paymentTimes * Number(m.paymentAmountOnce)).toLocaleString()}`
-                                : m.paymentAmount != null
-                                  ? `¥ ${Number(m.paymentAmount).toLocaleString()}`
-                                  : BLANK_CELL
+                                : BLANK_CELL
                         const salesStaffText = m.salesStaffName ?? BLANK_CELL
                         const relationText = m.relationToDeceased ?? BLANK_CELL
                         return (

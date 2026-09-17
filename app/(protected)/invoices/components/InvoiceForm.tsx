@@ -19,6 +19,7 @@ import { toast } from '@/hooks/use-toast'
 import type { InvoiceConfirmationFields } from '@/lib/invoices'
 import { PdfExportDialog } from '@/components/document/PdfExportDialog'
 import { usePdfExportTrigger } from '@/hooks/usePdfExportTrigger'
+import { buildMembershipMismatchWarning } from '@/lib/documentUtils'
 
 // useQuery の data が未取得の間、毎レンダー新しい配列を渡すと
 // それに依存する処理が無駄に再計算されるため安定した参照を使う
@@ -135,6 +136,9 @@ function InvoiceFormContent({
                         isService,
                         isMaturityService,
                         adhocSetScope,
+                        // 種類や選択内容が変わると 0 円扱いかどうかも変わる。保存時の控えを外して判定し直させる
+                        noChargeScope: null,
+                        noChargeReason: null,
                     } as any
                 }
                 if (!variant) return item
@@ -159,6 +163,9 @@ function InvoiceFormContent({
                     isService,
                     isMaturityService,
                     adhocSetScope,
+                    // 種類や選択内容が変わると 0 円扱いかどうかも変わる。保存時の控えを外して判定し直させる
+                    noChargeScope: null,
+                    noChargeReason: null,
                 } as any
             })
         )
@@ -191,6 +198,9 @@ function InvoiceFormContent({
                     adhocSetScope: options?.adhocSetScope ?? 'NONE',
                     isService: options?.isService ?? false,
                     isMaturityService: options?.isMaturityService ?? false,
+                    // 種類や選択内容が変わると 0 円扱いかどうかも変わる。保存時の控えを外して判定し直させる
+                    noChargeScope: null,
+                    noChargeReason: null,
                 } as any
             })
         )
@@ -220,6 +230,9 @@ function InvoiceFormContent({
                     unitPriceGeneral: allSelectedVariants.reduce((s, v) => s + v.priceGeneral, 0),
                     unitPriceMember: allSelectedVariants.reduce((s, v) => s + v.priceMember, 0),
                     qty: hasAnySelection ? 1 : 0,
+                    // 種類や選択内容が変わると 0 円扱いかどうかも変わる。保存時の控えを外して判定し直させる
+                    noChargeScope: null,
+                    noChargeReason: null,
                 } as any
             })
         )
@@ -305,6 +318,10 @@ function InvoiceFormContent({
             )
             if (!ok) return
         }
+        // 会費入金があるのに一般区分、という組み合わせは運用上ありえない（会費を入金した時点で会員になる）。
+        // 区分の設定漏れを見逃すと、会費入金が差し引かれないまま請求額が確定してしまう
+        const membershipWarning = buildMembershipMismatchWarning(customer, formValues.isMember === 'true', actionLabel)
+        if (membershipWarning && !confirm(membershipWarning)) return
         return onSubmit(formValues)
     }
 

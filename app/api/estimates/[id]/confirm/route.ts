@@ -94,6 +94,9 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
                         isService: item.isService,
                         isMaturityService: item.isMaturityService,
                         adhocSetScope: item.adhocSetScope,
+                        // 0 円扱いの控えは発行時点の判断なので、引き継ぎ先でも作り直さずそのまま持ち回る
+                        noChargeScope: item.noChargeScope ?? null,
+                        noChargeReason: item.noChargeReason ?? null,
                         multiSelectVariantIds: item.multiSelectVariantIds,
                         // 親祭壇の増額も引き継ぐ。unitPriceMember は上乗せ済みの金額をそのままコピーしている
                         surchargeAmount: item.surchargeAmount,

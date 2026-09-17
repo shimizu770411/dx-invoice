@@ -3,6 +3,13 @@ import { PdfCompanyProfile } from './PdfCompanyProfile'
 import { getCompanyProfile, CompanyProfile } from '@/lib/company'
 import type { PdfDocument, PdfDocumentCustomer, PdfProductItem, PdfDocumentItem, PdfFreeItem } from './PdfInvoiceLayout'
 import { displayProductItemName } from '@/lib/documentDisplayNames'
+import {
+    buildMembershipPaymentRows,
+    KEYAKI_ROW_INDEX,
+    calcFreeItemsSubtotal,
+    calcGrandTotal,
+    isCancellationFeeRow,
+} from '@/lib/documentTotals'
 
 export type { PdfDocument, PdfDocumentCustomer }
 
@@ -126,7 +133,7 @@ function buildDisplayRows(
     // 親付きフリー行（parentProductItemId あり）は商品直下で既に表示済みのため除外
     for (const fi of freeItems ?? []) {
         if (fi.parentProductItemId) continue
-        if (fi.productItemName === '解約手数料') continue
+        if (isCancellationFeeRow(fi.productItemName)) continue
         // 施行割増券は満期サービスと同様に明細欄の最終行（小計の直前）に固定表示する
         const isMaturity = fi.productItemName === '満期サービス' || fi.productItemName === '施行割増券'
         rows.push({
@@ -177,20 +184,22 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
     // 解約手数料: qty>0 で登録されていれば、合計欄に「解約手数料」「値引」の2行を表示。
     // 解約手数料は小計に含めない（消費税対象外）。値引で相殺するため差引合計にも影響しない。
     const cancellationFee = (doc.freeItems ?? [])
-        .filter((fi) => fi.productItemName === '解約手数料' && (fi.qty ?? 0) > 0)
+        .filter((fi) => isCancellationFeeRow(fi.productItemName) && (fi.qty ?? 0) > 0)
         .reduce((sum, fi) => sum + fi.unitPriceGeneral * fi.qty, 0)
     const showCancellationFee = cancellationFee >= 1
 
-    // DB保存値ではなく実際のitems/freeItemsから合計を再計算
+    // 小計・消費税・合計・差引合計はすべて実際の items / freeItems から再計算する。
+    // 一部だけDB保存値を出すと、同じ表の中で「合計 − 会費入金額 ≠ 差引合計」になる
+    const isMember = docAny.isMember === true
     const itemsSubtotal = doc.items.reduce((sum, item) => sum + (item.amount || 0), 0)
-    // フリー項目の小計（解約手数料を除く）
-    const freeSubtotal = (doc.freeItems ?? [])
-        .filter((fi) => fi.productItemName !== '解約手数料')
-        .reduce((sum, fi) => sum + fi.unitPriceGeneral * fi.qty, 0)
+    // フリー項目の小計。解約手数料の除外と、会員だけに効く割引（満期サービス・施行割増券）の
+    // 扱いは共通処理に任せる
+    const freeSubtotal = calcFreeItemsSubtotal(doc.freeItems, isMember)
     const subtotal = itemsSubtotal + freeSubtotal
     const tax = Math.round(subtotal * 0.1)
     const total = subtotal + tax
-    const grandTotal = Math.max(0, total - membershipPaidAmount)
+    // 会費入金額は互助会員が事前に積み立てたお金なので、会員の書類でのみ控除する
+    const grandTotal = calcGrandTotal(total, membershipPaidAmount, isMember)
 
     const addressee = customer?.payerName || customer?.chiefMournerName || ''
     const issuedAt = fmtDate(new Date())
@@ -406,7 +415,7 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
                                     <td className="border border-black px-1 text-center">&nbsp;</td>
                                     <td className="border border-black px-1 text-right">&nbsp;</td>
                                     <td className="border border-r-0 border-black px-1 text-right">
-                                        {doc.subtotal.toLocaleString()}
+                                        {subtotal.toLocaleString()}
                                     </td>
                                 </tr>
                                 <tr>
@@ -422,7 +431,7 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
                                     <td className="border border-black text-center">&nbsp;</td>
                                     <td className="border border-black px-1 text-right">&nbsp;</td>
                                     <td className="border border-r-0 border-black px-1 text-right">
-                                        {doc.tax.toLocaleString()}
+                                        {tax.toLocaleString()}
                                     </td>
                                 </tr>
                                 <tr>
@@ -438,7 +447,7 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
                                     <td className="border border-black text-center">&nbsp;</td>
                                     <td className="border border-black px-1 text-right">&nbsp;</td>
                                     <td className="border border-r-0 border-black px-1 text-right">
-                                        {doc.total.toLocaleString()}
+                                        {total.toLocaleString()}
                                     </td>
                                 </tr>
                                 {showCancellationFee && (
@@ -477,37 +486,38 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
                                         </tr>
                                     </>
                                 )}
-                                {(customer?.memberships ?? [])
-                                    .filter((m) => m.paymentAmountOnce != null && m.paymentTimes != null)
-                                    .map((m, idx) => {
-                                        const subtotal =
-                                            (m.paymentAmountOnce ?? 0) * (m.paymentTimes ?? 0)
-                                        return (
-                                            <tr key={`membership-${idx}`}>
-                                                <th className="border border-l-0 border-black text-center">
-                                                    {idx === 0 ? (
-                                                        <div className="mx-auto flex w-[6rem] justify-between">
-                                                            {'会費入金額'.split('').map((char, i) => (
-                                                                <span key={i} className="text-center">
-                                                                    {char}
-                                                                </span>
-                                                            ))}
-                                                        </div>
-                                                    ) : (
-                                                        <>&nbsp;</>
-                                                    )}
-                                                </th>
-                                                <td className="border border-black text-center">
-                                                    {`${(m.paymentAmountOnce ?? 0).toLocaleString()}円×${m.paymentTimes ?? 0}回`}
-                                                </td>
-                                                <td className="border border-black px-1 text-left">&nbsp;</td>
-                                                <td className="border border-r-0 border-black px-1 text-right">
-                                                    <span className="mr-1">△</span>
-                                                    {subtotal.toLocaleString()}
-                                                </td>
-                                            </tr>
-                                        )
-                                    })}
+                                {/* 行の有無も金額も共通処理に任せる。ここで別の式を書くと、
+                                    内訳に出ている合計と差引合計から引いた額が食い違う */}
+                                {buildMembershipPaymentRows(customer?.memberships).map(
+                                    ({ membership: m, rowIndex, amount: subtotal }, idx) => (
+                                        <tr key={`membership-${rowIndex}`}>
+                                            <th className="border border-l-0 border-black text-center">
+                                                {idx === 0 ? (
+                                                    <div className="mx-auto flex w-[6rem] justify-between">
+                                                        {'会費入金額'.split('').map((char, i) => (
+                                                            <span key={i} className="text-center">
+                                                                {char}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <>&nbsp;</>
+                                                )}
+                                            </th>
+                                            <td className="border border-black text-center">
+                                                {/* けやきは割引額を直接入力する仕様で、1回の入金額×回数では出せない */}
+                                                {rowIndex === KEYAKI_ROW_INDEX
+                                                    ? 'けやき入金額'
+                                                    : `${(m.paymentAmountOnce ?? 0).toLocaleString()}円×${m.paymentTimes ?? 0}回`}
+                                            </td>
+                                            <td className="border border-black px-1 text-left">&nbsp;</td>
+                                            <td className="border border-r-0 border-black px-1 text-right">
+                                                <span className="mr-1">△</span>
+                                                {subtotal.toLocaleString()}
+                                            </td>
+                                        </tr>
+                                    )
+                                )}
                             </tfoot>
                         </table>
                         <div className="border border-x-0 border-black px-4 py-1 text-right bg-black text-white">

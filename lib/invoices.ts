@@ -34,6 +34,9 @@ export interface InvoiceItem {
   isService?: boolean;
   isMaturityService?: boolean;
   adhocSetScope?: 'NONE' | 'MEMBER_ONLY' | 'GENERAL_ONLY' | 'BOTH';
+  /** 保存時点で 0 円扱いだったかの控えと、その理由。null / 未設定 は未記録 */
+  noChargeScope?: 'NONE' | 'MEMBER_ONLY' | 'GENERAL_ONLY' | 'BOTH' | null;
+  noChargeReason?: 'SET' | 'SERVICE' | 'MATURITY_SERVICE' | null;
   multiSelectVariantIds?: string | null;
   /** 親祭壇の増額。一般単価・会員単価には既に上乗せ済み */
   surchargeAmount?: number | null;
