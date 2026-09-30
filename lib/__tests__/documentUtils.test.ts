@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { expandEachModeItems, expandVariantGroupItems } from '@/lib/documentUtils'
+import { expandEachModeItems, expandVariantGroupItems, buildDocumentFreeItems } from '@/lib/documentUtils'
 
 /**
  * 複数選択商品・グループ商品は、保存時に種類ごとの明細行へ展開される。
@@ -96,5 +96,74 @@ describe('グループ商品の展開', () => {
         )
         expect(rows[1].noChargeScope).toBe('NONE')
         expect(rows[1].amount).toBe(10000)
+    })
+})
+describe('フリー行追加がONの商品の親リンク行', () => {
+    // 控室管理費のように「フリー行追加」が ON の商品。
+    // 画面はこの親リンク行が既にある場合だけ商品の直下にフリー行を描画し、
+    // チェックを入れる操作では行を作らない。そのため読み込み時点で必ず用意しておく必要がある。
+    type FreeRow = {
+        parentProductItemId?: string | null
+        productItemName: string
+        description?: string
+        unitPriceGeneral: number
+        qty: number
+        amount: number
+        sortNo?: number
+    }
+    const freeRowProduct = { id: 26, canAddFreeRow: true }
+    const plainProduct = { id: 99, canAddFreeRow: false }
+    const build = (loaded: FreeRow[], qty: number, product: any, fixedRowNames: string[] = []) =>
+        buildDocumentFreeItems<FreeRow>(loaded, [{ qty, productItem: product }], fixedRowNames)
+    const parentIdsOf = (rows: FreeRow[]) =>
+        rows.filter((r) => r.parentProductItemId).map((r) => String(r.parentProductItemId))
+
+    it('チェックが入っていない商品にも親リンク行を用意する', () => {
+        // 数量0（未チェック）で読み込んでも行が作られないと、後からチェックしてもフリー行を出せない
+        const rows = build([], 0, freeRowProduct)
+        expect(parentIdsOf(rows)).toEqual(['26'])
+    })
+
+    it('チェック済みの商品にも親リンク行を用意する', () => {
+        const rows = build([], 1, freeRowProduct)
+        expect(parentIdsOf(rows)).toEqual(['26'])
+    })
+
+    it('フリー行追加がOFFの商品には親リンク行を作らない', () => {
+        const rows = build([], 1, plainProduct)
+        expect(parentIdsOf(rows)).toEqual([])
+    })
+
+    it('保存済みの親リンク行がある場合は作り直さず、入力内容を保つ', () => {
+        const saved = {
+            parentProductItemId: '26',
+            productItemName: '延長分',
+            description: '',
+            unitPriceGeneral: 5000,
+            qty: 2,
+            amount: 10000,
+        }
+        const rows = build([saved], 0, freeRowProduct)
+        const linked = rows.filter((r) => r.parentProductItemId)
+        expect(linked).toHaveLength(1)
+        expect(linked[0].productItemName).toBe('延長分')
+        expect(linked[0].qty).toBe(2)
+    })
+
+    it('自動生成した親リンク行は空で、保存対象にならない', () => {
+        // 保存側は「品目名が入っていて数量1以上」の行だけを送るため、空行はDBに残らない
+        const rows = build([], 0, freeRowProduct)
+        const linked = rows.filter((r) => r.parentProductItemId)
+        expect(linked).toHaveLength(1)
+        expect(linked[0].productItemName).toBe('')
+        expect(linked[0].qty).toBe(0)
+        expect(linked[0].unitPriceGeneral).toBe(0)
+    })
+
+    it('親なしのフリー行は5行に揃え、固定行を末尾に置く（親リンク行はその後ろ）', () => {
+        const rows = build([], 0, freeRowProduct, ['満期サービス'])
+        expect(rows).toHaveLength(7)
+        expect(rows[5].productItemName).toBe('満期サービス')
+        expect(String(rows[6].parentProductItemId)).toBe('26')
     })
 })

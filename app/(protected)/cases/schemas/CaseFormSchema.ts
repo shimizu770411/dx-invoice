@@ -44,6 +44,8 @@ export const caseFormSchema = z.object({
 
     // 故人情報
     receptionAt: z.coerce.string().min(1, '必須です'),
+    diedAt: z.string().optional(),
+    diedAtTimeUnspecified: z.boolean().optional(),
     deceasedName: z.coerce.string().min(1, '必須です'),
     deceasedLastName: z.string().optional(),
     deceasedFirstName: z.string().optional(),

@@ -135,6 +135,8 @@ model Customer {
   id                    BigInt    @id @default(autoincrement())
   receptionNo           String?   @unique @db.VarChar(30) @map("reception_no")
   receptionAt           DateTime? @db.Timestamptz(6) @map("reception_at")
+  diedAt                DateTime? @db.Timestamptz(6) @map("died_at")
+  diedAtTimeUnspecified Boolean   @default(false) @map("died_at_time_unspecified")
   storeId               BigInt?   @map("store_id")
   deceasedLastName      String?   @db.VarChar(50) @map("deceased_last_name")
   deceasedFirstName     String?   @db.VarChar(50) @map("deceased_first_name")

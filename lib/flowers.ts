@@ -6,7 +6,7 @@ export interface FamilyNameSource {
     deceasedName: string
 }
 
-/** 喪家名を取得する。見積お名前が未入力の場合は故人の姓、それも未入力なら死亡者名をそのまま返す */
+/** 喪家名を取得する。案件に喪家名が入力されていない場合は故人の姓、それも未入力なら死亡者名をそのまま返す */
 export function getFamilyName(customer: FamilyNameSource): string {
     if (customer.estimateDisplayName) return customer.estimateDisplayName
     if (customer.deceasedLastName) return customer.deceasedLastName

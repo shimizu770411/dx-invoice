@@ -3,6 +3,7 @@ import { useFormContext, useWatch } from 'react-hook-form'
 import { CaseFormData } from '../schemas/CaseFormSchema'
 import { FormInput } from '@/components/form/FormInput'
 import { FormSelect } from '@/components/form/FormSelect'
+import { FormCheckbox } from '@/components/form/FormCheckbox'
 import { FormAutocomplete } from '@/components/form/FormAutocomplete'
 import { GENDER_OPTIONS, RELIGION_OPTIONS } from '../constants/casesOptions'
 import { AgeCalculatorDialog } from './AgeCalculatorDialog'
@@ -16,6 +17,7 @@ export function DeceasedInfoTab() {
 
     const [calcOpen, setCalcOpen] = useState(false)
     const receptionAt = useWatch({ control, name: 'receptionAt' }) as string | undefined
+    const diedAt = useWatch({ control, name: 'diedAt' }) as string | undefined
 
     return (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
@@ -30,6 +32,26 @@ export function DeceasedInfoTab() {
                 required
                 error={errors.receptionAt}
             />
+
+            {/* 死亡日時 */}
+            <div>
+                <FormInput<CaseFormData>
+                    name="diedAt"
+                    control={control}
+                    label="死亡日時"
+                    type="datetime-local"
+                    minYear={1950}
+                    maxYear={new Date().getFullYear()}
+                    error={errors.diedAt}
+                />
+                <div style={{ marginTop: '0.5rem' }}>
+                    <FormCheckbox<CaseFormData>
+                        name={'diedAtTimeUnspecified' as any}
+                        control={control}
+                        label="時間を指定しない（見積/請求書PDFで時刻を表示しない）"
+                    />
+                </div>
+            </div>
 
             {/* 故人名 */}
             <FormInput<CaseFormData>
@@ -124,11 +146,11 @@ export function DeceasedInfoTab() {
                 error={errors.religion}
             />
 
-            {/* 見積お名前（見積書タイトルの「○○家御葬儀見積書」に表示する苗字） */}
+            {/* 喪家名（見積書タイトルの「○○家御葬儀見積書」に表示する苗字） */}
             <FormInput<CaseFormData>
                 name="estimateDisplayName"
                 control={control}
-                label="見積お名前"
+                label="喪家名"
                 maxLength={8}
                 suffix="家"
                 error={errors.estimateDisplayName}
@@ -140,7 +162,9 @@ export function DeceasedInfoTab() {
                 onConfirm={(age) => {
                     setValue('age', age, { shouldDirty: true, shouldValidate: true })
                 }}
-                baseDate={receptionAt}
+                // 行年は死亡日時点の満年齢で数えるのが葬儀実務の慣例。
+                // 死亡日が未入力の案件もあるため、その場合は従来どおり受付日を初期値にする
+                baseDate={diedAt || receptionAt}
             />
         </div>
     )

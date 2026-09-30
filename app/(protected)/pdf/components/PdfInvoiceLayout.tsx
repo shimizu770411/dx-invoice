@@ -93,6 +93,8 @@ export type PdfDocumentCustomer = {
     gender?: 'MALE' | 'FEMALE' | 'OTHER' | null
     age?: number | null
     receptionAt?: string | Date | null
+    diedAt?: string | Date | null
+    diedAtTimeUnspecified?: boolean | null
     chiefMournerName?: string
     chiefMournerTel?: string
     chiefMournerAddress?: string
@@ -1311,6 +1313,16 @@ export function PdfInvoiceLayout({
                                                 label: '受付日',
                                                 data: `${fmtDate(customer?.receptionAt)} ${fmtTime(customer?.receptionAt)}`,
                                                 placeTemplate: '（　場　所　）',
+                                            },
+                                            {
+                                                // 死亡日は未入力のまま発行することがあるため、
+                                                // 「未定」ではなく空欄にして手書きで追記できるようにする
+                                                label: '死亡日',
+                                                data: customer?.diedAt
+                                                    ? customer?.diedAtTimeUnspecified
+                                                        ? `${fmtDate(customer.diedAt)}`
+                                                        : `${fmtDate(customer.diedAt)} ${fmtTime(customer.diedAt)}`
+                                                    : '',
                                             },
                                             {
                                                 label: '本通夜',

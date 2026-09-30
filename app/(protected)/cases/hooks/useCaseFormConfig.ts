@@ -17,6 +17,8 @@ export function getFormDefaultValues(): CaseFormData {
     return {
         storeId: undefined,
         receptionAt: defaultReceptionAt,
+        diedAt: undefined,
+        diedAtTimeUnspecified: true,
         deceasedName: '',
         deceasedLastName: undefined,
         deceasedFirstName: undefined,
@@ -119,6 +121,7 @@ export function transformSubmitData(data: CaseFormData, formatDateForISO: (val: 
         ...data,
         ...payerData,
         receptionAt: formatDateForISO(data.receptionAt),
+        diedAt: formatDateForISO(data.diedAt),
         age: data.age ? parseInt(data.age.toString()) : 0,
         chiefMournerTel: normalizePhoneNumber(data.chiefMournerTel),
         payerTel: normalizePhoneNumber(payerData.payerTel),

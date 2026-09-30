@@ -11,7 +11,33 @@
       "Bash(*prisma migrate deploy*)",
       "PowerShell(*prisma migrate deploy*)",
       "Bash(*pnpm*migrate:deploy*)",
-      "PowerShell(*pnpm*migrate:deploy*)"
+      "PowerShell(*pnpm*migrate:deploy*)",
+
+      "Bash(*--shadow-database-url*)",
+      "PowerShell(*--shadow-database-url*)",
+      "Bash(*migrate reset*)",
+      "PowerShell(*migrate reset*)",
+      "Bash(*force-reset*)",
+      "PowerShell(*force-reset*)",
+      "Bash(*prisma db push*)",
+      "PowerShell(*prisma db push*)",
+
+      "Bash(*TRUNCATE*)",
+      "PowerShell(*TRUNCATE*)",
+      "Bash(*DROP TABLE*)",
+      "PowerShell(*DROP TABLE*)",
+      "Bash(*DROP DATABASE*)",
+      "PowerShell(*DROP DATABASE*)",
+      "Bash(*DROP SCHEMA*)",
+      "PowerShell(*DROP SCHEMA*)"
+    ],
+    "ask": [
+      "Bash(*docker exec*psql*)",
+      "PowerShell(*docker exec*psql*)",
+      "Bash(*prisma db execute*)",
+      "PowerShell(*prisma db execute*)",
+      "Bash(*prisma migrate resolve*)",
+      "PowerShell(*prisma migrate resolve*)"
     ]
   }
 }

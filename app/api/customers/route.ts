@@ -336,6 +336,8 @@ export async function POST(request: NextRequest) {
             religion: toNullIfEmpty(data.religion),
             estimateDisplayName: toNullIfEmpty(data.estimateDisplayName),
             receptionAt: data.receptionAt ? new Date(data.receptionAt) : null,
+            diedAt: data.diedAt ? new Date(data.diedAt) : null,
+            diedAtTimeUnspecified: Boolean(data.diedAtTimeUnspecified),
             storeId: data.storeId ? BigInt(data.storeId) : null,
             chiefMournerName: toNullIfEmpty(data.chiefMournerName),
             chiefMournerRelation: toNullIfEmpty(data.chiefMournerRelation),

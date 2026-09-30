@@ -32,7 +32,7 @@ type TargetFile = {
 
 type DocumentSpec = {
     label: string
-    model: 'Estimate' | 'Invoice' | 'EstimateItem' | 'InvoiceItem'
+    model: 'Estimate' | 'Invoice' | 'EstimateItem' | 'InvoiceItem' | 'Customer'
     /** 画面から入力し、保存・読み込み・引き継ぎのすべてを通す必要がある項目 */
     formEditable: string[]
     /** 画面からは編集せず、サーバー側で決まる項目（採番・再計算・自動記録・他書類からの引き継ぎ） */
@@ -231,6 +231,68 @@ const DOCUMENTS: DocumentSpec[] = [
                 label: '見積からの引き継ぎ',
                 file: 'app/api/invoices/customers/[customerId]/from-estimate/[estimateId]/route.ts',
             },
+        ],
+    },
+    {
+        label: '葬儀案件情報',
+        model: 'Customer',
+        formEditable: [
+            'receptionAt',
+            // 死亡日は行年の算出基準日にもなるため、保存経路すべてに通す必要がある
+            'diedAt',
+            'diedAtTimeUnspecified',
+            'storeId',
+            'deceasedLastName',
+            'deceasedFirstName',
+            'deceasedName',
+            'gender',
+            'age',
+            'religion',
+            'estimateDisplayName',
+            'chiefMournerName',
+            'chiefMournerRelation',
+            'chiefMournerCityId',
+            'chiefMournerTownId',
+            'chiefMournerAddress',
+            'chiefMournerTel',
+            'payerName',
+            'payerRelation',
+            'payerAddress',
+            'payerTel',
+            'pickupPlace',
+            'wakeAt',
+            'wakeAtTimeUnspecified',
+            'wakePlace',
+            'departureAt',
+            'departureAtTimeUnspecified',
+            'departurePlace',
+            'funeralFrom',
+            'funeralTo',
+            'funeralPlace',
+            'returnAt',
+            'returnAtTimeUnspecified',
+            'returnPlace',
+            'memberCardNote',
+        ],
+        // 受付番号は保存時にサーバー側が採番する
+        serverManaged: ['id', 'receptionNo', 'createdAt', 'updatedAt'],
+        targets: [
+            {
+                label: '案件フォームの入力規則',
+                file: 'app/(protected)/cases/schemas/CaseFormSchema.ts',
+                notApplicable: [
+                    { field: 'memberCardNote', reason: '会員証は案件画面ではなく見積画面で入力する' },
+                ],
+            },
+            {
+                label: '案件フォームの初期値と送信整形',
+                file: 'app/(protected)/cases/hooks/useCaseFormConfig.ts',
+                notApplicable: [
+                    { field: 'memberCardNote', reason: '会員証は案件画面ではなく見積画面で入力する' },
+                ],
+            },
+            { label: '案件の新規作成API', file: 'app/api/customers/route.ts' },
+            { label: '案件の更新API', file: 'app/api/customers/[id]/route.ts' },
         ],
     },
 ]
