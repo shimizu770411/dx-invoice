@@ -9,6 +9,7 @@ import { useCaseFormData } from '../hooks/useCaseForm'
 import { getFormDefaultValues, transformSubmitData } from '../hooks/useCaseFormConfig'
 import { apiToForm } from '@/lib/dataTransformUtils'
 import { logFormErrors } from '@/lib/formDebugUtils'
+import { focusFirstTabWithError } from '../utils/formErrorUtils'
 import { CaseFormTabs } from '../components/CaseFormTabs'
 import { DeceasedInfoTab } from '../components/DeceasedInfoTab'
 import { ChiefMournerTab } from '../components/ChiefMournerTab'
@@ -182,8 +183,9 @@ export default function EditCustomerPage() {
         <FormProvider {...methods}>
             <form
                 onSubmit={methods.handleSubmit(onSubmit, (errors) => {
-                    console.error('Zod バリデーションエラー:', errors)
                     logFormErrors(errors)
+                    // 別タブの未入力が原因でも気づけるよう、該当タブへ移動して画面にも知らせる
+                    focusFirstTabWithError(errors, setActiveTab)
                 })}
                 onKeyDown={(e) => {
                     if (e.key === 'Enter' && !(e.target instanceof HTMLTextAreaElement)) {

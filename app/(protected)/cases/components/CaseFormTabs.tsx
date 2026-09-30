@@ -2,7 +2,7 @@
 
 import { useFormContext } from 'react-hook-form'
 import { CaseFormData } from '../schemas/CaseFormSchema'
-import { hasErrorInTab, TabKey } from '../utils/formErrorUtils'
+import { hasErrorInTab, TabKey, TAB_LABELS } from '../utils/formErrorUtils'
 import 'material-symbols/outlined.css'
 
 interface CaseFormTabsProps {
@@ -31,16 +31,9 @@ interface CaseFormTabsProps {
 export function CaseFormTabs({ activeTab, onTabChange }: CaseFormTabsProps) {
     const { formState } = useFormContext<CaseFormData>()
 
-    const primaryTabs: { key: TabKey; label: string }[] = [
-        { key: 'deceasedInfo', label: '故人情報' },
-        { key: 'chiefMourner', label: '喪主情報' },
-        { key: 'payer', label: '支払者情報' },
-        { key: 'wake', label: '通夜情報' },
-        { key: 'funeralInfo', label: '葬儀情報' },
-        { key: 'membership1', label: '互助会員１' },
-        { key: 'membership2', label: '互助会員２' },
-        { key: 'membership3', label: 'けやき' },
-    ]
+    const primaryTabs: { key: TabKey; label: string }[] = (
+        Object.keys(TAB_LABELS) as TabKey[]
+    ).map((key) => ({ key, label: TAB_LABELS[key] }))
 
     const renderTab = (tab: { key: TabKey; label: string }) => {
         const hasError = hasErrorInTab(formState.errors, tab.key)
