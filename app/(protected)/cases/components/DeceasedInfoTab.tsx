@@ -3,7 +3,7 @@ import { useFormContext, useWatch } from 'react-hook-form'
 import { CaseFormData } from '../schemas/CaseFormSchema'
 import { FormInput } from '@/components/form/FormInput'
 import { FormSelect } from '@/components/form/FormSelect'
-import { FormCheckbox } from '@/components/form/FormCheckbox'
+import { FormDateTimeWithUnspecified } from '@/components/form/FormDateTimeWithUnspecified'
 import { FormAutocomplete } from '@/components/form/FormAutocomplete'
 import { GENDER_OPTIONS, RELIGION_OPTIONS } from '../constants/casesOptions'
 import { AgeCalculatorDialog } from './AgeCalculatorDialog'
@@ -34,24 +34,15 @@ export function DeceasedInfoTab() {
             />
 
             {/* 死亡日時 */}
-            <div>
-                <FormInput<CaseFormData>
-                    name="diedAt"
-                    control={control}
-                    label="死亡日時"
-                    type="datetime-local"
-                    minYear={1950}
-                    maxYear={new Date().getFullYear()}
-                    error={errors.diedAt}
-                />
-                <div style={{ marginTop: '0.5rem' }}>
-                    <FormCheckbox<CaseFormData>
-                        name={'diedAtTimeUnspecified' as any}
-                        control={control}
-                        label="時間を指定しない（見積/請求書PDFで時刻を表示しない）"
-                    />
-                </div>
-            </div>
+            <FormDateTimeWithUnspecified<CaseFormData>
+                name="diedAt"
+                unspecifiedName={'diedAtTimeUnspecified' as any}
+                control={control}
+                label="死亡日時"
+                minYear={1950}
+                maxYear={new Date().getFullYear()}
+                error={errors.diedAt}
+            />
 
             {/* 故人名 */}
             <FormInput<CaseFormData>

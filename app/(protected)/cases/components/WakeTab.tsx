@@ -2,7 +2,7 @@ import { useFormContext } from 'react-hook-form'
 import { useQuery } from '@tanstack/react-query'
 import { CaseFormData } from '../schemas/CaseFormSchema'
 import { FormInput } from '@/components/form/FormInput'
-import { FormCheckbox } from '@/components/form/FormCheckbox'
+import { FormDateTimeWithUnspecified } from '@/components/form/FormDateTimeWithUnspecified'
 import { FormAutocomplete } from '@/components/form/FormAutocomplete'
 import { PICKUP_PLACE_OPTIONS } from '../constants/casesOptions'
 import { getStores } from '@/lib/stores'
@@ -34,24 +34,15 @@ export function WakeTab() {
             </div>
 
             {/* 通夜日時 */}
-            <div>
-                <FormInput<CaseFormData>
-                    name="wakeAt"
-                    control={control}
-                    label="通夜日時"
-                    type="datetime-local"
-                    minYear={1950}
-                    maxYear={new Date().getFullYear()}
-                    error={errors.wakeAt}
-                />
-                <div style={{ marginTop: '0.5rem' }}>
-                    <FormCheckbox<CaseFormData>
-                        name={'wakeAtTimeUnspecified' as any}
-                        control={control}
-                        label="時間を指定しない（見積/請求書PDFで時刻を表示しない）"
-                    />
-                </div>
-            </div>
+            <FormDateTimeWithUnspecified<CaseFormData>
+                name="wakeAt"
+                unspecifiedName={'wakeAtTimeUnspecified' as any}
+                control={control}
+                label="通夜日時"
+                minYear={1950}
+                maxYear={new Date().getFullYear()}
+                error={errors.wakeAt}
+            />
 
             {/* 通夜場所 */}
             <FormAutocomplete<CaseFormData>
@@ -63,24 +54,15 @@ export function WakeTab() {
             />
 
             {/* 出棺日時 */}
-            <div>
-                <FormInput<CaseFormData>
-                    name="departureAt"
-                    control={control}
-                    label="出棺日時"
-                    type="datetime-local"
-                    minYear={1950}
-                    maxYear={new Date().getFullYear()}
-                    error={errors.departureAt}
-                />
-                <div style={{ marginTop: '0.5rem' }}>
-                    <FormCheckbox<CaseFormData>
-                        name={'departureAtTimeUnspecified' as any}
-                        control={control}
-                        label="時間を指定しない（見積/請求書PDFで時刻を表示しない）"
-                    />
-                </div>
-            </div>
+            <FormDateTimeWithUnspecified<CaseFormData>
+                name="departureAt"
+                unspecifiedName={'departureAtTimeUnspecified' as any}
+                control={control}
+                label="出棺日時"
+                minYear={1950}
+                maxYear={new Date().getFullYear()}
+                error={errors.departureAt}
+            />
 
             {/* 火葬場名 */}
             <FormInput<CaseFormData>
