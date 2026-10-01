@@ -85,6 +85,7 @@ export default function EditCustomerPage() {
                 ...defaultValues,
                 ...formData,
                 receptionAt: formatDateForInput(formData.receptionAt),
+                diedAt: formatDateForInput(formData.diedAt),
                 wakeAt: formatDateForInput(formData.wakeAt),
                 departureAt: formatDateForInput(formData.departureAt),
                 funeralFrom: formatDateForInput(formData.funeralFrom),
