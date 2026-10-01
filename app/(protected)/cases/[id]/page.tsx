@@ -21,6 +21,7 @@ import { Membership2Tab } from '../components/Membership2Tab'
 import { Membership3Tab } from '../components/Membership3Tab'
 import { useGetCustomerQuery, useUpdateCustomerMutation } from '@/hooks/useCustomer'
 import { toast } from '@/hooks/use-toast'
+import { ProcessingOverlay } from '@/components/ui/ProcessingOverlay'
 
 export default function EditCustomerPage() {
     const router = useRouter()
@@ -184,6 +185,9 @@ export default function EditCustomerPage() {
 
     return (
         <FormProvider {...methods}>
+            {/* 更新中は画面を覆う。再表示が終わるまで触らせないことで、
+                続けて入力した内容が再表示で消えるのを防ぐ */}
+            <ProcessingOverlay active={updateMutation.isPending} message="更新しています" />
             <form
                 onSubmit={methods.handleSubmit(onSubmit, (errors) => {
                     logFormErrors(errors)

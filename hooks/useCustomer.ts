@@ -55,9 +55,13 @@ export function useUpdateCustomerMutation() {
 
     return useMutation({
         mutationFn: ({ customerId, data }: { customerId: string; data: any }) => updateCustomer(customerId, data),
-        onSuccess: (_, { customerId }) => {
-            queryClient.invalidateQueries({ queryKey: ['customer', customerId] })
-            queryClient.invalidateQueries({ queryKey: ['customers'] })
-        },
+        // 再取得の完了まで待ってから処理中を解く。
+        // 保存完了で解いてしまうと、再取得でフォームが入れ直されるまでの間に
+        // 続けて入力でき、その入力が消える
+        onSuccess: (_, { customerId }) =>
+            Promise.all([
+                queryClient.invalidateQueries({ queryKey: ['customer', customerId] }),
+                queryClient.invalidateQueries({ queryKey: ['customers'] }),
+            ]),
     })
 }

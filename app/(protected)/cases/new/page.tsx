@@ -20,6 +20,7 @@ import { Membership2Tab } from '../components/Membership2Tab'
 import { Membership3Tab } from '../components/Membership3Tab'
 import { useCreateCustomerMutation } from '@/hooks/useCustomer'
 import { toast } from '@/hooks/use-toast'
+import { ProcessingOverlay } from '@/components/ui/ProcessingOverlay'
 
 export default function NewCustomerPage() {
     const router = useRouter()
@@ -68,6 +69,8 @@ export default function NewCustomerPage() {
 
     return (
         <FormProvider {...methods}>
+            {/* 登録中は画面を覆う。二重送信も防ぐ */}
+            <ProcessingOverlay active={createMutation.isPending} message="登録しています" />
             <form
                 onSubmit={methods.handleSubmit(onSubmit, (errors) => {
                     logFormErrors(errors)
