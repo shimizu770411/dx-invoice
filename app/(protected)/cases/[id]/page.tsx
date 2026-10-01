@@ -100,15 +100,6 @@ export default function EditCustomerPage() {
         }
     }, [customer, isLoading, methods])
 
-    const handleNavigateToFlowers = () => {
-        if (!customer) {
-            toast({ title: '顧客情報が取得できていません', variant: 'destructive', duration: 3000 })
-            router.push('/cases')
-            return
-        }
-        router.push(`/flowers/customer/${customerId}`)
-    }
-
     const onSubmit: SubmitHandler<CaseFormData> = async (data) => {
         try {
             console.log('Form data passed Zod validation:', JSON.stringify(data, null, 2))
@@ -164,18 +155,6 @@ export default function EditCustomerPage() {
                 エラー: データの読み込みに失敗しました
             </div>
         )
-    }
-
-    const linkBtnBase: React.CSSProperties = {
-        padding: '10px 20px',
-        fontSize: '14px',
-        letterSpacing: '0.15em',
-        fontWeight: 500,
-        fontFamily: 'var(--font-mincho)',
-        cursor: 'pointer',
-        transition: 'all 0.15s ease',
-        border: '1px solid transparent',
-        minWidth: '120px',
     }
 
     return (
@@ -248,22 +227,7 @@ export default function EditCustomerPage() {
                         </h1>
                     </div>
 
-                    {/* 関連機能へのリンク */}
-                    <div className="flex gap-2 flex-wrap">
-                        <button
-                            type="button"
-                            onClick={handleNavigateToFlowers}
-                            style={{
-                                ...linkBtnBase,
-                                backgroundColor: '#ffffff',
-                                color: 'var(--brand-gold-soft)',
-                                borderColor: 'var(--brand-gold)',
-                                boxShadow: '0 1px 2px rgba(196, 174, 106, 0.2)',
-                            }}
-                        >
-                            供花登録
-                        </button>
-                    </div>
+                    {/* 供花登録は画面上部の切替バーに移した */}
                 </div>
 
                 {/* タブ */}

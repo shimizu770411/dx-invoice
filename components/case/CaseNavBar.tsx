@@ -213,22 +213,21 @@ export function CaseNavBar({ customerId, current, currentEstimateId, isDirty = f
                     ‹ 一覧
                 </button>
 
-                <span
-                    className="font-mincho mr-2 truncate"
-                    style={{
-                        fontSize: '13px',
-                        color: 'var(--brand-navy)',
-                        letterSpacing: '0.1em',
-                        maxWidth: '280px',
-                    }}
-                >
-                    {progress.receptionNo && (
-                        <span style={{ color: 'var(--brand-text-muted)', marginRight: '10px' }}>
-                            No. {progress.receptionNo}
-                        </span>
-                    )}
-                    {progress.deceasedName && `故 ${progress.deceasedName} 様`}
-                </span>
+                {/* 故人名はどの画面でも見出しか顧客欄に出ているため、ここには出さない。
+                    受付番号はどこにも出ていないので、見積・請求書の書類番号と紛れないよう「受付」を付けて出す */}
+                {progress.receptionNo && (
+                    <span
+                        className="font-mincho mr-2 truncate"
+                        style={{
+                            fontSize: '13px',
+                            color: 'var(--brand-text-muted)',
+                            letterSpacing: '0.1em',
+                            maxWidth: '200px',
+                        }}
+                    >
+                        受付No. {progress.receptionNo}
+                    </span>
+                )}
 
                 <span className="ml-auto flex flex-wrap items-center gap-x-1 gap-y-2">
                     {editSteps.map(renderStep)}
