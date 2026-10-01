@@ -126,7 +126,9 @@ export default function EditCustomerPage() {
                 variant: 'success',
                 duration: 2000,
             })
-            router.push('/cases')
+            // 更新後は編集画面に留まる。続けて別のタブを直したいことが多く、
+            // 一覧へ戻されると開き直す手間がかかるため。
+            // 更新時に案件データを取り直す作りなので、画面の表示は保存後の内容に揃う
         } catch (error) {
             console.error('Failed to update customer:', error)
             toast({
