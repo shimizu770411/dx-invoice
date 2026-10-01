@@ -22,6 +22,7 @@ import { Membership3Tab } from '../components/Membership3Tab'
 import { useGetCustomerQuery, useUpdateCustomerMutation } from '@/hooks/useCustomer'
 import { toast } from '@/hooks/use-toast'
 import { ProcessingOverlay } from '@/components/ui/ProcessingOverlay'
+import { isPayerSameAsChiefMourner } from '@/lib/customerPayer'
 
 export default function EditCustomerPage() {
     const router = useRouter()
@@ -71,16 +72,9 @@ export default function EditCustomerPage() {
             const formData = apiToForm(customer as CaseFormData)
             const defaultValues = getFormDefaultValues()
 
-            // 喪主情報と支払者情報が一致しているか確認
-            const isSameAsMourner =
-                formData.chiefMournerName === formData.payerName &&
-                formData.chiefMournerRelation === formData.payerRelation &&
-                formData.chiefMournerAddress === formData.payerAddress &&
-                formData.chiefMournerTel === formData.payerTel &&
-                formData.chiefMournerName !== undefined &&
-                formData.chiefMournerName !== '' &&
-                formData.payerName !== undefined &&
-                formData.payerName !== ''
+            // 喪主情報と支払者情報が一致しているか確認。
+            // 見積・請求書PDFの「同上」表示と同じ判断になるよう、判定は共通のものを使う
+            const isSameAsMourner = isPayerSameAsChiefMourner(formData)
 
             const mergedData: CaseFormData = {
                 ...defaultValues,

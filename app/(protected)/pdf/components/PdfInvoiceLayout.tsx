@@ -15,6 +15,11 @@ import {
 } from '@/lib/documentTotals'
 import { buildSeparateFeesText, buildInvoiceFeeLines, SEPARATE_FEES_BLOCK_END } from '@/lib/separateFees'
 import { displayProductItemName, displayProductVariantName } from '@/lib/documentDisplayNames'
+import {
+    isPayerSameAsChiefMourner,
+    SAME_AS_CHIEF_MOURNER_LABEL,
+    DITTO_MARK,
+} from '@/lib/customerPayer'
 import { useDateFormat } from '@/hooks/useDateFormat'
 import {
     A4_HEIGHT_MM,
@@ -642,6 +647,8 @@ export function PdfInvoiceLayout({
     const generalGrandTotal = calcGrandTotal(generalTotal, membershipPaidAmount, false)
     const memberGrandTotal = calcGrandTotal(memberTotal, membershipPaidAmount, true)
     const customer: PdfDocumentCustomer | undefined = docAny.customer
+    // 支払者が喪主と同じかはDBに持っていないため、保存された値を突き合わせて判断する
+    const payerIsSameAsChiefMourner = isPayerSameAsChiefMourner(customer ?? {})
         ? {
               ...docAny.customer,
               cremationProcessType: docAny.cremationProcessType ?? null,
@@ -1262,13 +1269,25 @@ export function PdfInvoiceLayout({
                                             data: customer?.chiefMournerName,
                                             relData: customer?.chiefMournerRelation ?? '',
                                         },
+                                        // 支払者が喪主と同じときは、手書き伝票と同じく同上・〃で表す。
+                                        // 同じ内容を4行ぶん書き写すと、別人かどうかが読み取りにくい
                                         {
                                             label: '御支払者名',
-                                            data: customer?.payerName,
-                                            relData: customer?.payerRelation ?? '',
+                                            data: payerIsSameAsChiefMourner
+                                                ? SAME_AS_CHIEF_MOURNER_LABEL
+                                                : customer?.payerName,
+                                            relData: payerIsSameAsChiefMourner
+                                                ? DITTO_MARK
+                                                : (customer?.payerRelation ?? ''),
                                         },
-                                        { label: '支払者住所', data: customer?.payerAddress },
-                                        { label: '支払者電話', data: customer?.payerTel },
+                                        {
+                                            label: '支払者住所',
+                                            data: payerIsSameAsChiefMourner ? DITTO_MARK : customer?.payerAddress,
+                                        },
+                                        {
+                                            label: '支払者電話',
+                                            data: payerIsSameAsChiefMourner ? DITTO_MARK : customer?.payerTel,
+                                        },
                                         { label: '引取場所', data: customer?.pickupPlace },
                                     ] as {
                                         label: string
