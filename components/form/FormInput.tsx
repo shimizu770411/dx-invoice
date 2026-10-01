@@ -19,6 +19,8 @@ interface FormInputProps<T extends FieldValues> {
     maxYear?: number
     maxLength?: number
     onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void
+    /** 担当者が値を変えたときに呼ばれる。フォームの読み込み・初期設定では呼ばれない */
+    onValueChange?: (value: string) => void
 }
 
 export function FormInput<T extends FieldValues>({
@@ -38,6 +40,7 @@ export function FormInput<T extends FieldValues>({
     maxYear,
     maxLength,
     onKeyDown,
+    onValueChange,
 }: FormInputProps<T>) {
     const errorMessage = error && 'message' in error ? (error.message as string) : undefined
 
@@ -61,6 +64,7 @@ export function FormInput<T extends FieldValues>({
                             }
                         }
                         field.onChange(v)
+                        onValueChange?.(v)
                     }}
                     onBlur={field.onBlur}
                     label={label}

@@ -7,10 +7,13 @@ import { FormSelect } from '@/components/form/FormSelect'
 import { FormDateTimeWithUnspecified } from '@/components/form/FormDateTimeWithUnspecified'
 import { FUNERAL_PLACE_OPTIONS } from '../constants/casesOptions'
 import { getStores } from '@/lib/stores'
+import { syncFuneralEndDate } from '../utils/funeralDateSync'
 
 export function FuneralInfoTab() {
     const {
         control,
+        setValue,
+        getValues,
         formState: { errors },
     } = useFormContext<CaseFormData>()
 
@@ -51,6 +54,12 @@ export function FuneralInfoTab() {
                 minYear={1950}
                 maxYear={new Date().getFullYear()}
                 error={errors.funeralFrom}
+                onValueChange={(value) => {
+                    // 告別式は日付を跨がないため、終了日時の日付を開始日に合わせる。
+                    // 時刻は担当者が入れたものなので触らない
+                    const next = syncFuneralEndDate(value, (getValues('funeralTo') as string) || '')
+                    setValue('funeralTo', next as never, { shouldDirty: true, shouldValidate: true })
+                }}
             />
 
             {/* 葬儀・告別式終了日時 */}
