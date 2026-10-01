@@ -69,7 +69,7 @@ export interface CaseStep {
 export function buildCaseSteps(progress: CaseProgressLike): CaseStep[] {
     const hasFormalEstimate = progress.estimateType === 'FORMAL'
     const steps: CaseStep[] = [
-        { key: 'case', group: 'edit', label: '情報編集', variant: 'accent', disabled: false },
+        { key: 'case', group: 'edit', label: '葬儀案件', variant: 'accent', disabled: false },
     ]
 
     if (hasFormalEstimate && progress.preConsultEstimateId) {
@@ -120,6 +120,36 @@ export function buildCaseSteps(progress: CaseProgressLike): CaseStep[] {
     steps.push({ key: 'flowers', group: 'parallel', label: '供花登録', variant: 'accent', disabled: false })
 
     return steps
+}
+
+/** 切替バーを置く画面。入金と領収書はその場での操作なので画面としては存在しない */
+export type CaseScreen = 'case' | 'estimate' | 'invoice' | 'flowers'
+
+/**
+ * 今いる画面が、どのボタンに当たるかを求める。
+ *
+ * 見積画面だけは、本見積と事前相談見積のどちらを開いているかでボタンが変わる。
+ * ただし事前相談見積のボタンは本見積を作ったあとしか並ばないため、
+ * 「並んでいないボタンを現在地にして、見積ボタンが押せたままになる」ことがないよう
+ * 実際に並んでいるボタンの中から選ぶ。
+ *
+ * @param steps buildCaseSteps の結果
+ * @param screen 今いる画面
+ * @param openEstimateId 見積画面で開いている見積のID（他の画面では不要）
+ * @param preConsultEstimateId 事前相談見積のID
+ */
+export function resolveCurrentStepKey(
+    steps: CaseStep[],
+    screen: CaseScreen,
+    openEstimateId?: string | null,
+    preConsultEstimateId?: string | null
+): CaseStepKey {
+    if (screen !== 'estimate') return screen
+
+    const hasPreConsultButton = steps.some((s) => s.key === 'preConsultEstimate')
+    const isPreConsultOpen = !!openEstimateId && openEstimateId === preConsultEstimateId
+
+    return hasPreConsultButton && isPreConsultOpen ? 'preConsultEstimate' : 'estimate'
 }
 
 // ---------------------------------------------------------------------------

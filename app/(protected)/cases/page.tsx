@@ -300,14 +300,14 @@ export default function CasesPage() {
                                 className="flex items-center gap-0.5 flex-wrap lg:gap-1"
                                 onClick={(e) => e.stopPropagation()}
                             >
-                                {/* 案件編集（会員情報・故人情報など） */}
+                                {/* 葬儀案件の編集（会員情報・故人情報など） */}
                                 <button
                                     onClick={() => router.push(`/cases/${item.id}`)}
                                     style={caseStepButtonStyle('accent')}
                                     className={`font-mincho ${CASE_ROW_BTN_SIZE_CLASSES}`}
                                     title="案件詳細・会員情報を編集"
                                 >
-                                    情報編集
+                                    {stepOf('case').label}
                                 </button>
                                 <span
                                     className="mx-1.5 self-stretch lg:mx-2"

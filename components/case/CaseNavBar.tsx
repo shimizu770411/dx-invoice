@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
-import { buildCaseSteps, CaseStep, CaseStepKey } from '@/lib/caseProgress'
+import { buildCaseSteps, resolveCurrentStepKey, CaseScreen, CaseStep } from '@/lib/caseProgress'
 import { useCaseProgressQuery } from '@/hooks/useCaseProgress'
 import { caseStepButtonStyle } from './caseStepButtonStyle'
 import { PaymentDialog } from './PaymentDialog'
@@ -23,7 +23,7 @@ import { handleOperationError } from '@/lib/errorHandler'
 interface CaseNavBarProps {
     customerId: string
     /** 今開いている画面。そのボタンは押せない代わりに現在地として強調する */
-    current: 'case' | 'estimate' | 'invoice' | 'flowers'
+    current: CaseScreen
     /**
      * 見積画面で開いている見積のID。
      * 本見積と事前相談見積のどちらを開いているか、バー側で判別するために使う
@@ -51,13 +51,7 @@ export function CaseNavBar({ customerId, current, currentEstimateId, isDirty = f
 
     const steps = buildCaseSteps(progress)
 
-    // 見積画面では、本見積と事前相談見積のどちらを開いているかで現在地が変わる
-    const currentKey: CaseStepKey | null =
-        current === 'estimate'
-            ? currentEstimateId && currentEstimateId === progress.preConsultEstimateId
-                ? 'preConsultEstimate'
-                : 'estimate'
-            : current
+    const currentKey = resolveCurrentStepKey(steps, current, currentEstimateId, progress.preConsultEstimateId)
 
     /** 未保存の変更があれば確認してから実行する */
     const withUnsavedCheck = (action: () => void) => {

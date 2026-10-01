@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildCaseSteps, toCaseProgress, CaseStepKey } from '@/lib/caseProgress'
+import { buildCaseSteps, resolveCurrentStepKey, toCaseProgress, CaseStepKey } from '@/lib/caseProgress'
 
 /**
  * 案件の進捗（どこまで書類ができているか）の判定。
@@ -83,6 +83,17 @@ describe('操作ボタンの並び', () => {
     })
 })
 
+describe('ボタンの名称', () => {
+    it('案件の基本情報を開くボタンは「葬儀案件」', () => {
+        // 画面の見出し（葬儀案件 編集）と呼び名を揃える
+        expect(step(noDocuments, 'case')?.label).toBe('葬儀案件')
+    })
+
+    it('供花のボタンは「供花登録」', () => {
+        expect(step(noDocuments, 'flowers')?.label).toBe('供花登録')
+    })
+})
+
 describe('見積ボタンの表示', () => {
     it('見積が無ければ「見積書作成」', () => {
         expect(step(noDocuments, 'estimate')).toMatchObject({ label: '見積書作成', variant: 'primary' })
@@ -149,6 +160,60 @@ describe('次に進めるかどうか', () => {
     it('情報編集と供花はいつでも押せる', () => {
         expect(step(noDocuments, 'case')?.disabled).toBe(false)
         expect(step(noDocuments, 'flowers')?.disabled).toBe(false)
+    })
+})
+
+describe('今いる画面がどのボタンに当たるか', () => {
+    const preConsultOnly = {
+        hasEstimate: true,
+        estimateType: 'PRE_CONSULTATION' as const,
+        preConsultEstimateId: '1',
+        hasInvoice: false,
+        isPaid: false,
+    }
+    const withFormal = {
+        hasEstimate: true,
+        estimateType: 'FORMAL' as const,
+        preConsultEstimateId: '1',
+        hasInvoice: false,
+        isPaid: false,
+    }
+
+    it('事前相談見積しかない案件でその見積を開いていたら、見積ボタンが現在地になる', () => {
+        // 事前相談見積の別枠ボタンは本見積を作るまで並ばない。
+        // 並んでいないボタンを現在地にすると、今開いている見積ボタンが押せたままになる
+        const steps = buildCaseSteps(preConsultOnly)
+        expect(resolveCurrentStepKey(steps, 'estimate', '1', '1')).toBe('estimate')
+    })
+
+    it('本見積を作ったあとに事前相談見積を開いていたら、その別枠ボタンが現在地になる', () => {
+        const steps = buildCaseSteps(withFormal)
+        expect(resolveCurrentStepKey(steps, 'estimate', '1', '1')).toBe('preConsultEstimate')
+    })
+
+    it('本見積を開いていたら、見積ボタンが現在地になる', () => {
+        const steps = buildCaseSteps(withFormal)
+        expect(resolveCurrentStepKey(steps, 'estimate', '9', '1')).toBe('estimate')
+    })
+
+    it('新規作成でまだ見積IDが無くても、見積ボタンが現在地になる', () => {
+        const steps = buildCaseSteps({ hasEstimate: false, hasInvoice: false, isPaid: false })
+        expect(resolveCurrentStepKey(steps, 'estimate', undefined, null)).toBe('estimate')
+    })
+
+    it('見積以外の画面は、そのままその画面のボタンが現在地になる', () => {
+        const steps = buildCaseSteps(withFormal)
+        expect(resolveCurrentStepKey(steps, 'case')).toBe('case')
+        expect(resolveCurrentStepKey(steps, 'invoice')).toBe('invoice')
+        expect(resolveCurrentStepKey(steps, 'flowers')).toBe('flowers')
+    })
+
+    it('現在地として返すキーは、必ず実際に並んでいるボタンのもの', () => {
+        for (const progress of [preConsultOnly, withFormal]) {
+            const steps = buildCaseSteps(progress)
+            const key = resolveCurrentStepKey(steps, 'estimate', '1', '1')
+            expect(steps.map((s) => s.key)).toContain(key)
+        }
     })
 })
 
