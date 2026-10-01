@@ -8,7 +8,9 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useCustomersQuery } from '@/hooks/useCustomer'
-import { useCreatePaymentMutation, useCancelPaymentMutation } from '@/hooks/usePayment'
+import { buildCaseSteps, CaseStepKey } from '@/lib/caseProgress'
+import { caseStepButtonStyle } from '@/components/case/caseStepButtonStyle'
+import { PaymentDialog } from '@/components/case/PaymentDialog'
 import { createInvoiceFromEstimate } from '@/lib/invoices'
 import { toast } from '@/hooks/use-toast'
 import { handleOperationError } from '@/lib/errorHandler'
@@ -64,15 +66,12 @@ export default function CasesPage() {
         customerId: string | null
         isPaid: boolean
     }>({ open: false, invoiceId: null, customerId: null, isPaid: false })
-    const [paymentData, setPaymentData] = useState({ paidAt: '', memo: '' })
 
     const [creatingInvoiceForId, setCreatingInvoiceForId] = useState<string | null>(null)
 
     // React Query フック
     const queryClient = useQueryClient()
     const { data: customers = [], isLoading: customersLoading } = useCustomersQuery(searchParams)
-    const createPaymentMutation = useCreatePaymentMutation()
-    const cancelPaymentMutation = useCancelPaymentMutation()
     const formatDate = useDateFormat()
 
     const loading = customersLoading
@@ -113,31 +112,6 @@ export default function CasesPage() {
             customerId: customer.id,
             isPaid: customer.isPaid,
         })
-        setPaymentData({
-            paidAt: new Date().toISOString().split('T')[0],
-            memo: '',
-        })
-    }
-
-    const handlePaymentSave = async () => {
-        if (!paymentDialog.invoiceId) return
-        try {
-            if (paymentDialog.isPaid) {
-                await cancelPaymentMutation.mutateAsync({
-                    invoiceId: paymentDialog.invoiceId,
-                    data: paymentData,
-                })
-            } else {
-                await createPaymentMutation.mutateAsync({
-                    invoiceId: paymentDialog.invoiceId,
-                    data: paymentData,
-                })
-            }
-            setPaymentDialog({ open: false, invoiceId: null, customerId: null, isPaid: false })
-        } catch (error) {
-            console.error('Payment failed:', error)
-            alert('入金処理に失敗しました')
-        }
     }
 
     const handlePaymentCancel = () => {
@@ -283,86 +257,6 @@ export default function CasesPage() {
                         },
                     ]}
                     subRow={(item) => {
-                        type Variant = 'primary' | 'gold' | 'done' | 'current' | 'alert' | 'disabled' | 'accent'
-
-                        const btnStyle = (variant: Variant, disabled = false): React.CSSProperties => {
-                            const base: React.CSSProperties = {
-                                letterSpacing: '0.12em',
-                                fontWeight: 500,
-                                // variantごとにborderColor/borderStyleだけを上書きするため、
-                                // shorthand(border)とlonghandの混在を避けて個別プロパティで指定する
-                                borderWidth: '1px',
-                                borderStyle: 'solid',
-                                borderColor: 'transparent',
-                                transition: 'all 0.15s ease',
-                                cursor: disabled ? 'not-allowed' : 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '6px',
-                            }
-                            if (disabled) {
-                                return {
-                                    ...base,
-                                    backgroundColor: '#f0eee8',
-                                    color: '#c4bfb0',
-                                    borderColor: '#e0dbcc',
-                                    borderStyle: 'dashed',
-                                    opacity: 0.7,
-                                    boxShadow: 'none',
-                                }
-                            }
-                            const activeShadow = '0 2px 4px rgba(1, 8, 62, 0.12)'
-                            switch (variant) {
-                                case 'primary':
-                                    return {
-                                        ...base,
-                                        backgroundColor: 'var(--brand-navy)',
-                                        color: '#fff',
-                                        boxShadow: activeShadow,
-                                    }
-                                case 'gold':
-                                    return {
-                                        ...base,
-                                        backgroundColor: 'var(--brand-gold)',
-                                        color: 'var(--brand-navy-dark)',
-                                        boxShadow: activeShadow,
-                                    }
-                                case 'done':
-                                    return {
-                                        ...base,
-                                        backgroundColor: '#ffffff',
-                                        color: 'var(--brand-navy)',
-                                        borderColor: 'var(--brand-navy)',
-                                        boxShadow: '0 1px 2px rgba(1, 8, 62, 0.08)',
-                                    }
-                                case 'current':
-                                    return {
-                                        ...base,
-                                        backgroundColor: 'var(--brand-navy)',
-                                        color: '#fff',
-                                        boxShadow: activeShadow,
-                                    }
-                                case 'alert':
-                                    return {
-                                        ...base,
-                                        backgroundColor: 'var(--brand-red)',
-                                        color: '#ffffff',
-                                        borderColor: 'var(--brand-red)',
-                                        boxShadow: '0 2px 4px rgba(154, 31, 40, 0.25)',
-                                    }
-                                case 'accent':
-                                    return {
-                                        ...base,
-                                        backgroundColor: '#ffffff',
-                                        color: 'var(--brand-gold-soft)',
-                                        borderColor: 'var(--brand-gold)',
-                                        boxShadow: '0 1px 2px rgba(196, 174, 106, 0.2)',
-                                    }
-                                default:
-                                    return base
-                            }
-                        }
 
                         const LockIcon = () => (
                             <span
@@ -374,30 +268,19 @@ export default function CasesPage() {
                             </span>
                         )
 
-                        // ステップの状態判定
-                        const hasEst = item.hasEstimate
-                        const hasInv = item.hasInvoice
-                        const isPaid = item.isPaid
+                        // ステップの状態（ラベル・配色・使えるかどうか）は、この一覧と各画面上部の切替バーで共通にしている。
+                        // 片方だけ条件を変えると、同じ案件なのに画面によって押せるボタンが違う、という食い違いが起きる
+                        const steps = buildCaseSteps(item)
+                        const stepOf = (key: CaseStepKey) => steps.find((s) => s.key === key)!
+                        const estStep = stepOf('estimate')
+                        const invStep = stepOf('invoice')
+                        const payStep = stepOf('payment')
+                        const recStep = stepOf('receipt')
+                        // 事前相談見積の別枠ボタンは、本見積を作ったあとだけ並ぶ
+                        const preConsultStep = steps.find((s) => s.key === 'preConsultEstimate')
 
-                        // 見積書: 本見積あり → gold、事前相談見積のみ → done、未作成 → primary
-                        const hasFormalEst = item.estimateType === 'FORMAL'
-                        const estVariant: Variant = !hasEst ? 'primary' : hasFormalEst ? 'gold' : 'done'
-                        const estLabel = !hasEst ? '見積書作成' : hasFormalEst ? '本見積編集' : '事前相談見積'
-
-                        // 請求書: 本見積なし → disabled、請求書なし → primary(次ステップ)、あり → done
-                        const invDisabled = !hasFormalEst
-                        const invVariant: Variant = hasInv ? 'done' : 'primary'
                         const isCreatingInvoice = creatingInvoiceForId === item.id
-                        const invLabel = isCreatingInvoice ? '作成中…' : hasInv ? '請求書編集' : '請求書作成'
-
-                        // 入金: 請求書なし → disabled、未入金 → alert(要対応)、入金済 → done
-                        const payDisabled = !hasInv
-                        const payVariant: Variant = isPaid ? 'done' : 'alert'
-                        const payLabel = isPaid ? '入金取消' : '入金登録'
-
-                        // 領収書: 未入金 → disabled、入金済 → gold(最終成果物)
-                        const recDisabled = !isPaid
-                        const recVariant: Variant = 'gold'
+                        const invLabel = isCreatingInvoice ? '作成中…' : invStep.label
 
                         // フロー矢印
                         const Arrow = () => (
@@ -420,7 +303,7 @@ export default function CasesPage() {
                                 {/* 案件編集（会員情報・故人情報など） */}
                                 <button
                                     onClick={() => router.push(`/cases/${item.id}`)}
-                                    style={btnStyle('accent')}
+                                    style={caseStepButtonStyle('accent')}
                                     className={`font-mincho ${CASE_ROW_BTN_SIZE_CLASSES}`}
                                     title="案件詳細・会員情報を編集"
                                 >
@@ -435,10 +318,10 @@ export default function CasesPage() {
                                 />
                                 {/* メインフロー: 見積 → 請求 → 入金 → 領収書 */}
                                 {/* 本見積あり: 事前相談見積（左）→ 本見積編集（右）の時系列順 */}
-                                {hasFormalEst && item.preConsultEstimateId && (
+                                {preConsultStep && item.preConsultEstimateId && (
                                     <button
                                         onClick={() => router.push(`/estimates/${item.preConsultEstimateId}`)}
-                                        style={btnStyle('done')}
+                                        style={caseStepButtonStyle(preConsultStep.variant)}
                                         className={`font-mincho ${CASE_ROW_BTN_SIZE_CLASSES}`}
                                         title="事前相談見積を閲覧"
                                     >
@@ -447,19 +330,19 @@ export default function CasesPage() {
                                 )}
                                 <button
                                     onClick={() => {
-                                        if (hasEst) router.push(`/estimates/${item.estimateId}`)
+                                        if (item.hasEstimate) router.push(`/estimates/${item.estimateId}`)
                                         else router.push(`/estimates/new?customerId=${item.id}`)
                                     }}
-                                    style={btnStyle(estVariant)}
+                                    style={caseStepButtonStyle(estStep.variant)}
                                     className={`font-mincho ${CASE_ROW_BTN_SIZE_CLASSES}`}
                                 >
-                                    <ResponsiveActionLabel label={estLabel} />
+                                    <ResponsiveActionLabel label={estStep.label} />
                                 </button>
                                 <Arrow />
                                 <button
                                     onClick={async () => {
-                                        if (invDisabled || isCreatingInvoice) return
-                                        if (hasInv && item.invoiceId) {
+                                        if (invStep.disabled || isCreatingInvoice) return
+                                        if (item.hasInvoice && item.invoiceId) {
                                             router.push(`/invoices/${item.invoiceId}`)
                                             return
                                         }
@@ -484,40 +367,40 @@ export default function CasesPage() {
                                             setCreatingInvoiceForId(null)
                                         }
                                     }}
-                                    disabled={invDisabled || isCreatingInvoice}
-                                    style={btnStyle(invVariant, invDisabled || isCreatingInvoice)}
+                                    disabled={invStep.disabled || isCreatingInvoice}
+                                    style={caseStepButtonStyle(invStep.variant, invStep.disabled || isCreatingInvoice)}
                                     className={`font-mincho ${CASE_ROW_BTN_SIZE_CLASSES}`}
-                                    title={invDisabled ? '本見積作成後に使用できます' : undefined}
+                                    title={invStep.lockedReason}
                                 >
-                                    {invDisabled && <LockIcon />}
+                                    {invStep.disabled && <LockIcon />}
                                     <ResponsiveActionLabel label={invLabel} />
                                 </button>
                                 <Arrow />
                                 <button
                                     onClick={() => {
-                                        if (payDisabled) return
+                                        if (payStep.disabled) return
                                         handlePaymentClick(item)
                                     }}
-                                    disabled={payDisabled}
-                                    style={btnStyle(payVariant, payDisabled)}
+                                    disabled={payStep.disabled}
+                                    style={caseStepButtonStyle(payStep.variant, payStep.disabled)}
                                     className={`font-mincho ${CASE_ROW_BTN_SIZE_CLASSES}`}
-                                    title={payDisabled ? '請求書作成後に使用できます' : undefined}
+                                    title={payStep.lockedReason}
                                 >
-                                    {payDisabled && <LockIcon />}
-                                    <ResponsiveActionLabel label={payLabel} />
+                                    {payStep.disabled && <LockIcon />}
+                                    <ResponsiveActionLabel label={payStep.label} />
                                 </button>
                                 <Arrow />
                                 <button
                                     onClick={() => {
-                                        if (recDisabled || !item.invoiceId) return
+                                        if (recStep.disabled || !item.invoiceId) return
                                         window.open(`/api/pdf/receipt/${item.invoiceId}?_t=${Date.now()}`, '_blank')
                                     }}
-                                    disabled={recDisabled}
-                                    style={btnStyle(recVariant, recDisabled)}
+                                    disabled={recStep.disabled}
+                                    style={caseStepButtonStyle(recStep.variant, recStep.disabled)}
                                     className={`font-mincho ${CASE_ROW_BTN_SIZE_CLASSES}`}
-                                    title={recDisabled ? '入金登録後に使用できます' : undefined}
+                                    title={recStep.lockedReason}
                                 >
-                                    {recDisabled && <LockIcon />}
+                                    {recStep.disabled && <LockIcon />}
                                     <ResponsiveActionLabel label="領収書発行" />
                                 </button>
 
@@ -533,7 +416,7 @@ export default function CasesPage() {
                                 {/* 並列タスク */}
                                 <button
                                     onClick={() => router.push(`/flowers/customer/${item.id}`)}
-                                    style={btnStyle('accent')}
+                                    style={caseStepButtonStyle('accent')}
                                     className={`font-mincho ${CASE_ROW_BTN_SIZE_CLASSES}`}
                                 >
                                     <ResponsiveActionLabel label="供花登録" />
@@ -550,134 +433,13 @@ export default function CasesPage() {
                 />
             </div>
 
-            {/* 入金入力ダイアログ */}
-            {paymentDialog.open && (
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center"
-                    style={{ backgroundColor: 'rgba(1, 8, 62, 0.55)' }}
-                    onClick={handlePaymentCancel}
-                >
-                    <div
-                        className="w-11/12 max-w-md bg-white"
-                        style={{
-                            border: '1px solid var(--brand-border)',
-                            borderTop: '4px solid var(--brand-navy)',
-                            padding: '40px 36px',
-                            boxShadow: '0 20px 40px rgba(1, 8, 62, 0.2)',
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div className="mb-6 pb-4" style={{ borderBottom: '1px solid var(--brand-border)' }}>
-                            <p
-                                className="font-garamond mb-2"
-                                style={{
-                                    fontSize: '11px',
-                                    color: 'var(--brand-gold-soft)',
-                                    letterSpacing: '0.3em',
-                                    fontWeight: 500,
-                                }}
-                            >
-                                {paymentDialog.isPaid ? 'CANCEL PAYMENT' : 'REGISTER PAYMENT'}
-                            </p>
-                            <h2
-                                className="font-mincho"
-                                style={{
-                                    fontSize: '22px',
-                                    fontWeight: 600,
-                                    color: 'var(--brand-navy)',
-                                    letterSpacing: '0.2em',
-                                }}
-                            >
-                                {paymentDialog.isPaid ? '入金取消' : '入金登録'}
-                            </h2>
-                        </div>
-
-                        <div className="mb-5">
-                            <label
-                                className="mb-2 block font-mincho"
-                                style={{
-                                    fontSize: '14px',
-                                    fontWeight: 500,
-                                    color: 'var(--brand-navy)',
-                                    letterSpacing: '0.1em',
-                                }}
-                            >
-                                入金日
-                            </label>
-                            <input
-                                type="date"
-                                value={paymentData.paidAt}
-                                onChange={(e) => setPaymentData({ ...paymentData, paidAt: e.target.value })}
-                                className="w-full focus:outline-none transition-colors"
-                                style={{
-                                    padding: '12px 14px',
-                                    fontSize: '16px',
-                                    border: '1px solid var(--brand-input-border)',
-                                    backgroundColor: 'var(--brand-ivory-light)',
-                                }}
-                            />
-                        </div>
-
-                        <div className="mb-8">
-                            <label
-                                className="mb-2 block font-mincho"
-                                style={{
-                                    fontSize: '14px',
-                                    fontWeight: 500,
-                                    color: 'var(--brand-navy)',
-                                    letterSpacing: '0.1em',
-                                }}
-                            >
-                                備考
-                            </label>
-                            <textarea
-                                value={paymentData.memo}
-                                onChange={(e) => setPaymentData({ ...paymentData, memo: e.target.value })}
-                                rows={3}
-                                className="w-full focus:outline-none transition-colors"
-                                style={{
-                                    padding: '12px 14px',
-                                    fontSize: '16px',
-                                    border: '1px solid var(--brand-input-border)',
-                                    backgroundColor: 'var(--brand-ivory-light)',
-                                    resize: 'vertical',
-                                }}
-                            />
-                        </div>
-
-                        <div className="flex justify-end gap-3">
-                            <button
-                                onClick={handlePaymentCancel}
-                                className="font-mincho transition-colors"
-                                style={{
-                                    padding: '12px 32px',
-                                    backgroundColor: '#ffffff',
-                                    color: 'var(--brand-text-muted)',
-                                    border: '1px solid var(--brand-border)',
-                                    fontSize: '15px',
-                                    letterSpacing: '0.2em',
-                                    fontWeight: 500,
-                                }}
-                            >
-                                キャンセル
-                            </button>
-                            <button
-                                onClick={handlePaymentSave}
-                                className="font-mincho transition-colors text-white"
-                                style={{
-                                    padding: '12px 32px',
-                                    backgroundColor: paymentDialog.isPaid ? 'var(--brand-red)' : 'var(--brand-navy)',
-                                    border: 'none',
-                                    fontSize: '15px',
-                                    letterSpacing: '0.3em',
-                                    fontWeight: 500,
-                                }}
-                            >
-                                {paymentDialog.isPaid ? '取　消' : '保　存'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
+            {/* 入金登録・取消のダイアログ。各画面上部の切替バーからも同じものを開く */}
+            {paymentDialog.open && paymentDialog.invoiceId && (
+                <PaymentDialog
+                    invoiceId={paymentDialog.invoiceId}
+                    isPaid={paymentDialog.isPaid}
+                    onClose={handlePaymentCancel}
+                />
             )}
         </div>
     )

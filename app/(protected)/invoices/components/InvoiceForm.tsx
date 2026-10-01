@@ -20,6 +20,7 @@ import type { InvoiceConfirmationFields } from '@/lib/invoices'
 import { PdfExportDialog } from '@/components/document/PdfExportDialog'
 import { usePdfExportTrigger } from '@/hooks/usePdfExportTrigger'
 import { buildMembershipMismatchWarning } from '@/lib/documentUtils'
+import { CaseNavBar } from '@/components/case/CaseNavBar'
 
 // useQuery の data が未取得の間、毎レンダー新しい配列を渡すと
 // それに依存する処理が無駄に再計算されるため安定した参照を使う
@@ -350,6 +351,11 @@ function InvoiceFormContent({
                     paddingBottom: footerHeight + 32,
                 }}
             >
+                {/* 案件内の画面切替。一覧に戻らずに案件情報・見積・供花へ移れる */}
+                {customer?.id && (
+                    <CaseNavBar customerId={String(customer.id)} current="invoice" isDirty={isDirty} />
+                )}
+
                 {/* ページヘッダー */}
                 <div
                     className="flex flex-wrap items-end justify-between gap-y-3 mb-6 pb-5 lg:flex-nowrap"

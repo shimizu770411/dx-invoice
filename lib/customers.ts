@@ -1,4 +1,5 @@
 import apiClient from './api'
+import type { CaseProgress } from './caseProgress'
 
 export interface CustomerListItem {
     id: string
@@ -63,5 +64,14 @@ export async function createCustomer(data: any) {
 
 export async function updateCustomer(id: string, data: any) {
     const response = await apiClient.put(`/customers/${id}`, data)
+    return response.data
+}
+
+/**
+ * 案件の進捗（見積・請求・入金の有無）だけを取得する。
+ * 各画面の上部に置く切替バーが、次にどの書類へ行けるかを判断するために使う。
+ */
+export async function getCaseProgress(customerId: string): Promise<CaseProgress> {
+    const response = await apiClient.get<CaseProgress>(`/customers/${customerId}/progress`)
     return response.data
 }

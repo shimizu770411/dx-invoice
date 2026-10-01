@@ -23,6 +23,7 @@ import { useGetCustomerQuery, useUpdateCustomerMutation } from '@/hooks/useCusto
 import { toast } from '@/hooks/use-toast'
 import { ProcessingOverlay } from '@/components/ui/ProcessingOverlay'
 import { isPayerSameAsChiefMourner } from '@/lib/customerPayer'
+import { CaseNavBar } from '@/components/case/CaseNavBar'
 
 export default function EditCustomerPage() {
     const router = useRouter()
@@ -200,6 +201,9 @@ export default function EditCustomerPage() {
                     paddingBottom: footerHeight + 32,
                 }}
             >
+                {/* 案件内の画面切替。一覧に戻らずに見積・請求書・供花へ移れる */}
+                <CaseNavBar customerId={customerId} current="case" isDirty={methods.formState.isDirty} />
+
                 {/* ページヘッダー */}
                 <div
                     className="flex items-end justify-between mb-6 pb-5"

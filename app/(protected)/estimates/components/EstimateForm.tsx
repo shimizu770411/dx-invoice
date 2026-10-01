@@ -21,6 +21,7 @@ import { toast } from '@/hooks/use-toast'
 import { PdfExportDialog } from '@/components/document/PdfExportDialog'
 import { usePdfExportTrigger } from '@/hooks/usePdfExportTrigger'
 import { buildMembershipMismatchWarning } from '@/lib/documentUtils'
+import { CaseNavBar } from '@/components/case/CaseNavBar'
 
 // useQuery の data が未取得の間、毎レンダー新しい配列を渡すと
 // それに依存する処理が無駄に再計算されるため安定した参照を使う
@@ -411,6 +412,16 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                     paddingBottom: footerHeight + 32,
                 }}
             >
+                {/* 案件内の画面切替。一覧に戻らずに案件情報・請求書・供花へ移れる */}
+                {customer?.id && (
+                    <CaseNavBar
+                        customerId={String(customer.id)}
+                        current="estimate"
+                        currentEstimateId={estimate?.id}
+                        isDirty={isDirty}
+                    />
+                )}
+
                 {/* ページヘッダー */}
                 <div
                     className="flex items-end justify-between mb-6 pb-5"

@@ -11,6 +11,7 @@ import { FlowerFormDialog } from '../../components/FlowerFormDialog'
 import { BillingTargetDialog } from '../../components/BillingTargetDialog'
 import { DataTable } from '@/components/table/DataTable'
 import { PageHeader } from '@/components/layout/PageHeader'
+import { CaseNavBar } from '@/components/case/CaseNavBar'
 
 type ActionVariant = 'navy' | 'gold' | 'alert' | 'done' | 'accent' | 'muted'
 
@@ -177,6 +178,9 @@ export default function FlowersListPage() {
 
     return (
         <div className="px-10 py-8" style={{ backgroundColor: '#fbfaf7', minHeight: 'calc(100vh - 68px)' }}>
+            {/* 案件内の画面切替。一覧に戻らずに案件情報・見積・請求書へ移れる */}
+            <CaseNavBar customerId={customerId} current="flowers" />
+
             {/* ページヘッダー */}
             <PageHeader
                 eyebrow="FLOWER LIST"

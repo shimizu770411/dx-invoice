@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth-middleware'
 import { serializeBigInt } from '@/lib/prisma-utils'
 import { prisma } from '@/lib/prisma'
+import { CASE_PROGRESS_INCLUDE, toCaseProgress } from '@/lib/caseProgress'
 
 export async function GET(request: NextRequest) {
     try {
@@ -163,23 +164,8 @@ export async function GET(request: NextRequest) {
             include: {
                 chiefMournerCity: true,
                 chiefMournerTown: true,
-                estimates: {
-                    select: { id: true, status: true, estimateType: true },
-                    orderBy: { id: 'asc' },
-                },
-                invoices: {
-                    include: {
-                        payments: {
-                            where: {
-                                targetType: 'INVOICE' as const,
-                            },
-                            orderBy: {
-                                createdAt: 'desc',
-                            },
-                            take: 1,
-                        },
-                    },
-                },
+                // 見積・請求・入金の取得条件は案件1件の取得と共有している（lib/caseProgress）
+                ...CASE_PROGRESS_INCLUDE,
             },
             orderBy: [
                 {
@@ -246,28 +232,27 @@ export async function GET(request: NextRequest) {
 
         // レスポンス形式に変換
         const result = filteredCustomers.map((customer: any) => {
-            const invoice = customer.invoices[0]
-            const latestPayment = invoice?.payments[0]
-            const isPaid = latestPayment?.status === 'PAID'
+            // 見積・請求・入金の進捗は案件1件の取得と同じ関数で求める（lib/caseProgress）
+            const progress = toCaseProgress(customer)
 
             return {
-                id: customer.id.toString(),
-                receptionNo: customer.receptionNo,
-                deceasedName: customer.deceasedName,
+                id: progress.customerId,
+                receptionNo: progress.receptionNo,
+                deceasedName: progress.deceasedName,
                 chiefMournerName: customer.chiefMournerName || '',
                 age: customer.age,
                 address: customer.chiefMournerAddress || '',
                 receptionAt: customer.receptionAt ? customer.receptionAt.toISOString() : null,
                 funeralFrom: customer.funeralFrom ? customer.funeralFrom.toISOString() : null,
-                hasEstimate: customer.estimates.length > 0,
+                hasEstimate: progress.hasEstimate,
                 // 本見積（FORMAL）があればそちらを優先して返す
-                estimateId: (customer.estimates.find((e: any) => e.estimateType === 'FORMAL') ?? customer.estimates[0])?.id.toString(),
-                estimateStatus: (customer.estimates.find((e: any) => e.estimateType === 'FORMAL') ?? customer.estimates[0])?.status ?? null,
-                estimateType: (customer.estimates.find((e: any) => e.estimateType === 'FORMAL') ?? customer.estimates[0])?.estimateType ?? null,
-                preConsultEstimateId: customer.estimates.find((e: any) => e.estimateType === 'PRE_CONSULTATION')?.id.toString() ?? null,
-                hasInvoice: customer.invoices.length > 0,
-                invoiceId: invoice?.id.toString(),
-                isPaid: isPaid,
+                estimateId: progress.estimateId ?? undefined,
+                estimateStatus: progress.estimateStatus,
+                estimateType: progress.estimateType,
+                preConsultEstimateId: progress.preConsultEstimateId,
+                hasInvoice: progress.hasInvoice,
+                invoiceId: progress.invoiceId ?? undefined,
+                isPaid: progress.isPaid,
                 chiefMournerCity: customer.chiefMournerCity
                     ? {
                           id: customer.chiefMournerCity.id.toString(),
