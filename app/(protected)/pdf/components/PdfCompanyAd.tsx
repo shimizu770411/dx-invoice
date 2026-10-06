@@ -11,7 +11,7 @@ export function PdfCompanyAd() {
                             <span key={j}>{c}</span>
                         ))}
                     </div>
-                    <div>
+                    <div className="flex justify-between">
                         {'総合葬祭　玉　泉　院'.split('').map((c, j) => (
                             <span key={j}>{c}</span>
                         ))}
