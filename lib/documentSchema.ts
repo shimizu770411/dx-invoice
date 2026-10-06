@@ -13,6 +13,7 @@ export const documentFreeItemFieldSchema = z
         productItemName: z.string(),
         description: z.string(),
         unitPriceGeneral: z.coerce.number(),
+        unitPriceMember: z.coerce.number(),
         qty: z.coerce.number().min(0).max(3000, '数量オーバー'),
     })
     .superRefine((data, ctx) => {
@@ -32,11 +33,16 @@ export const documentFreeItemFieldSchema = z
                     message: `施行割増券は${EXECUTION_SURCHARGE_AMOUNT.toLocaleString()}円固定です`,
                 })
             }
-        } else if (data.unitPriceGeneral < 0) {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                path: ['unitPriceGeneral'],
-                message: '0以上の金額を入力してください',
-            })
+        } else {
+            // 固定行以外は一般価格・会員価格の両方を持つ（固定行は一般価格の欄だけを使う）
+            for (const path of ['unitPriceGeneral', 'unitPriceMember'] as const) {
+                if (data[path] < 0) {
+                    ctx.addIssue({
+                        code: z.ZodIssueCode.custom,
+                        path: [path],
+                        message: '0以上の金額を入力してください',
+                    })
+                }
+            }
         }
     })

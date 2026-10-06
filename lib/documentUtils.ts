@@ -19,6 +19,7 @@ type DocumentFreeItemBase = {
     productItemName: string
     description?: string
     unitPriceGeneral: number
+    unitPriceMember: number
     qty: number
     amount: number
     sortNo?: number
@@ -37,7 +38,7 @@ export function padDocumentFreeItems<T extends DocumentFreeItemBase>(
 
     const padded: T[] = others.slice()
     while (padded.length < FIXED_FREE_ROW_COUNT) {
-        padded.push({ productItemName: '', description: '', unitPriceGeneral: 0, qty: 0, amount: 0, sortNo: padded.length } as T)
+        padded.push({ productItemName: '', description: '', unitPriceGeneral: 0, unitPriceMember: 0, qty: 0, amount: 0, sortNo: padded.length } as T)
     }
 
     fixedRowNames.forEach((name, idx) => {
@@ -56,6 +57,7 @@ export function padDocumentFreeItems<T extends DocumentFreeItemBase>(
                       productItemName: name,
                       description: '',
                       unitPriceGeneral: forcedUnitPrice ?? 0,
+                      unitPriceMember: 0,
                       qty: 0,
                       amount: 0,
                       sortNo: FIXED_FREE_ROW_COUNT + idx,
@@ -212,6 +214,7 @@ export function buildDocumentFreeItems<T extends DocumentFreeItemBase>(
             productItemName: '',
             description: '',
             unitPriceGeneral: 0,
+            unitPriceMember: 0,
             qty: 0,
             amount: 0,
             sortNo: 9999,

@@ -10,6 +10,7 @@ import {
     calcFreeItemsSubtotal,
     calcGrandTotal,
     isCancellationFeeRow,
+    freeItemUnitPrice,
     noChargeReasonFor,
     NO_CHARGE_LABELS,
 } from '@/lib/documentTotals'
@@ -147,6 +148,7 @@ export type PdfFreeItem = {
     productItemName: string
     description?: string | null
     unitPriceGeneral: number
+    unitPriceMember: number
     qty: number
     amount: number
     sortNo: number
@@ -360,8 +362,8 @@ function buildDisplayRows(
                         description: linkedFi?.description ?? null,
                         qty: linkedFi?.qty ?? 0,
                         unitPriceGeneral: linkedFi?.unitPriceGeneral ?? 0,
-                        unitPriceMember: linkedFi?.unitPriceGeneral ?? 0,
-                        amount: (linkedFi?.unitPriceGeneral ?? 0) * (linkedFi?.qty ?? 0),
+                        unitPriceMember: linkedFi?.unitPriceMember ?? 0,
+                        amount: linkedFi?.amount ?? 0,
                         sortNo: 9999,
                     } as any,
                     showProductVariantName: false,
@@ -388,8 +390,8 @@ function buildDisplayRows(
             estimateItem: {
                 description: fi.description ?? null,
                 qty: fi.qty,
-                unitPriceGeneral: fi.unitPriceGeneral,
-                unitPriceMember: fi.unitPriceGeneral,
+                unitPriceGeneral: freeItemUnitPrice(fi, false),
+                unitPriceMember: freeItemUnitPrice(fi, true),
                 amount: fi.amount,
                 sortNo: fi.sortNo,
             },
@@ -737,7 +739,7 @@ export function PdfInvoiceLayout({
                     : ''
             const unitPriceText =
                 row.isFreeItem && !row.isFixedRow && row.estimateItem
-                    ? `${row.estimateItem.qty > 1 ? '　' : ''}単価: ¥${fmtAmount(row.estimateItem.unitPriceGeneral)}`
+                    ? `${row.estimateItem.qty > 1 ? '　' : ''}単価: ¥${fmtAmount(isMember ? row.estimateItem.unitPriceMember : row.estimateItem.unitPriceGeneral)}`
                     : ''
             pushText(`${qtyText}${deductionText}${unitPriceText}`)
         }

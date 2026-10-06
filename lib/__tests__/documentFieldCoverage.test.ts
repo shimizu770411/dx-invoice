@@ -28,11 +28,17 @@ type TargetFile = {
     file: string
     /** この処理では扱わないことが確定している項目と、その理由 */
     notApplicable?: { field: string; reason: string }[]
+    /**
+     * ファイル全体ではなく、この文字列の直後の括弧の中だけを検査する（出現箇所すべて）。
+     * 自由入力行のように、同じファイルに同名の項目（通常の明細行の unitPriceMember 等）があり、
+     * ファイル全体を見ると通し忘れを見逃す場合に使う。
+     */
+    section?: string
 }
 
 type DocumentSpec = {
     label: string
-    model: 'Estimate' | 'Invoice' | 'EstimateItem' | 'InvoiceItem' | 'Customer'
+    model: 'Estimate' | 'Invoice' | 'EstimateItem' | 'InvoiceItem' | 'EstimateItemFree' | 'InvoiceItemFree' | 'Customer'
     /** 画面から入力し、保存・読み込み・引き継ぎのすべてを通す必要がある項目 */
     formEditable: string[]
     /** 画面からは編集せず、サーバー側で決まる項目（採番・再計算・自動記録・他書類からの引き継ぎ） */
@@ -234,6 +240,74 @@ const DOCUMENTS: DocumentSpec[] = [
         ],
     },
     {
+        label: '見積の自由入力行',
+        model: 'EstimateItemFree',
+        formEditable: [
+            'parentProductItemId',
+            'productItemName',
+            'description',
+            'unitPriceGeneral',
+            'unitPriceMember',
+            'qty',
+            'amount',
+            'sortNo',
+        ],
+        // 自由入力行は書類の先頭の明細行（なければダミー行）に紐付けて保存する
+        serverManaged: ['id', 'estimateItemId', 'createdAt', 'updatedAt'],
+        targets: [
+            { label: '新規保存API', file: 'app/api/estimates/route.ts', section: 'estimateItemFree.createMany' },
+            { label: '更新保存API', file: 'app/api/estimates/[id]/route.ts', section: 'estimateItemFree.createMany' },
+            { label: '本見積作成の引き継ぎ', file: 'app/api/estimates/[id]/confirm/route.ts', section: 'estimateItemFree.createMany' },
+            {
+                label: '編集画面の読み込み（新規作成時）',
+                file: 'app/(protected)/estimates/hooks/useEstimateForm.ts',
+                section: 'freeItems: initialFreeItems.map',
+                notApplicable: [
+                    { field: 'amount', reason: '画面では入力せず、送信時に単価 × 数量で出し直す' },
+                    { field: 'sortNo', reason: '画面では入力せず、送信時に並び順から振り直す' },
+                ],
+            },
+            {
+                label: '編集画面の読み込み（編集時）',
+                file: 'app/(protected)/estimates/hooks/useEstimateForm.ts',
+                section: 'freeItems: paddedFreeItems.map',
+                notApplicable: [
+                    { field: 'amount', reason: '画面では入力せず、送信時に単価 × 数量で出し直す' },
+                    { field: 'sortNo', reason: '画面では入力せず、送信時に並び順から振り直す' },
+                ],
+            },
+        ],
+    },
+    {
+        label: '請求書の自由入力行',
+        model: 'InvoiceItemFree',
+        formEditable: [
+            'parentProductItemId',
+            'productItemName',
+            'description',
+            'unitPriceGeneral',
+            'unitPriceMember',
+            'qty',
+            'amount',
+            'sortNo',
+        ],
+        // 自由入力行は書類の先頭の明細行（なければダミー行）に紐付けて保存する
+        serverManaged: ['id', 'invoiceItemId', 'createdAt', 'updatedAt'],
+        targets: [
+            { label: '更新保存API', file: 'app/api/invoices/[id]/route.ts', section: 'invoiceItemFree.createMany' },
+            { label: '見積からの引き継ぎ', file: 'app/api/invoices/customers/[customerId]/from-estimate/[estimateId]/route.ts', section: 'invoiceItemFree.createMany' },
+            {
+                label: '編集画面の読み込み',
+                file: 'app/(protected)/invoices/hooks/useInvoiceForm.ts',
+                section: 'freeItems: paddedFreeItems.map',
+                notApplicable: [
+                    { field: 'amount', reason: '画面では入力せず、送信時に単価 × 数量で出し直す' },
+                    { field: 'sortNo', reason: '画面では入力せず、送信時に並び順から振り直す' },
+                ],
+            },
+        ],
+    },
+    {
         label: '葬儀案件情報',
         model: 'Customer',
         formEditable: [
@@ -313,6 +387,24 @@ function readSource(relativePath: string): string {
     return fs.readFileSync(full, 'utf8')
 }
 
+// section の直後の括弧（対応する閉じ括弧まで）を、出現箇所ごとに切り出す
+function extractSections(source: string, section: string): string[] {
+    const sections: string[] = []
+    let from = source.indexOf(section)
+    while (from >= 0) {
+        const open = source.indexOf('(', from + section.length)
+        let depth = 0
+        let end = open
+        for (; end < source.length; end++) {
+            if (source[end] === '(') depth++
+            else if (source[end] === ')' && --depth === 0) break
+        }
+        sections.push(source.slice(open, end + 1))
+        from = source.indexOf(section, end)
+    }
+    return sections
+}
+
 // 項目名が「単語として」現れるかを見る。
 // cremationFee と cremationProcessType のような前方一致での取り違えを防ぐ
 function mentionsField(source: string, field: string): boolean {
@@ -344,8 +436,15 @@ describe.each(DOCUMENTS)('$label の項目が各処理に通っているか', (d
     describe.each(doc.targets)('$label', (target) => {
         it(`画面から入力する項目がすべて現れる（${target.file}）`, () => {
             const source = readSource(target.file)
+            const sources = target.section ? extractSections(source, target.section) : [source]
+            expect(
+                sources.length,
+                `${target.file} に「${target.section}」が見つかりません（処理を書き換えた場合はこのテストの一覧も更新すること）`
+            ).toBeGreaterThan(0)
             const excluded = new Set((target.notApplicable ?? []).map((n) => n.field))
-            const missing = doc.formEditable.filter((f) => !excluded.has(f) && !mentionsField(source, f))
+            const missing = doc.formEditable.filter(
+                (f) => !excluded.has(f) && sources.some((s) => !mentionsField(s, f))
+            )
 
             expect(
                 missing,

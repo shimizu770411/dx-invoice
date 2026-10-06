@@ -107,6 +107,7 @@ describe('フリー行追加がONの商品の親リンク行', () => {
         productItemName: string
         description?: string
         unitPriceGeneral: number
+        unitPriceMember: number
         qty: number
         amount: number
         sortNo?: number
@@ -140,6 +141,7 @@ describe('フリー行追加がONの商品の親リンク行', () => {
             productItemName: '延長分',
             description: '',
             unitPriceGeneral: 5000,
+            unitPriceMember: 3000,
             qty: 2,
             amount: 10000,
         }

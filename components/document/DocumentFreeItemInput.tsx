@@ -7,6 +7,7 @@ export type FreeItemAddData = {
     productItemName: string
     description: string
     unitPriceGeneral: number
+    unitPriceMember: number
     qty: number
     amount: number
 }
@@ -31,6 +32,8 @@ export function DocumentFreeItemInput({ onAdd, count }: Props) {
             productItemName: name,
             description: '',
             unitPriceGeneral: isNaN(price) ? 0 : price,
+            // この入力は金額を1つしか持たないため、会員価格にも同じ額を入れる
+            unitPriceMember: isNaN(price) ? 0 : price,
             qty: 1,
             amount: isNaN(price) ? 0 : price,
         })

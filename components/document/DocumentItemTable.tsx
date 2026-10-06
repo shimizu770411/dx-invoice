@@ -12,7 +12,7 @@ import { ImageOff, X } from 'lucide-react'
 import { ProductVariant } from '@/lib/products'
 import { resolveProductImageUrl } from '@/lib/utils'
 import { scopeApplies } from '@/lib/productScope'
-import { calcDocumentItemAmount, noChargeReasonFor, NO_CHARGE_LABELS } from '@/lib/documentTotals'
+import { calcDocumentItemAmount, freeItemUnitPrice, noChargeReasonFor, NO_CHARGE_LABELS } from '@/lib/documentTotals'
 import { EXECUTION_SURCHARGE_NAME } from '@/lib/documentUtils'
 import { PlanSurcharge, canApplySurcharge } from '@/lib/planSurcharges'
 import { MISSING_FROM_MASTER_LABEL } from '@/lib/documentMissingProducts'
@@ -48,7 +48,38 @@ export type DocumentFormData = {
     returnStaff: string
     remarks: string
     items: { qty: number; description: string }[]
-    freeItems: { parentProductItemId?: string | null; productItemName: string; description: string; unitPriceGeneral: number; qty: number }[]
+    freeItems: { parentProductItemId?: string | null; productItemName: string; description: string; unitPriceGeneral: number; unitPriceMember: number; qty: number }[]
+}
+
+/**
+ * 控室管理費の追加行・自由入力行の価格欄。
+ * 通常の明細と同じく一般価格と会員価格を持ち、書類の会員区分でどちらを使うかが決まる。
+ */
+function FreeRowPriceInputs({
+    index,
+    control,
+    disabled,
+}: {
+    index: number
+    control: Control<DocumentFormData>
+    disabled: boolean
+}) {
+    return (
+        <div className="space-y-1">
+            <FormCurrencyInput
+                name={`freeItems.${index}.unitPriceGeneral`}
+                control={control}
+                disabled={disabled}
+                prefix={<span className="text-sm text-gray-500">一般</span>}
+            />
+            <FormCurrencyInput
+                name={`freeItems.${index}.unitPriceMember`}
+                control={control}
+                disabled={disabled}
+                prefix={<span className="text-sm text-gray-500">会員</span>}
+            />
+        </div>
+    )
 }
 
 type DocumentRowVariant = {
@@ -137,6 +168,7 @@ type DocumentItem = {
 type DocumentFreeItem = {
     productItemName?: string | null
     unitPriceGeneral: number
+    unitPriceMember?: number
     qty: number
 }
 
@@ -1014,8 +1046,8 @@ export function DocumentItemTable({
                                                 />
                                             </td>
                                             <td className="border border-gray-300 p-3">
-                                                <FormCurrencyInput
-                                                    name={`freeItems.${linkedFreeIndex}.unitPriceGeneral`}
+                                                <FreeRowPriceInputs
+                                                    index={linkedFreeIndex}
                                                     control={control}
                                                     disabled={isGroupableItem ? !groupAnyChecked : !checkedItems[index]}
                                                 />
@@ -1039,10 +1071,6 @@ export function DocumentItemTable({
                                 // 親付きフリー行（商品の直下に既に表示済み）は下部テーブルからは除外
                                 if (watchedFreeItems?.[index]?.parentProductItemId) return null
                                 const liveQty = watchedFreeItems?.[index]?.qty ?? freeItems[index]?.qty ?? 0
-                                const liveUnitPrice =
-                                    watchedFreeItems?.[index]?.unitPriceGeneral ??
-                                    freeItems[index]?.unitPriceGeneral ??
-                                    0
                                 const isChecked = freeCheckedItems[index] ?? false
                                 const itemName =
                                     freeItems[index]?.productItemName ??
@@ -1052,6 +1080,16 @@ export function DocumentItemTable({
                                 const isCancellationFee = itemName === '解約手数料'
                                 const isExecutionSurcharge = itemName === EXECUTION_SURCHARGE_NAME
                                 const isFixedRow = isMaturity || isCancellationFee || isExecutionSurcharge
+                                const liveUnitPrice = freeItemUnitPrice(
+                                    {
+                                        productItemName: itemName,
+                                        unitPriceGeneral:
+                                            watchedFreeItems?.[index]?.unitPriceGeneral ?? freeItems[index]?.unitPriceGeneral,
+                                        unitPriceMember:
+                                            watchedFreeItems?.[index]?.unitPriceMember ?? freeItems[index]?.unitPriceMember,
+                                    },
+                                    isMember
+                                )
                                 // 満期サービス・施行割増券は互助会員だけに効く割引なので、
                                 // 一般の書類では入力させない（入れても合計には反映されない）
                                 const memberBenefitBlocked = (isMaturity || isExecutionSurcharge) && !isMember
@@ -1154,8 +1192,8 @@ export function DocumentItemTable({
                                                     />
                                                 </td>
                                                 <td className="border border-gray-300 p-3">
-                                                    <FormCurrencyInput
-                                                        name={`freeItems.${index}.unitPriceGeneral`}
+                                                    <FreeRowPriceInputs
+                                                        index={index}
                                                         control={control}
                                                         disabled={inputsDisabled}
                                                     />

@@ -7,6 +7,7 @@ export interface EstimateFreeItem {
     productItemName: string
     description?: string
     unitPriceGeneral: number
+    unitPriceMember: number
     qty: number
     amount: number
     sortNo: number

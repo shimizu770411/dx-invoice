@@ -114,6 +114,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
                             productItemName: fi.productItemName,
                             description: fi.description,
                             unitPriceGeneral: fi.unitPriceGeneral,
+                            unitPriceMember: fi.unitPriceMember,
                             qty: fi.qty,
                             amount: fi.amount,
                             sortNo: fi.sortNo,

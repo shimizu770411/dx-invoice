@@ -27,6 +27,7 @@ type DocumentFormItemField = {
 type DocumentFormFreeItem = {
     productItemName?: string
     unitPriceGeneral: number
+    unitPriceMember?: number
     qty: number
 }
 
@@ -34,6 +35,7 @@ type DocumentFormFreeItemField = {
     productItemName?: string
     qty?: number
     unitPriceGeneral?: number
+    unitPriceMember?: number
 }
 
 /**
@@ -56,7 +58,27 @@ export function isMemberBenefitFreeRow(productItemName?: string | null): boolean
 type FreeItemForTotal = {
     productItemName?: string | null
     unitPriceGeneral?: number
+    unitPriceMember?: number
     qty?: number
+}
+
+/** 価格を1つしか持たない固定行（満期サービス・解約手数料・施行割増券）か */
+export function isFixedFreeRow(productItemName?: string | null): boolean {
+    return (
+        productItemName === MATURITY_SERVICE_NAME ||
+        productItemName === CANCELLATION_FEE_NAME ||
+        productItemName === EXECUTION_SURCHARGE_NAME
+    )
+}
+
+/**
+ * フリー行の単価。
+ * 控室管理費の追加行・自由入力行は通常の明細と同じく、書類の会員区分で一般価格／会員価格を選ぶ。
+ * 固定行は価格を1つしか持たず、一般価格の欄にその金額を入れている。
+ */
+export function freeItemUnitPrice(item: FreeItemForTotal, isMember: boolean): number {
+    if (isFixedFreeRow(item.productItemName)) return item.unitPriceGeneral || 0
+    return (isMember ? item.unitPriceMember : item.unitPriceGeneral) || 0
 }
 
 /**
@@ -67,7 +89,7 @@ export function calcFreeItemsSubtotal(freeItems: FreeItemForTotal[] | undefined,
     return (freeItems ?? []).reduce((sum, item) => {
         if (isCancellationFeeRow(item.productItemName)) return sum
         if (!isMember && isMemberBenefitFreeRow(item.productItemName)) return sum
-        return sum + (item.unitPriceGeneral || 0) * (item.qty ?? 1)
+        return sum + freeItemUnitPrice(item, isMember) * (item.qty ?? 1)
     }, 0)
 }
 
@@ -277,6 +299,7 @@ export function calculateDocumentFormTotals(
     const mergedFreeItems = (freeItems || []).map((item, i) => ({
         productItemName: freeItemFields?.[i]?.productItemName ?? item.productItemName,
         unitPriceGeneral: freeItemFields?.[i]?.unitPriceGeneral ?? item.unitPriceGeneral,
+        unitPriceMember: freeItemFields?.[i]?.unitPriceMember ?? item.unitPriceMember,
         qty: freeItemFields?.[i]?.qty ?? item.qty,
     }))
     const freeSubtotal = calcFreeItemsSubtotal(mergedFreeItems, isMember)

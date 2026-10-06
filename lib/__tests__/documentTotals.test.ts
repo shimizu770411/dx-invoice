@@ -284,6 +284,43 @@ describe('互助会員だけに効く割引', () => {
     })
 })
 
+describe('自由入力行の一般価格・会員価格', () => {
+    // 控室管理費の追加行・下部の自由入力行は、通常の明細と同じく一般価格と会員価格を持ち、
+    // 書類の会員区分で使う価格を選ぶ。固定行（満期サービス等）は価格を1つしか持たない。
+    const items = [item({ qty: 1, unitPriceGeneral: 100000, unitPriceMember: 100000 })]
+    const freeItems = [{ productItemName: '控室延長', unitPriceGeneral: 25000, unitPriceMember: 15000, qty: 2 }]
+
+    it('会員の書類では会員価格で計算する', () => {
+        const totals = calculateDocumentFormTotals(items, undefined, true, null, freeItems)
+        expect(totals.subtotal).toBe(130000)
+    })
+
+    it('一般の書類では一般価格で計算する', () => {
+        const totals = calculateDocumentFormTotals(items, undefined, false, null, freeItems)
+        expect(totals.subtotal).toBe(150000)
+    })
+
+    it('入力中の会員価格（フォームの値）を優先する', () => {
+        const fields = [{ productItemName: '控室延長', unitPriceGeneral: 25000, unitPriceMember: 10000, qty: 2 }]
+        const totals = calculateDocumentFormTotals(items, undefined, true, null, freeItems, fields)
+        expect(totals.subtotal).toBe(120000)
+    })
+
+    it('固定行は会員の書類でも一般価格の欄の金額を使う', () => {
+        const fixed = [{ productItemName: MATURITY_SERVICE_NAME, unitPriceGeneral: -20000, unitPriceMember: 0, qty: 1 }]
+        const totals = calculateDocumentFormTotals(items, undefined, true, null, fixed)
+        expect(totals.subtotal).toBe(80000)
+    })
+
+    it('保存される合計も画面と同じ価格で算出する', () => {
+        for (const isMember of [true, false]) {
+            const formTotals = calculateDocumentFormTotals(items, undefined, isMember, null, freeItems)
+            const apiTotals = calculateDocumentTotals([{ amount: 100000 }], 0, freeItems, isMember)
+            expect(apiTotals.subtotal).toBe(formTotals.subtotal)
+        }
+    })
+})
+
 describe('会費入金額の内訳行', () => {
     // 合計欄に出す「会費入金額」の内訳。
     // 互助会員（1・2行目）は 1回の入金額 × 入金回数、けやき（3行目）は手入力の割引額。

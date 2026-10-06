@@ -14,6 +14,7 @@ import { handleLoadError, handleSaveError } from '@/lib/errorHandler'
 import {
     calculateDocumentFormTotals,
     calcDocumentItemAmount,
+    freeItemUnitPrice,
     clearNoChargeSnapshot,
     resolveNoChargeScope,
     resolveNoChargeReason,
@@ -98,6 +99,7 @@ export function useEstimateCreate(customerId: string, reset: UseFormReset<Estima
                     productItemName: item.productItemName || '',
                     description: item.description || '',
                     unitPriceGeneral: item.unitPriceGeneral,
+                    unitPriceMember: item.unitPriceMember ?? 0,
                     qty: item.qty,
                 })),
             })
@@ -190,9 +192,11 @@ export function useEstimateCreate(customerId: string, reset: UseFormReset<Estima
                     const unitPriceGeneral = isExecutionSurcharge
                         ? EXECUTION_SURCHARGE_AMOUNT
                         : formValues.freeItems[i]?.unitPriceGeneral ?? item.unitPriceGeneral
+                    const unitPriceMember = formValues.freeItems[i]?.unitPriceMember ?? item.unitPriceMember ?? 0
                     const qty = formValues.freeItems[i]?.qty ?? item.qty
-                    const amount = unitPriceGeneral * qty
-                    return { ...item, productItemName, description, unitPriceGeneral, qty, amount }
+                    const amount =
+                        freeItemUnitPrice({ productItemName, unitPriceGeneral, unitPriceMember }, isMember) * qty
+                    return { ...item, productItemName, description, unitPriceGeneral, unitPriceMember, qty, amount }
                 })
                 .filter((it) => it.productItemName.trim().length > 0 && it.qty > 0)
                 .map((it, i) => ({ ...it, sortNo: i }))
@@ -281,6 +285,7 @@ export function useEstimateEdit(estimateId: string, reset: UseFormReset<Estimate
                     productItemName: item.productItemName || '',
                     description: item.description || '',
                     unitPriceGeneral: item.unitPriceGeneral,
+                    unitPriceMember: item.unitPriceMember ?? 0,
                     qty: item.qty,
                 })),
             })
@@ -373,9 +378,11 @@ export function useEstimateEdit(estimateId: string, reset: UseFormReset<Estimate
                     const unitPriceGeneral = isExecutionSurcharge
                         ? EXECUTION_SURCHARGE_AMOUNT
                         : formValues.freeItems[i]?.unitPriceGeneral ?? item.unitPriceGeneral
+                    const unitPriceMember = formValues.freeItems[i]?.unitPriceMember ?? item.unitPriceMember ?? 0
                     const qty = formValues.freeItems[i]?.qty ?? item.qty
-                    const amount = unitPriceGeneral * qty
-                    return { ...item, productItemName, description, unitPriceGeneral, qty, amount }
+                    const amount =
+                        freeItemUnitPrice({ productItemName, unitPriceGeneral, unitPriceMember }, isMember) * qty
+                    return { ...item, productItemName, description, unitPriceGeneral, unitPriceMember, qty, amount }
                 })
                 .filter((it) => it.productItemName.trim().length > 0 && it.qty > 0)
                 .map((it, i) => ({ ...it, sortNo: i }))

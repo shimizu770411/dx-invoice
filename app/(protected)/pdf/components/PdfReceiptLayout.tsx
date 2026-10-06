@@ -9,6 +9,7 @@ import {
     calcFreeItemsSubtotal,
     calcGrandTotal,
     isCancellationFeeRow,
+    freeItemUnitPrice,
 } from '@/lib/documentTotals'
 
 export type { PdfDocument, PdfDocumentCustomer }
@@ -116,8 +117,8 @@ function buildDisplayRows(
                         description: linkedFi?.description ?? null,
                         qty: linkedFi?.qty ?? 0,
                         unitPriceGeneral: linkedFi?.unitPriceGeneral ?? 0,
-                        unitPriceMember: linkedFi?.unitPriceGeneral ?? 0,
-                        amount: (linkedFi?.unitPriceGeneral ?? 0) * (linkedFi?.qty ?? 0),
+                        unitPriceMember: linkedFi?.unitPriceMember ?? 0,
+                        amount: linkedFi?.amount ?? 0,
                         sortNo: 9999,
                     } as any,
                     showProductVariantName: false,
@@ -141,8 +142,8 @@ function buildDisplayRows(
             estimateItem: {
                 description: fi.description ?? null,
                 qty: fi.qty,
-                unitPriceGeneral: fi.unitPriceGeneral,
-                unitPriceMember: fi.unitPriceGeneral,
+                unitPriceGeneral: freeItemUnitPrice(fi, false),
+                unitPriceMember: freeItemUnitPrice(fi, true),
                 amount: fi.amount,
                 sortNo: fi.sortNo,
             },
@@ -267,7 +268,7 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
                     </div>
                     {row.isFreeItem && !row.isFixedRow && row.estimateItem && (
                         <div>
-                            単価: ¥{row.estimateItem.unitPriceGeneral.toLocaleString()}
+                            単価: ¥{(isMember ? row.estimateItem.unitPriceMember : row.estimateItem.unitPriceGeneral).toLocaleString()}
                         </div>
                     )}
                 </td>

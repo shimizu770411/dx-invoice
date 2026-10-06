@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-middleware'
 import { serializeBigInt } from '@/lib/prisma-utils'
-import { calculateDocumentTotals, sumMembershipPaidAmount } from '@/lib/documentTotals'
+import { calculateDocumentTotals, freeItemUnitPrice, sumMembershipPaidAmount } from '@/lib/documentTotals'
 import { isValidDocNo, toNullableAmount } from '@/lib/documentUtils'
 import { recordOperationLog } from '@/lib/operationLog'
 import { loadProductNameLookup, pickProductItemName, pickProductVariantName } from '@/lib/documentItemNames'
@@ -287,8 +287,9 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
                         productItemName: item.productItemName || '',
                         description: item.description || '',
                         unitPriceGeneral: item.unitPriceGeneral || 0,
+                        unitPriceMember: item.unitPriceMember || 0,
                         qty: item.qty || 1,
-                        amount: (item.unitPriceGeneral || 0) * (item.qty || 1),
+                        amount: freeItemUnitPrice(item, isMember) * (item.qty || 1),
                         sortNo: item.sortNo ?? index,
                     })),
                 })
