@@ -1173,7 +1173,7 @@ export function PdfInvoiceLayout({
                                                 </th>
                                                 <td className="border border-black text-center">
                                                     {isKeyaki
-                                                        ? 'けやき入金額'
+                                                        ? 'けやき割引額'
                                                         : `${(m.paymentAmountOnce ?? 0).toLocaleString()}円×${m.paymentTimes ?? 0}回`}
                                                 </td>
                                                 <td className="border border-black px-1 text-left">&nbsp;</td>
