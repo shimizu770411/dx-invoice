@@ -21,6 +21,7 @@ type DisplayRow = {
     isFreeItem?: boolean
     isMaturity?: boolean
     isFixedRow?: boolean
+    isLinkedFreeRow?: boolean // 親商品の直下に出すフリー行（控室管理費の追加行など）。個数の表示は親商品の設定に従う
     hideDescription?: boolean
     isSecondaryRow?: boolean
     variantLabelOverride?: string // 複数行構成商品(isMultiRow)の括弧書き用。useForVariantLabel行の選択種類名
@@ -123,8 +124,11 @@ function buildDisplayRows(
                     } as any,
                     showProductVariantName: false,
                     isFreeItem: true,
-                    // 「単価: ¥XX」表示をスキップし、qty>1 のときの「数量: XX」のみ表示させる
+                    // 「単価: ¥XX」表示をスキップする
                     isFixedRow: true,
+                    // 個数は親商品と同じく、商品マスタの「摘要に個数を表示」がオンのときだけ摘要欄の末尾に出す
+                    isLinkedFreeRow: true,
+                    showQtyInDescription: !!product.showQtyInDescription,
                 })
             }
         }

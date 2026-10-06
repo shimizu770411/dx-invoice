@@ -205,6 +205,7 @@ type DisplayRow = {
     isFreeItem?: boolean // フリー項目（商品マスタ非連動）の場合に単価を表示
     isMaturity?: boolean // 満期サービス・施行割増券（固定行、明細欄末尾に固定表示）。qty=1なので単価表示はスキップ
     isFixedRow?: boolean // 満期サービス・解約手数料など固定行（単価表示スキップ）
+    isLinkedFreeRow?: boolean // 親商品の直下に出すフリー行（控室管理費の追加行など）。個数の表示は親商品の設定に従う
     hideDescription?: boolean // 複数行構成商品の2行目以降は摘要を非表示
     isSecondaryRow?: boolean // 複数行構成商品の2行目以降（品名空・上罫線なし）
     multiRowGroupSize?: number // 複数行構成商品の先頭行のみ設定（rowSpan に使用）
@@ -368,8 +369,11 @@ function buildDisplayRows(
                     } as any,
                     showProductVariantName: false,
                     isFreeItem: true,
-                    // 「単価: ¥XX」表示をスキップし、qty>1 のときの「数量: XX」のみ表示させる
+                    // 「単価: ¥XX」表示をスキップする
                     isFixedRow: true,
+                    // 個数は親商品と同じく、商品マスタの「摘要に個数を表示」がオンのときだけ摘要欄の末尾に出す
+                    isLinkedFreeRow: true,
+                    showQtyInDescription: !!product.showQtyInDescription,
                 })
             }
         }
@@ -728,8 +732,9 @@ export function PdfInvoiceLayout({
                 row.estimateItem.calcType === 'UNIT_PRICE_X_QTY'
                     ? `${row.estimateItem.qty.toLocaleString()} × ¥${fmtAmount(isMember ? row.estimateItem.unitPriceMember : row.estimateItem.unitPriceGeneral)}`
                     : row.estimateItem &&
+                        !row.isLinkedFreeRow &&
                         !row.showQtyInDescription &&
-                        (row.estimateItem.qty > 1 || (row.isFreeItem && row.isFixedRow && !row.isMaturity))
+                        row.estimateItem.qty > 1
                       ? `数量: ${row.estimateItem.qty.toLocaleString()}`
                       : ''
             // 複数行構成商品(hasReturn)の返品行。数量>0のときのみ「▲数量 × 単価」を次の行に追記する
