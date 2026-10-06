@@ -20,7 +20,7 @@ import {
     resolveNoChargeReason,
 } from '@/lib/documentTotals'
 import { useDocumentItems } from '@/hooks/useDocumentItems'
-import { expandEachModeItems, expandVariantGroupItems, buildDocumentFreeItems, MATURITY_SERVICE_NAME, EXECUTION_SURCHARGE_NAME, EXECUTION_SURCHARGE_AMOUNT } from '@/lib/documentUtils'
+import { expandEachModeItems, expandVariantGroupItems, buildDocumentFreeItems, isFreeItemToSave, MATURITY_SERVICE_NAME, EXECUTION_SURCHARGE_NAME, EXECUTION_SURCHARGE_AMOUNT } from '@/lib/documentUtils'
 import { useDocumentProductSearch } from '@/hooks/useDocumentProductSearch'
 import { EstimateFormData, DEFAULT_FORM_VALUES } from '../schemas/EstimateFormSchema'
 
@@ -198,7 +198,7 @@ export function useEstimateCreate(customerId: string, reset: UseFormReset<Estima
                         freeItemUnitPrice({ productItemName, unitPriceGeneral, unitPriceMember }, isMember) * qty
                     return { ...item, productItemName, description, unitPriceGeneral, unitPriceMember, qty, amount }
                 })
-                .filter((it) => it.productItemName.trim().length > 0 && it.qty > 0)
+                .filter(isFreeItemToSave)
                 .map((it, i) => ({ ...it, sortNo: i }))
             const totals = calculateDocumentFormTotals(items, formValues.items, isMember, customer, freeItems, formValues.freeItems)
             const data = { ...formValues, ...totals, items: finalItems, freeItems: mergedFreeItems }
@@ -384,7 +384,7 @@ export function useEstimateEdit(estimateId: string, reset: UseFormReset<Estimate
                         freeItemUnitPrice({ productItemName, unitPriceGeneral, unitPriceMember }, isMember) * qty
                     return { ...item, productItemName, description, unitPriceGeneral, unitPriceMember, qty, amount }
                 })
-                .filter((it) => it.productItemName.trim().length > 0 && it.qty > 0)
+                .filter(isFreeItemToSave)
                 .map((it, i) => ({ ...it, sortNo: i }))
             const totals = calculateDocumentFormTotals(items, formValues.items, isMember, customer, freeItems, formValues.freeItems)
             const data = { ...formValues, ...totals, items: finalItems, freeItems: mergedFreeItems }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { expandEachModeItems, expandVariantGroupItems, buildDocumentFreeItems } from '@/lib/documentUtils'
+import { expandEachModeItems, expandVariantGroupItems, buildDocumentFreeItems, isFreeItemToSave } from '@/lib/documentUtils'
 
 /**
  * 複数選択商品・グループ商品は、保存時に種類ごとの明細行へ展開される。
@@ -167,5 +167,37 @@ describe('フリー行追加がONの商品の親リンク行', () => {
         expect(rows).toHaveLength(7)
         expect(rows[5].productItemName).toBe('満期サービス')
         expect(String(rows[6].parentProductItemId)).toBe('26')
+    })
+})
+
+describe('保存する自由入力行', () => {
+    // 控室管理費の追加行などは、品目名を入れずに数量と金額だけ入れる運用がある。
+    // 品目名が空というだけで捨てると、入力した金額が警告も無く消える。
+    const row = (overrides: Record<string, any> = {}) => ({
+        productItemName: '',
+        unitPriceGeneral: 0,
+        unitPriceMember: 0,
+        qty: 0,
+        ...overrides,
+    })
+
+    it('品目名が空でも、数量と一般価格があれば保存する', () => {
+        expect(isFreeItemToSave(row({ qty: 1, unitPriceGeneral: 5000 }))).toBe(true)
+    })
+
+    it('品目名が空でも、数量と会員価格があれば保存する', () => {
+        expect(isFreeItemToSave(row({ qty: 1, unitPriceMember: 3000 }))).toBe(true)
+    })
+
+    it('品目名があれば、金額が0でも数量があれば保存する（満期サービス等の固定行を含む）', () => {
+        expect(isFreeItemToSave(row({ productItemName: '満期サービス', qty: 1 }))).toBe(true)
+    })
+
+    it('品目名も金額も無ければ、数量があっても保存しない', () => {
+        expect(isFreeItemToSave(row({ qty: 1 }))).toBe(false)
+    })
+
+    it('数量が0なら保存しない', () => {
+        expect(isFreeItemToSave(row({ productItemName: '控室延長', unitPriceGeneral: 5000 }))).toBe(false)
     })
 })

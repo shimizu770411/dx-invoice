@@ -17,7 +17,7 @@ import {
     resolveNoChargeReason,
 } from '@/lib/documentTotals'
 import { useDocumentItems } from '@/hooks/useDocumentItems'
-import { expandEachModeItems, expandVariantGroupItems, buildDocumentFreeItems, MATURITY_SERVICE_NAME, CANCELLATION_FEE_NAME, EXECUTION_SURCHARGE_NAME, EXECUTION_SURCHARGE_AMOUNT } from '@/lib/documentUtils'
+import { expandEachModeItems, expandVariantGroupItems, buildDocumentFreeItems, isFreeItemToSave, MATURITY_SERVICE_NAME, CANCELLATION_FEE_NAME, EXECUTION_SURCHARGE_NAME, EXECUTION_SURCHARGE_AMOUNT } from '@/lib/documentUtils'
 import { useDocumentProductSearch } from '@/hooks/useDocumentProductSearch'
 import { InvoiceFormData } from '../schemas/InvoiceFormSchema'
 
@@ -323,7 +323,7 @@ export function useInvoiceEdit(invoiceId: string, reset: UseFormReset<InvoiceFor
                         freeItemUnitPrice({ productItemName, unitPriceGeneral, unitPriceMember }, isMember) * qty
                     return { ...item, productItemName, description, unitPriceGeneral, unitPriceMember, qty, amount }
                 })
-                .filter((it) => it.productItemName.trim().length > 0 && it.qty > 0)
+                .filter(isFreeItemToSave)
                 .map((it, i) => ({ ...it, sortNo: i }))
             const totals = calculateDocumentFormTotals(
                 items,

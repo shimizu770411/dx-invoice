@@ -290,3 +290,19 @@ export function buildMembershipMismatchWarning(
         `このまま${actionLabel}してよろしいですか？`
     )
 }
+
+/**
+ * 自由入力行（控室管理費の追加行・下部の自由入力行・固定行）を保存するか。
+ * 数量が入っていて、品目名か金額のどちらかがあれば保存する。
+ */
+export function isFreeItemToSave(item: {
+    productItemName?: string | null
+    unitPriceGeneral?: number | null
+    unitPriceMember?: number | null
+    qty?: number | null
+}): boolean {
+    if ((item.qty ?? 0) <= 0) return false
+    const hasName = (item.productItemName ?? '').trim().length > 0
+    const hasPrice = (item.unitPriceGeneral ?? 0) !== 0 || (item.unitPriceMember ?? 0) !== 0
+    return hasName || hasPrice
+}
