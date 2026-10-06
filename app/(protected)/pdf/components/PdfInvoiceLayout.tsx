@@ -662,8 +662,6 @@ export function PdfInvoiceLayout({
     const generalGrandTotal = calcGrandTotal(generalTotal, membershipPaidAmount, false)
     const memberGrandTotal = calcGrandTotal(memberTotal, membershipPaidAmount, true)
     const customer: PdfDocumentCustomer | undefined = docAny.customer
-    // 支払者が喪主と同じかはDBに持っていないため、保存された値を突き合わせて判断する
-    const payerIsSameAsChiefMourner = isPayerSameAsChiefMourner(customer ?? {})
         ? {
               ...docAny.customer,
               cremationProcessType: docAny.cremationProcessType ?? null,
@@ -679,6 +677,8 @@ export function PdfInvoiceLayout({
               returnStaff: docAny.returnStaff ?? null,
           }
         : undefined
+    // 支払者が喪主と同じかはDBに持っていないため、保存された値を突き合わせて判断する
+    const payerIsSameAsChiefMourner = isPayerSameAsChiefMourner(customer ?? {})
     const displayRows = buildDisplayRows(products, items, doc.freeItems)
     // 摘要欄は「摘要テキスト」と「数量・単価」を上下に積んで表示するため、行によって
     // 1行にも2行以上にもなる。どの行が何行になるかをここで確定させ、
