@@ -1,4 +1,4 @@
-import { ProductVariant } from '@/lib/products'
+import { AppliesTo, ProductVariant } from '@/lib/products'
 import { applySurchargeToPrice } from '@/lib/planSurcharges'
 
 type ItemForPricing = {
@@ -38,4 +38,43 @@ export function resolveUnitPriceGeneral(
     surchargeAmount?: number | null
 ): number {
     return applySurchargeToPrice(variant.priceGeneral, pickSurcharge(item, surchargeAmount))
+}
+
+type ServiceCapability = {
+    serviceableScope?: AppliesTo | null
+    isMaturityServiceable?: boolean | null
+} | null | undefined
+
+type ServiceFlags = { isService?: boolean; isMaturityService?: boolean }
+
+/**
+ * 明細のサービス品・満期サービスの印のうち、商品マスタで許可されているものだけを残す。
+ * 商品マスタの設定を後から「不可」に戻すと、種類選択ダイアログにチェック欄が出なくなり、
+ * 明細に残った印を画面から外せなくなる。外せない印で会員単価が0円にされ続けないよう、ここで落とす。
+ * 会員区分による適用範囲は0円扱いの判定（documentTotals）で見るため、ここでは商品として可能かだけを見る。
+ */
+export function allowedServiceFlags(productItem: ServiceCapability, flags: ServiceFlags) {
+    return {
+        isService: !!flags.isService && (productItem?.serviceableScope ?? 'NONE') !== 'NONE',
+        isMaturityService: !!flags.isMaturityService && !!productItem?.isMaturityServiceable,
+    }
+}
+
+/** 種類を選び直したときの単価と印。サービス品・満期サービスの会員単価は0円にする */
+export function resolveVariantChange(
+    item: ItemForPricing & { productItem?: ServiceCapability & { isSetChild?: boolean | null } },
+    variant: Pick<ProductVariant, 'priceGeneral' | 'priceMember'>,
+    isMember: boolean,
+    options: ServiceFlags & { surchargeAmount?: number | null }
+) {
+    const { isService, isMaturityService } = allowedServiceFlags(item.productItem, options)
+    return {
+        isService,
+        isMaturityService,
+        unitPriceGeneral: resolveUnitPriceGeneral(item, variant, options.surchargeAmount),
+        unitPriceMember:
+            isService || isMaturityService
+                ? 0
+                : resolveUnitPriceMember(item, variant, isMember, options.surchargeAmount),
+    }
 }

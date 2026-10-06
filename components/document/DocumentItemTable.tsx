@@ -12,6 +12,7 @@ import { ImageOff, X } from 'lucide-react'
 import { ProductVariant } from '@/lib/products'
 import { resolveProductImageUrl } from '@/lib/utils'
 import { scopeApplies } from '@/lib/productScope'
+import { allowedServiceFlags } from '@/lib/itemPricing'
 import { calcDocumentItemAmount, freeItemUnitPrice, noChargeReasonFor, NO_CHARGE_LABELS } from '@/lib/documentTotals'
 import { EXECUTION_SURCHARGE_NAME } from '@/lib/documentUtils'
 import { PlanSurcharge, canApplySurcharge } from '@/lib/planSurcharges'
@@ -417,8 +418,13 @@ export function DocumentItemTable({
             setPendingRowVariantsMap({})
             setPendingGroupSelections({})
         }
-        setPendingIsService(!!item?.isService)
-        setPendingIsMaturityService(!!item?.isMaturityService)
+        // 商品マスタで許可されていない印は、明細に残っていてもオフで始める（チェック欄が出ず外せないため）
+        const allowedFlags = allowedServiceFlags(item?.productItem, {
+            isService: !!item?.isService,
+            isMaturityService: !!item?.isMaturityService,
+        })
+        setPendingIsService(allowedFlags.isService)
+        setPendingIsMaturityService(allowedFlags.isMaturityService)
         // 子商品は adhocSetScope を引き継がない（子商品では adhocSetScope UI が非表示のため）
         const isThisChildItem = !!item?.productItem?.isSetChild
         const adhoc = (item as any)?.adhocSetScope

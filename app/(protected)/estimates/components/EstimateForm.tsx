@@ -14,7 +14,7 @@ import { EstimateOtherFields } from './EstimateOtherFields'
 import { EstimateCustomerSummary } from './EstimateCustomerSummary'
 import { EstimateBasicInfo } from './EstimateBasicInfo'
 import { ProductVariant } from '@/lib/products'
-import { resolveUnitPriceMember, resolveUnitPriceGeneral } from '@/lib/itemPricing'
+import { allowedServiceFlags, resolveUnitPriceMember, resolveVariantChange } from '@/lib/itemPricing'
 import { getPlanSurcharges, PlanSurcharge } from '@/lib/planSurcharges'
 import { confirmEstimate } from '@/lib/estimates'
 import { toast } from '@/hooks/use-toast'
@@ -171,8 +171,7 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                         productRowVariant: rv,
                         unitPriceGeneral: rv.unitPrice,
                         unitPriceMember: rv.unitPrice,
-                        isService,
-                        isMaturityService,
+                        ...allowedServiceFlags((item as any).productItem, { isService, isMaturityService }),
                         adhocSetScope,
                         // 種類や選択内容が変わると 0 円扱いかどうかも変わる。保存時の控えを外して判定し直させる
                         noChargeScope: null,
@@ -191,15 +190,15 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                     description,
                     productVariantId: variant.id,
                     productVariant: variant,
-                    // 増額は一般価格・会員価格の両方に同額を上乗せする
-                    unitPriceGeneral: resolveUnitPriceGeneral(item, variant, surchargeAmount),
-                    unitPriceMember: isService || isMaturityService
-                        ? 0
-                        : resolveUnitPriceMember(item, variant, isMember, surchargeAmount),
+                    // 増額は一般価格・会員価格の両方に同額を上乗せする。
+                    // サービス品・満期サービスの印は、商品マスタで許可された商品でだけ効かせる
+                    ...resolveVariantChange(item as any, variant, isMember, {
+                        isService,
+                        isMaturityService,
+                        surchargeAmount,
+                    }),
                     surchargeAmount,
                     planSurchargeId,
-                    isService,
-                    isMaturityService,
                     adhocSetScope,
                     // 種類や選択内容が変わると 0 円扱いかどうかも変わる。保存時の控えを外して判定し直させる
                     noChargeScope: null,
@@ -234,8 +233,10 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                     unitPriceGeneral: totalGeneral,
                     unitPriceMember: totalMember,
                     adhocSetScope: options?.adhocSetScope ?? 'NONE',
-                    isService: options?.isService ?? false,
-                    isMaturityService: options?.isMaturityService ?? false,
+                    ...allowedServiceFlags((item as any).productItem, {
+                        isService: options?.isService,
+                        isMaturityService: options?.isMaturityService,
+                    }),
                     // 種類や選択内容が変わると 0 円扱いかどうかも変わる。保存時の控えを外して判定し直させる
                     noChargeScope: null,
                     noChargeReason: null,
