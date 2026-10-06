@@ -14,7 +14,7 @@ import { resolveProductImageUrl } from '@/lib/utils'
 import { scopeApplies } from '@/lib/productScope'
 import { allowedServiceFlags } from '@/lib/itemPricing'
 import { calcDocumentItemAmount, freeItemUnitPrice, noChargeReasonFor, NO_CHARGE_LABELS } from '@/lib/documentTotals'
-import { EXECUTION_SURCHARGE_NAME } from '@/lib/documentUtils'
+import { EXECUTION_SURCHARGE_NAME, defaultQtyOnCheck } from '@/lib/documentUtils'
 import { PlanSurcharge, canApplySurcharge } from '@/lib/planSurcharges'
 import { MISSING_FROM_MASTER_LABEL } from '@/lib/documentMissingProducts'
 import { displayProductItemName } from '@/lib/documentDisplayNames'
@@ -733,21 +733,19 @@ export function DocumentItemTable({
                                                             })
 
                                                             // qty を一括更新（フォームを dirty 化）
-                                                            // 返品行（sign=-1）は数量のデフォルトを常に 0 にする
+                                                            // 複数行構成商品は行ごとの規定数量、返品行（sign=-1）は常に 0 にする。
+                                                            // 親祭壇から子商品（霊柩車など）をまとめてチェックするときも同じ数量にする
                                                             for (const gi of groupIndexes) {
-                                                                const gItem = items[gi]
-                                                                const isReturnRow = (gItem?.sign ?? 1) === -1
-                                                                const defaultQty = isReturnRow ? 0 : (gItem?.productRow?.defaultQty ?? 1)
                                                                 setValue?.(
                                                                     `items.${gi}.qty` as `items.${number}.qty`,
-                                                                    checked ? defaultQty : 0,
+                                                                    checked ? defaultQtyOnCheck(items[gi]) : 0,
                                                                     { shouldDirty: true }
                                                                 )
                                                             }
                                                             for (const ci of childIndexes) {
                                                                 setValue?.(
                                                                     `items.${ci}.qty` as `items.${number}.qty`,
-                                                                    checked ? 1 : 0,
+                                                                    checked ? defaultQtyOnCheck(items[ci]) : 0,
                                                                     { shouldDirty: true }
                                                                 )
                                                                 const childItem = items[ci]

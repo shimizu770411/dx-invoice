@@ -306,3 +306,17 @@ export function isFreeItemToSave(item: {
     const hasPrice = (item.unitPriceGeneral ?? 0) !== 0 || (item.unitPriceMember ?? 0) !== 0
     return hasName || hasPrice
 }
+
+/**
+ * 明細にチェックを入れたときに入れる数量。
+ * 複数行構成商品（霊柩車の「車種」「10㎞毎に」など）は行ごとの規定数量、返品行は常に0、
+ * それ以外の商品は1。商品そのもののチェックでも、親祭壇から子商品をまとめてチェックするときでも、
+ * 同じ数量にならないと、親祭壇経由のときだけ距離加算行に数量が入ってしまう。
+ */
+export function defaultQtyOnCheck(item: {
+    sign?: number | null
+    productRow?: { defaultQty?: number | null } | null
+} | null | undefined): number {
+    if ((item?.sign ?? 1) === -1) return 0
+    return item?.productRow?.defaultQty ?? 1
+}

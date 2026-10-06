@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { expandEachModeItems, expandVariantGroupItems, buildDocumentFreeItems, isFreeItemToSave } from '@/lib/documentUtils'
+import { expandEachModeItems, expandVariantGroupItems, buildDocumentFreeItems, isFreeItemToSave, defaultQtyOnCheck } from '@/lib/documentUtils'
 
 /**
  * 複数選択商品・グループ商品は、保存時に種類ごとの明細行へ展開される。
@@ -199,5 +199,21 @@ describe('保存する自由入力行', () => {
 
     it('数量が0なら保存しない', () => {
         expect(isFreeItemToSave(row({ productItemName: '控室延長', unitPriceGeneral: 5000 }))).toBe(false)
+    })
+})
+
+describe('チェックを入れたときの数量', () => {
+    it('複数行構成商品は、行ごとの規定数量を入れる（規定数量0の距離加算行は0のまま）', () => {
+        expect(defaultQtyOnCheck({ sign: 1, productRow: { defaultQty: 0 } })).toBe(0)
+        expect(defaultQtyOnCheck({ sign: 1, productRow: { defaultQty: 1 } })).toBe(1)
+    })
+
+    it('返品行は常に0', () => {
+        expect(defaultQtyOnCheck({ sign: -1, productRow: { defaultQty: 1 } })).toBe(0)
+    })
+
+    it('複数行構成でない商品は1', () => {
+        expect(defaultQtyOnCheck({})).toBe(1)
+        expect(defaultQtyOnCheck(undefined)).toBe(1)
     })
 })
