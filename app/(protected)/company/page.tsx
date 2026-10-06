@@ -57,6 +57,8 @@ export default function CompanyPage() {
                 dateFormat: (profile.dateFormat === 'JAPANESE' ? 'JAPANESE' : 'WESTERN') as 'WESTERN' | 'JAPANESE',
                 pdfShowOptionImages: profile.pdfShowOptionImages ?? false,
                 pdfPromptOnExport: profile.pdfPromptOnExport ?? true,
+                pdfShowFreeItemUnitPrice: profile.pdfShowFreeItemUnitPrice ?? true,
+                pdfShowFreeItemQty: profile.pdfShowFreeItemQty ?? true,
                 estimateRemarksDefault: profile.estimateRemarksDefault ?? '',
                 invoiceRemarksDefault: profile.invoiceRemarksDefault ?? '',
                 sealImageUrl: profile.sealImageUrl ?? '',

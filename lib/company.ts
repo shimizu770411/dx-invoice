@@ -32,6 +32,8 @@ export interface CompanyProfile {
     dateFormat?: string
     pdfShowOptionImages?: boolean
     pdfPromptOnExport?: boolean
+    pdfShowFreeItemUnitPrice?: boolean
+    pdfShowFreeItemQty?: boolean
     estimateRemarksDefault?: string
     invoiceRemarksDefault?: string
     sealImageUrl?: string
@@ -68,6 +70,8 @@ export interface UpdateCompanyProfileData {
     dateFormat?: string
     pdfShowOptionImages?: boolean
     pdfPromptOnExport?: boolean
+    pdfShowFreeItemUnitPrice?: boolean
+    pdfShowFreeItemQty?: boolean
     estimateRemarksDefault?: string
     invoiceRemarksDefault?: string
     sealImageUrl?: string

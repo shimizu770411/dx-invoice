@@ -64,6 +64,8 @@ export async function PUT(request: NextRequest) {
             dateFormat: body.dateFormat === 'JAPANESE' ? 'JAPANESE' : 'WESTERN',
             pdfShowOptionImages: body.pdfShowOptionImages === true,
             pdfPromptOnExport: body.pdfPromptOnExport !== false,
+            pdfShowFreeItemUnitPrice: body.pdfShowFreeItemUnitPrice !== false,
+            pdfShowFreeItemQty: body.pdfShowFreeItemQty !== false,
             estimateRemarksDefault: body.estimateRemarksDefault ?? null,
             invoiceRemarksDefault: body.invoiceRemarksDefault ?? null,
             sealImageUrl: body.sealImageUrl ?? null,

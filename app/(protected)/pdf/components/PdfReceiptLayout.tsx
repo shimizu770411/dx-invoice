@@ -1,6 +1,7 @@
 import { Fragment, RefObject, useState, useEffect } from 'react'
 import { PdfCompanyProfile } from './PdfCompanyProfile'
 import { getCompanyProfile, CompanyProfile } from '@/lib/company'
+import { shouldShowFreeItemUnitPrice, toFreeItemDisplay } from '@/lib/pdfFreeItemDisplay'
 import type { PdfDocument, PdfDocumentCustomer, PdfProductItem, PdfDocumentItem, PdfFreeItem } from './PdfInvoiceLayout'
 import { displayProductItemName } from '@/lib/documentDisplayNames'
 import {
@@ -270,7 +271,7 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
                             ? `　${(row.descriptionQtyOverride ?? row.estimateItem!.qty).toLocaleString()}${row.descriptionUnitLabel ?? row.estimateItem?.productVariant?.unitLabel ?? ''}`
                             : ''}
                     </div>
-                    {row.isFreeItem && !row.isFixedRow && row.estimateItem && (
+                    {shouldShowFreeItemUnitPrice(row, freeItemDisplay) && row.estimateItem && (
                         <div>
                             単価: ¥{(isMember ? row.estimateItem.unitPriceMember : row.estimateItem.unitPriceGeneral).toLocaleString()}
                         </div>
@@ -297,6 +298,8 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
             .then(setCompany)
             .catch(() => {})
     }, [])
+    // 下部の自由入力行の単価を出すか（自社情報管理の設定）。取得できるまでは従来どおり出す
+    const freeItemDisplay = toFreeItemDisplay(company)
 
 
     return (

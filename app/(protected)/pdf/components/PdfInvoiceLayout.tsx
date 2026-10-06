@@ -23,6 +23,12 @@ import {
 } from '@/lib/customerPayer'
 import { useDateFormat } from '@/hooks/useDateFormat'
 import {
+    DEFAULT_FREE_ITEM_DISPLAY,
+    FreeItemDisplay,
+    isFreeItemQtyHidden,
+    shouldShowFreeItemUnitPrice,
+} from '@/lib/pdfFreeItemDisplay'
+import {
     A4_HEIGHT_MM,
     PX_PER_MM,
     PAGE_BODY_PADDING_PX,
@@ -187,6 +193,8 @@ type Props = {
     showInvoiceFees?: boolean
     /** 備考欄の最下部に出す振込先の1行（請求書のみ）。未登録なら渡さない */
     bankTransferText?: string | null
+    /** 下部の自由入力行の単価・数量を出すか（自社情報管理の設定）。未指定なら両方出す */
+    freeItemDisplay?: FreeItemDisplay
 }
 
 // 支払合計ブロックの罫線の長さ。備考欄の幅いっぱいだと不格好なため、
@@ -611,6 +619,7 @@ export function PdfInvoiceLayout({
     showSeparateFees,
     showInvoiceFees,
     bankTransferText,
+    freeItemDisplay = DEFAULT_FREE_ITEM_DISPLAY,
 }: Props) {
     const { docNo, membershipPaidAmount, items } = doc
     const docAny = doc as any
@@ -734,6 +743,7 @@ export function PdfInvoiceLayout({
                     : row.estimateItem &&
                         !row.isLinkedFreeRow &&
                         !row.showQtyInDescription &&
+                        !isFreeItemQtyHidden(row, freeItemDisplay) &&
                         row.estimateItem.qty > 1
                       ? `数量: ${row.estimateItem.qty.toLocaleString()}`
                       : ''
@@ -743,8 +753,8 @@ export function PdfInvoiceLayout({
                     ? `\n▲${row.deductionItem.qty.toLocaleString()} × ¥${fmtAmount(isMember ? row.deductionItem.unitPriceMember : row.deductionItem.unitPriceGeneral)}`
                     : ''
             const unitPriceText =
-                row.isFreeItem && !row.isFixedRow && row.estimateItem
-                    ? `${row.estimateItem.qty > 1 ? '　' : ''}単価: ¥${fmtAmount(isMember ? row.estimateItem.unitPriceMember : row.estimateItem.unitPriceGeneral)}`
+                shouldShowFreeItemUnitPrice(row, freeItemDisplay) && row.estimateItem
+                    ? `${qtyText ? '　' : ''}単価: ¥${fmtAmount(isMember ? row.estimateItem.unitPriceMember : row.estimateItem.unitPriceGeneral)}`
                     : ''
             pushText(`${qtyText}${deductionText}${unitPriceText}`)
         }

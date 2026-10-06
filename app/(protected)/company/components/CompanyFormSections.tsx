@@ -339,7 +339,7 @@ function BinaryChoiceField({
     name,
     options,
 }: {
-    name: 'pdfPromptOnExport' | 'pdfShowOptionImages'
+    name: 'pdfPromptOnExport' | 'pdfShowOptionImages' | 'pdfShowFreeItemUnitPrice' | 'pdfShowFreeItemQty'
     options: [BinaryChoiceOption, BinaryChoiceOption]
 }) {
     const { control } = useFormContext<CompanyFormData>()
@@ -659,6 +659,68 @@ export function SystemSettingsSection() {
                     >
                         「表示する」の場合は毎回確認画面で選び、「表示しない」の場合は上の「明細の画像一覧」の設定がそのまま使われます。
                     </p>
+                </div>
+                <div>
+                    <p
+                        style={{
+                            fontFamily: 'var(--font-mincho)',
+                            fontSize: '13px',
+                            color: 'var(--brand-navy)',
+                            letterSpacing: '0.1em',
+                            marginBottom: '10px',
+                        }}
+                    >
+                        自由入力行の単価
+                    </p>
+                    <p
+                        style={{
+                            fontFamily: 'var(--font-mincho)',
+                            fontSize: '13px',
+                            color: 'var(--brand-text-muted)',
+                            letterSpacing: '0.1em',
+                            marginBottom: '10px',
+                        }}
+                    >
+                        見積書・請求書・領収書で、下部の自由入力行の摘要欄に「単価: ¥〇〇」を表示するか選択してください。
+                    </p>
+                    <BinaryChoiceField
+                        name="pdfShowFreeItemUnitPrice"
+                        options={[
+                            { value: true, label: '表示する' },
+                            { value: false, label: '表示しない' },
+                        ]}
+                    />
+                </div>
+                <div>
+                    <p
+                        style={{
+                            fontFamily: 'var(--font-mincho)',
+                            fontSize: '13px',
+                            color: 'var(--brand-navy)',
+                            letterSpacing: '0.1em',
+                            marginBottom: '10px',
+                        }}
+                    >
+                        自由入力行の数量
+                    </p>
+                    <p
+                        style={{
+                            fontFamily: 'var(--font-mincho)',
+                            fontSize: '13px',
+                            color: 'var(--brand-text-muted)',
+                            letterSpacing: '0.1em',
+                            marginBottom: '10px',
+                        }}
+                    >
+                        見積書・請求書で、下部の自由入力行の数量が2以上のとき、摘要欄に「数量: 〇」を表示するか選択してください。
+                    </p>
+                    <BinaryChoiceField
+                        name="pdfShowFreeItemQty"
+                        options={[
+                            { value: true, label: '表示する' },
+                            { value: false, label: '表示しない' },
+                        ]}
+                    />
                 </div>
             </div>
 

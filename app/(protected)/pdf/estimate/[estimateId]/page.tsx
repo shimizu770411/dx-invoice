@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { getEstimate } from '@/lib/estimates'
 import { getProducts } from '@/lib/products'
+import { getCompanyProfile } from '@/lib/company'
+import { DEFAULT_FREE_ITEM_DISPLAY, FreeItemDisplay, toFreeItemDisplay } from '@/lib/pdfFreeItemDisplay'
 import { withProductsMissingFromMaster } from '@/lib/documentMissingProducts'
 import { getProductPlanSettings, applyPlanOverrides, BASE_PLAN_ID } from '@/lib/plans'
 import { CreateButton } from '@/components/button/CreateButton'
@@ -20,6 +22,7 @@ export default function EstimatePdfPage() {
     const [loading, setLoading] = useState(true)
     const [estimate, setEstimate] = useState<any>(null)
     const [products, setProducts] = useState<any[]>([])
+    const [freeItemDisplay, setFreeItemDisplay] = useState<FreeItemDisplay>(DEFAULT_FREE_ITEM_DISPLAY)
     const [generating, setGenerating] = useState(false)
 
     useEffect(() => {
@@ -30,6 +33,14 @@ export default function EstimatePdfPage() {
     const loadData = async () => {
         try {
             const [estimateData, productsData] = await Promise.all([getEstimate(estimateId), getProducts()])
+
+            // 自由入力行の単価・数量を出すか（自社情報管理の設定）。取得に失敗しても
+            // 見積書自体は表示できるよう、ここだけ個別にフォールバックして従来どおり出す
+            try {
+                setFreeItemDisplay(toFreeItemDisplay(await getCompanyProfile()))
+            } catch (companyError) {
+                console.error('Failed to load company profile:', companyError)
+            }
 
             // プラン別商品設定の内容を商品情報に反映する。取得に失敗しても
             // PDF自体は元データのまま表示できるよう、ここだけ個別にフォールバックする。
@@ -126,6 +137,7 @@ export default function EstimatePdfPage() {
                 products={products}
                 hideSelectedOptions={hideSelectedOptions}
                 showSeparateFees
+                freeItemDisplay={freeItemDisplay}
             />
         </div>
     )

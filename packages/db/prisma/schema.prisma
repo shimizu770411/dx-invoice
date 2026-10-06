@@ -806,6 +806,8 @@ model CompanyProfile {
   dateFormat    String   @default("WESTERN") @db.VarChar(20) @map("date_format")
   pdfShowOptionImages Boolean @default(false) @map("pdf_show_option_images")
   pdfPromptOnExport   Boolean @default(true)  @map("pdf_prompt_on_export")
+  pdfShowFreeItemUnitPrice Boolean @default(true) @map("pdf_show_free_item_unit_price")
+  pdfShowFreeItemQty       Boolean @default(true) @map("pdf_show_free_item_qty")
   estimateRemarksDefault String? @db.Text @map("estimate_remarks_default")
   invoiceRemarksDefault  String? @db.Text @map("invoice_remarks_default")
   sealImageUrl  String?  @db.VarChar(500) @map("seal_image_url")

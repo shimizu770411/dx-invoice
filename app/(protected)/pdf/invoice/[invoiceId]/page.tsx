@@ -6,6 +6,7 @@ import { getInvoice } from '@/lib/invoices'
 import { getProducts } from '@/lib/products'
 import { withProductsMissingFromMaster } from '@/lib/documentMissingProducts'
 import { getCompanyProfile } from '@/lib/company'
+import { DEFAULT_FREE_ITEM_DISPLAY, FreeItemDisplay, toFreeItemDisplay } from '@/lib/pdfFreeItemDisplay'
 import { buildBankTransferText } from '@/lib/separateFees'
 import { getProductPlanSettings, applyPlanOverrides, BASE_PLAN_ID } from '@/lib/plans'
 import { CreateButton } from '@/components/button/CreateButton'
@@ -23,6 +24,7 @@ export default function InvoicePdfPage() {
     const [invoice, setInvoice] = useState<any>(null)
     const [products, setProducts] = useState<any[]>([])
     const [bankTransferText, setBankTransferText] = useState<string | null>(null)
+    const [freeItemDisplay, setFreeItemDisplay] = useState<FreeItemDisplay>(DEFAULT_FREE_ITEM_DISPLAY)
     const [generating, setGenerating] = useState(false)
 
     useEffect(() => {
@@ -34,10 +36,12 @@ export default function InvoicePdfPage() {
         try {
             const [invoiceData, productsData] = await Promise.all([getInvoice(invoiceId), getProducts()])
 
-            // 備考欄の最下部に出す振込先。取得に失敗しても請求書自体は表示できるよう、
-            // ここだけ個別にフォールバックして振込先なしで描画する
+            // 備考欄の最下部に出す振込先と、自由入力行の単価・数量を出すか（自社情報管理の設定）。
+            // 取得に失敗しても請求書自体は表示できるよう、ここだけ個別にフォールバックして
+            // 振込先なし・単価と数量は従来どおり出す形で描画する
             try {
                 const company = await getCompanyProfile()
+                setFreeItemDisplay(toFreeItemDisplay(company))
                 setBankTransferText(
                     buildBankTransferText({
                         name: company.bank1Name,
@@ -148,6 +152,7 @@ export default function InvoicePdfPage() {
                 hideSelectedOptions={hideSelectedOptions}
                 showInvoiceFees
                 bankTransferText={bankTransferText}
+                freeItemDisplay={freeItemDisplay}
             />
         </div>
     )
