@@ -11,10 +11,14 @@ export function PdfCompanyAd() {
                             <span key={j}>{c}</span>
                         ))}
                     </div>
-                    <div className="flex justify-between">
-                        {'総合葬祭　玉　泉　院'.split('').map((c, j) => (
-                            <span key={j}>{c}</span>
-                        ))}
+                    {/* 漢字は字幅が広く、外側の字詰め指定のままだと重なるため、この行だけ字詰めを解除する */}
+                    <div className="flex" style={{ letterSpacing: 0 }}>
+                        <span>総合葬祭</span>
+                        <span className="ml-1 flex flex-1 justify-between">
+                            {'玉泉院'.split('').map((c, j) => (
+                                <span key={j}>{c}</span>
+                            ))}
+                        </span>
                     </div>
                 </div>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
