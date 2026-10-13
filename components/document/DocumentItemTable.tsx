@@ -55,15 +55,19 @@ export type DocumentFormData = {
 /**
  * 控室管理費の追加行・自由入力行の価格欄。
  * 通常の明細と同じく一般価格と会員価格を持ち、書類の会員区分でどちらを使うかが決まる。
+ * 一般の書類では会員価格の入力欄を出さない。欄を出さないだけで値は保持されるため、
+ * 会員で入力したあと一般に切り替えても、会員価格は入力したまま残る（会員に戻すと再表示される）。
  */
 function FreeRowPriceInputs({
     index,
     control,
     disabled,
+    isMember,
 }: {
     index: number
     control: Control<DocumentFormData>
     disabled: boolean
+    isMember: boolean
 }) {
     return (
         <div className="space-y-1">
@@ -73,12 +77,14 @@ function FreeRowPriceInputs({
                 disabled={disabled}
                 prefix={<span className="text-sm text-gray-500">一般</span>}
             />
-            <FormCurrencyInput
-                name={`freeItems.${index}.unitPriceMember`}
-                control={control}
-                disabled={disabled}
-                prefix={<span className="text-sm text-gray-500">会員</span>}
-            />
+            {isMember && (
+                <FormCurrencyInput
+                    name={`freeItems.${index}.unitPriceMember`}
+                    control={control}
+                    disabled={disabled}
+                    prefix={<span className="text-sm text-gray-500">会員</span>}
+                />
+            )}
         </div>
     )
 }
@@ -1054,6 +1060,7 @@ export function DocumentItemTable({
                                                     index={linkedFreeIndex}
                                                     control={control}
                                                     disabled={isGroupableItem ? !groupAnyChecked : !checkedItems[index]}
+                                                    isMember={isMember}
                                                 />
                                             </td>
                                             <td className="border border-gray-300 p-3">
@@ -1200,6 +1207,7 @@ export function DocumentItemTable({
                                                         index={index}
                                                         control={control}
                                                         disabled={inputsDisabled}
+                                                        isMember={isMember}
                                                     />
                                                     <div className="text-md mt-1">
                                                         ¥{amount.toLocaleString()}
@@ -1659,9 +1667,11 @@ export function DocumentItemTable({
                                                                                 <p className="text-lg text-gray-500">
                                                                                     一般: ¥{v.priceGeneral.toLocaleString()}
                                                                                 </p>
-                                                                                <p className="text-lg text-gray-500">
-                                                                                    会員: ¥{v.priceMember.toLocaleString()}
-                                                                                </p>
+                                                                                {isMember && (
+                                                                                    <p className="text-lg text-gray-500">
+                                                                                        会員: ¥{v.priceMember.toLocaleString()}
+                                                                                    </p>
+                                                                                )}
                                                                                 {isSelected && (
                                                                                     <p className="mt-1 text-sm font-semibold" style={{ color: 'var(--brand-navy)' }}>
                                                                                         ✓ 選択中
@@ -1736,9 +1746,11 @@ export function DocumentItemTable({
                                                             <p className="text-lg text-gray-500">
                                                                 一般: ¥{v.priceGeneral.toLocaleString()}
                                                             </p>
-                                                            <p className="text-lg text-gray-500">
-                                                                会員: ¥{v.priceMember.toLocaleString()}
-                                                            </p>
+                                                            {isMember && (
+                                                                <p className="text-lg text-gray-500">
+                                                                    会員: ¥{v.priceMember.toLocaleString()}
+                                                                </p>
+                                                            )}
                                                             {isSelected && (
                                                                 <p className="mt-1 text-sm font-semibold" style={{ color: 'var(--brand-navy)' }}>
                                                                     ✓ 選択中
@@ -1796,9 +1808,11 @@ export function DocumentItemTable({
                                                         <p className="text-lg text-gray-500">
                                                             一般: ¥{v.priceGeneral.toLocaleString()}
                                                         </p>
-                                                        <p className="text-lg text-gray-500">
-                                                            会員: ¥{v.priceMember.toLocaleString()}
-                                                        </p>
+                                                        {isMember && (
+                                                            <p className="text-lg text-gray-500">
+                                                                会員: ¥{v.priceMember.toLocaleString()}
+                                                            </p>
+                                                        )}
                                                     </button>
                                                 )
                                             })}

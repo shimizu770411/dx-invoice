@@ -625,6 +625,9 @@ export function PdfInvoiceLayout({
     const docAny = doc as any
     const formatDate = useDateFormat()
     const isMember = doc.isMember === true
+    // 一般の書類には会員価格を見せない（列ごと出さず、摘要欄を広げる）。
+    // 一般の書類でも会員価格列を残す運用に戻す場合は、ここを true にするだけでよい。
+    const showMemberPriceColumn = isMember
     // ローカル開発環境でのみ、PDF生成日時をページ左下に薄く表示する（レイアウト崩れ・
     // キャッシュ切り分けの目視確認用。顧客向けの本番PDFには出さない）
     const [renderedAt] = useState(() => new Date())
@@ -776,7 +779,9 @@ export function PdfInvoiceLayout({
     // 行間(ITEM_TABLE_LINE_HEIGHT)は全書類共通の固定値。フッター変動行数が
     // 最大パターンより少ない書類は、その分だけ通常サイズの空白行が増える
     // （39行が最低保証、それ以上は書類ごとの余裕次第）。
-    const displayedMembershipCount = buildMembershipPaymentRows(customer?.memberships).length
+    // 会費入金額は会員価格列にだけ印字・控除するものなので、会員価格列が無い書類では行ごと出さない
+    const displayedMemberships = showMemberPriceColumn ? buildMembershipPaymentRows(customer?.memberships) : []
+    const displayedMembershipCount = displayedMemberships.length
     const itemTableFooterExtraRows = displayedMembershipCount + (showCancellationFee ? 2 : 0)
     const itemTableLineHeight = ITEM_TABLE_LINE_HEIGHT
     const { targetBodyRows, grandTotalExtraPx } = computeItemTableRowPlan(
@@ -790,6 +795,19 @@ export function PdfInvoiceLayout({
     // 満期サービス行は商品行群の直後ではなく、明細欄の最終行（小計の直前）に固定表示する
     const normalRows = displayRows.filter((row) => !row.isMaturity)
     const maturityRows = displayRows.filter((row) => row.isMaturity)
+    // 会員価格列が無いときは一般価格列が表の右端になるため、外枠と二重にならないよう右罫線を消す
+    const generalPriceEdgeCls = showMemberPriceColumn ? '' : 'border-r-0'
+    // 解約手数料・値引のように価格列の右端だけに金額を出す行。
+    // 会員価格列があればそこへ、無ければ一般価格列へ出す。
+    const renderRightmostPriceCells = (amountText: string) =>
+        showMemberPriceColumn ? (
+            <>
+                <td className="border border-black px-1 text-right">&nbsp;</td>
+                <td className="border border-black px-1 border-r-0 text-right">{amountText}</td>
+            </>
+        ) : (
+            <td className="border border-black px-1 border-r-0 text-right">{amountText}</td>
+        )
     const renderItemRow = (row: DisplayRow, index: number, rows: DisplayRow[], keyPrefix: string) => {
         const isNextSecondary = rows[index + 1]?.isSecondaryRow
         const mergeCls = `${row.isSecondaryRow ? 'border-t-0' : ''} ${isNextSecondary ? 'border-b-0' : ''}`
@@ -873,7 +891,7 @@ export function PdfInvoiceLayout({
                     1行目（品名・摘要の1行目と同じ位置）に並ぶようにする。
                     1行だけの行では上下中央と同じ位置になるため見た目は変わらない。 */}
                 <td
-                    className={`border border-black px-1 text-right align-top ${mergeCls}`}
+                    className={`border border-black px-1 text-right align-top ${generalPriceEdgeCls} ${mergeCls}`}
                 >
                     {row.estimateItem && !row.isMaturity ? (
                         noChargeReasonFor(row.estimateItem, false) ? (
@@ -887,6 +905,7 @@ export function PdfInvoiceLayout({
                         ''
                     )}
                 </td>
+                {showMemberPriceColumn && (
                 <td
                     className={`border border-r-0 border-black px-1 text-right align-top ${mergeCls}`}
                 >
@@ -902,6 +921,7 @@ export function PdfInvoiceLayout({
                         ''
                     )}
                 </td>
+                )}
             </tr>
         </Fragment>
         )
@@ -1052,7 +1072,7 @@ export function PdfInvoiceLayout({
                                 <col style={{ width: '24%' }} />
                                 <col />
                                 <col style={{ width: '18%' }} />
-                                <col style={{ width: '18%' }} />
+                                {showMemberPriceColumn && <col style={{ width: '18%' }} />}
                             </colgroup>
                             <thead>
                                 <tr>
@@ -1074,7 +1094,7 @@ export function PdfInvoiceLayout({
                                             ))}
                                         </div>
                                     </th>
-                                    <th className="border border-l-0 border-t-0 border-black px-1 text-center">
+                                    <th className={`border border-l-0 border-t-0 border-black px-1 text-center ${generalPriceEdgeCls}`}>
                                         <div className="mx-auto flex w-[3rem] justify-between">
                                             {'一般価格'.split('').map((char, i) => (
                                                 <span key={i} className="text-center">
@@ -1083,6 +1103,7 @@ export function PdfInvoiceLayout({
                                             ))}
                                         </div>
                                     </th>
+                                    {showMemberPriceColumn && (
                                     <th className="border border-x-0 border-t-0 border-black px-1 text-center">
                                         <div className="mx-auto flex w-[3rem] justify-between">
                                             {'会員価格'.split('').map((char, i) => (
@@ -1092,6 +1113,7 @@ export function PdfInvoiceLayout({
                                             ))}
                                         </div>
                                     </th>
+                                    )}
                                 </tr>
                             </thead>
                             <tbody>
@@ -1100,8 +1122,10 @@ export function PdfInvoiceLayout({
                                     <tr key={`blank-${i}`}>
                                         <td className="border border-l-0 border-black px-2">&nbsp;</td>
                                         <td className="border border-l-0 border-black px-0.5">&nbsp;</td>
-                                        <td className="border border-black px-1">&nbsp;</td>
-                                        <td className="border border-r-0 border-black px-1">&nbsp;</td>
+                                        <td className={`border border-black px-1 ${generalPriceEdgeCls}`}>&nbsp;</td>
+                                        {showMemberPriceColumn && (
+                                            <td className="border border-r-0 border-black px-1">&nbsp;</td>
+                                        )}
                                     </tr>
                                 ))}
                                 {maturityRows.map((row, index) => renderItemRow(row, index, maturityRows, 'maturity'))}
@@ -1119,12 +1143,14 @@ export function PdfInvoiceLayout({
                                         </div>
                                     </th>
                                     <td className="border border-black px-1 text-center">&nbsp;</td>
-                                    <td className="border border-black px-1 text-right">
+                                    <td className={`border border-black px-1 text-right ${generalPriceEdgeCls}`}>
                                         {fmtAmount(generalSubtotal)}
                                     </td>
-                                    <td className="border border-black border-r-0 px-1 text-right">
-                                        {fmtAmount(memberSubtotal)}
-                                    </td>
+                                    {showMemberPriceColumn && (
+                                        <td className="border border-black border-r-0 px-1 text-right">
+                                            {fmtAmount(memberSubtotal)}
+                                        </td>
+                                    )}
                                 </tr>
                                 <tr>
                                     <th className="border border-l-0 border-black text-center">
@@ -1137,12 +1163,14 @@ export function PdfInvoiceLayout({
                                         </div>
                                     </th>
                                     <td className="border border-black text-center">&nbsp;</td>
-                                    <td className="border border-black px-1 text-right">
+                                    <td className={`border border-black px-1 text-right ${generalPriceEdgeCls}`}>
                                         {fmtAmount(generalTax)}
                                     </td>
-                                    <td className="border border-black border-r-0 px-1 text-right">
-                                        {fmtAmount(memberTax)}
-                                    </td>
+                                    {showMemberPriceColumn && (
+                                        <td className="border border-black border-r-0 px-1 text-right">
+                                            {fmtAmount(memberTax)}
+                                        </td>
+                                    )}
                                 </tr>
                                 <tr>
                                     <th className="border border-l-0 border-black text-center">
@@ -1155,17 +1183,18 @@ export function PdfInvoiceLayout({
                                         </div>
                                     </th>
                                     <td className="border border-black text-center">&nbsp;</td>
-                                    <td className="border border-black px-1 text-right">
+                                    <td className={`border border-black px-1 text-right ${generalPriceEdgeCls}`}>
                                         {fmtAmount(generalTotal)}
                                     </td>
-                                    <td className="border border-black border-r-0 px-1 text-right">
-                                        {fmtAmount(memberTotal)}
-                                    </td>
+                                    {showMemberPriceColumn && (
+                                        <td className="border border-black border-r-0 px-1 text-right">
+                                            {fmtAmount(memberTotal)}
+                                        </td>
+                                    )}
                                 </tr>
                                 {(() => {
-                                    // 行の有無も金額も共通処理に任せる。ここで別の式を書くと、
+                                    // 行の有無も金額も共通処理(displayedMemberships)に任せる。ここで別の式を書くと、
                                     // 書類に出ている内訳の合計と差引合計から引いた額が食い違う
-                                    const displayedMemberships = buildMembershipPaymentRows(customer?.memberships)
                                     return displayedMemberships.map(({ membership: m, rowIndex: originalIdx, amount: subtotal }, idx) => {
                                         // けやきは割引額を直接入力する仕様で、1回の入金額×回数では出せない
                                         const isKeyaki = originalIdx === KEYAKI_ROW_INDEX
@@ -1215,10 +1244,7 @@ export function PdfInvoiceLayout({
                                                 </div>
                                             </th>
                                             <td className="border border-black text-center">&nbsp;</td>
-                                            <td className="border border-black px-1 text-right">&nbsp;</td>
-                                            <td className="border border-black px-1 border-r-0 text-right">
-                                                {cancellationFee.toLocaleString()}
-                                            </td>
+                                            {renderRightmostPriceCells(cancellationFee.toLocaleString())}
                                         </tr>
                                         <tr>
                                             <th className="border border-l-0 border-black text-center">
@@ -1231,10 +1257,7 @@ export function PdfInvoiceLayout({
                                                 </div>
                                             </th>
                                             <td className="border border-black text-center">&nbsp;</td>
-                                            <td className="border border-black px-1 text-right">&nbsp;</td>
-                                            <td className="border border-black px-1 border-r-0 text-right">
-                                                {fmtAmount(-cancellationFee)}
-                                            </td>
+                                            {renderRightmostPriceCells(fmtAmount(-cancellationFee))}
                                         </tr>
                                     </>
                                 )}
@@ -1261,12 +1284,14 @@ export function PdfInvoiceLayout({
                                         </div>
                                     </th>
                                     <td className="border border-t-2 border-black text-center">&nbsp;</td>
-                                    <td className="border border-t-2 border-black px-1 text-right font-bold">
+                                    <td className={`border border-t-2 border-black px-1 text-right font-bold ${generalPriceEdgeCls}`}>
                                         {fmtAmount(generalGrandTotal)}
                                     </td>
-                                    <td className="border border-t-2 border-black border-r-0 px-1 text-right font-bold">
-                                        {fmtAmount(memberGrandTotal)}
-                                    </td>
+                                    {showMemberPriceColumn && (
+                                        <td className="border border-t-2 border-black border-r-0 px-1 text-right font-bold">
+                                            {fmtAmount(memberGrandTotal)}
+                                        </td>
+                                    )}
                                 </tr>
                             </tfoot>
                         </table>
