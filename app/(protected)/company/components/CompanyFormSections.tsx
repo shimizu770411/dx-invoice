@@ -6,6 +6,8 @@ import { FormInput } from '@/components/form/FormInput'
 import { FormSelect } from '@/components/form/FormSelect'
 import { FormTextarea } from '@/components/form/FormTextarea'
 import {
+    INVOICE_MAX_REMARKS_LENGTH,
+    INVOICE_REMARKS_ROWS,
     MAX_REMARKS_LENGTH,
     REMARKS_LINE_LENGTH,
     REMARKS_ROWS,
@@ -300,10 +302,11 @@ export function RemarksDefaultSection() {
                         name="invoiceRemarksDefault"
                         control={control}
                         label="請求書"
-                        rows={REMARKS_ROWS}
-                        maxRows={REMARKS_ROWS}
+                        // 請求書の備考はそのままこの初期値から作られるため、請求書の備考欄と同じ行数にそろえる
+                        rows={INVOICE_REMARKS_ROWS}
+                        maxRows={INVOICE_REMARKS_ROWS}
                         maxLineLength={REMARKS_LINE_LENGTH}
-                        maxLength={MAX_REMARKS_LENGTH}
+                        maxLength={INVOICE_MAX_REMARKS_LENGTH}
                         noResize
                         error={errors.invoiceRemarksDefault}
                     />

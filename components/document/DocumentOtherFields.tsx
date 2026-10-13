@@ -15,6 +15,11 @@ export const REMARKS_FIXED_BLOCK_ROWS = 4
 // 備考欄の表示行数と文字数上限。固定出力するぶん、入力欄はその行数を差し引いた高さにする
 export const REMARKS_ROWS = 15 - REMARKS_FIXED_BLOCK_ROWS
 export const MAX_REMARKS_LENGTH = REMARKS_LINE_LENGTH * REMARKS_ROWS
+// 請求書は備考欄の最下部に振込先（口座1行＋口座名義1行）を出すため、その分だけ入力できる行を減らす。
+// 振込先2行とその上の余白で、実測では備考本文3行ぶんの高さを使う（11行入力すると9行目以降が振込先と重なる）
+const INVOICE_BANK_TRANSFER_RESERVED_ROWS = 3
+export const INVOICE_REMARKS_ROWS = REMARKS_ROWS - INVOICE_BANK_TRANSFER_RESERVED_ROWS
+export const INVOICE_MAX_REMARKS_LENGTH = REMARKS_LINE_LENGTH * INVOICE_REMARKS_ROWS
 // 備考欄の入力幅。実測した24文字ぶんの表示幅(約471px)にpadding/borderと安全マージンを加えた値
 export const REMARKS_TEXTAREA_MAX_WIDTH = '510px'
 
@@ -25,6 +30,8 @@ type Props = {
     preConsultStaffSlot?: React.ReactNode
     /** 備考欄の上に差し込む金額入力（見積は【別料金】3項目、請求書は支払合計3項目） */
     remarksHeaderSlot?: React.ReactNode
+    /** 備考欄に入力できる行数。請求書は振込先の分だけ少ない（INVOICE_REMARKS_ROWS） */
+    remarksRows?: number
 }
 
 export function DocumentOtherFields({
@@ -33,6 +40,7 @@ export function DocumentOtherFields({
     estimateStaffLabel = '見積担当',
     preConsultStaffSlot,
     remarksHeaderSlot,
+    remarksRows = REMARKS_ROWS,
 }: Props) {
     return (
         <div className="mb-8">
@@ -86,10 +94,10 @@ export function DocumentOtherFields({
                     name="remarks"
                     control={control}
                     label="備考"
-                    rows={REMARKS_ROWS}
-                    maxRows={REMARKS_ROWS}
+                    rows={remarksRows}
+                    maxRows={remarksRows}
                     maxLineLength={REMARKS_LINE_LENGTH}
-                    maxLength={MAX_REMARKS_LENGTH}
+                    maxLength={REMARKS_LINE_LENGTH * remarksRows}
                     noResize
                 />
             </div>

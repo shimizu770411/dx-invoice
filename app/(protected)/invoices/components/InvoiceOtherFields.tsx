@@ -2,7 +2,7 @@
 
 import { Control, useWatch } from 'react-hook-form'
 import { InvoiceFormData } from '../schemas/InvoiceFormSchema'
-import { DocumentOtherFields } from '@/components/document/DocumentOtherFields'
+import { DocumentOtherFields, INVOICE_REMARKS_ROWS } from '@/components/document/DocumentOtherFields'
 import { FormCurrencyInput } from '@/components/form/FormCurrencyInput'
 import { CurrencyInputUI } from '@/components/form/ui/CurrencyInputUI'
 import { INVOICE_FEE_LABELS, calcInvoicePaymentTotal } from '@/lib/separateFees'
@@ -26,6 +26,8 @@ export function InvoiceOtherFields({ control, disabled, grandTotal }: Props) {
             control={control as unknown as Control<DocumentFormData>}
             disabled={disabled}
             estimateStaffLabel="請求書発行担当"
+            // 請求書PDFは備考欄の最下部に振込先を出すため、入力できる行を見積より少なくする
+            remarksRows={INVOICE_REMARKS_ROWS}
             remarksHeaderSlot={
                 // 請求書PDFの備考欄冒頭に固定出力する支払合計ブロックの金額。
                 // 手入力するのは生花代だけで、葬儀代金と支払合計は自動計算の表示専用。
