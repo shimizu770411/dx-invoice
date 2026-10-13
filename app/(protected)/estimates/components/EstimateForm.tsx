@@ -535,8 +535,9 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                             <>
                                 <EstimateBasicInfo
                                     control={control}
-                                    isNew={mode === 'create'}
                                     disabled={isLocked}
+                                    // 見積番号は本見積で採番するため、事前相談見積では欄を出さない
+                                    showDocNo={mode === 'edit' && estimate?.estimateType === 'FORMAL'}
                                     onAssignDocNo={
                                         mode === 'edit' && estimate?.estimateType === 'FORMAL' && !isLocked
                                             ? handleAssignDocNo

@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-middleware'
 import { serializeBigInt } from '@/lib/prisma-utils'
 import { calculateDocumentTotals, freeItemUnitPrice, sumMembershipPaidAmount } from '@/lib/documentTotals'
-import { isValidDocNo, toNullableAmount } from '@/lib/documentUtils'
+import { toNullableAmount } from '@/lib/documentUtils'
 import { recordOperationLog } from '@/lib/operationLog'
 import { loadProductNameLookup, pickProductItemName, pickProductVariantName } from '@/lib/documentItemNames'
 import { OperationAction, OperationEntityType } from '@phoenix-jpn/db'
@@ -108,23 +108,6 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'customerId は必須です' }, { status: 400 })
         }
 
-        if (data.docNo && !isValidDocNo(data.docNo)) {
-            return NextResponse.json(
-                { error: '見積番号は空欄、または9桁の数字（例: 202607001）で入力してください' },
-                { status: 400 }
-            )
-        }
-
-        if (data.docNo) {
-            const duplicate = await prisma.estimate.findUnique({ where: { docNo: data.docNo } })
-            if (duplicate) {
-                return NextResponse.json(
-                    { error: `見積番号「${data.docNo}」は既に他の見積で使用されています` },
-                    { status: 400 }
-                )
-            }
-        }
-
         // 顧客を取得
         const customer = await prisma.customer.findUnique({
             where: { id: BigInt(customerId) },
@@ -160,9 +143,9 @@ export async function POST(request: NextRequest) {
 
         const altarType = data.altarType && VALID_ALTAR_TYPES.includes(data.altarType) ? data.altarType : null
 
-        // ここで作るのは事前相談見積なので自動採番しない（見積番号は本見積で採番する）。
-        // 手入力された番号があればそれを保存する
-        const docNo = data.docNo || null
+        // ここで作るのは事前相談見積なので見積番号は付けない（本見積で採番する）。
+        // 送られてきた番号があっても使わない
+        const docNo = null
 
         // 保存時点の商品名・種類名を控えるための名称引き当て（商品マスタの改名を発行済み書類に波及させないため）
         const nameLookup = await loadProductNameLookup(data.items || [])

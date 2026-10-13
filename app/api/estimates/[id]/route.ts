@@ -135,23 +135,6 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
         const { id } = params
         const data = await request.json()
 
-        if (data.docNo && !isValidDocNo(data.docNo)) {
-            return NextResponse.json(
-                { error: '見積番号は空欄、または9桁の数字（例: 202607001）で入力してください' },
-                { status: 400 }
-            )
-        }
-
-        if (data.docNo) {
-            const duplicate = await prisma.estimate.findUnique({ where: { docNo: data.docNo } })
-            if (duplicate && duplicate.id.toString() !== id) {
-                return NextResponse.json(
-                    { error: `見積番号「${data.docNo}」は既に他の見積で使用されています` },
-                    { status: 400 }
-                )
-            }
-        }
-
         // 見積を取得
         const estimate = await prisma.estimate.findUnique({
             where: { id: BigInt(id) },
@@ -166,6 +149,28 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
 
         if (!estimate) {
             return NextResponse.json({ error: '見積が見つかりません' }, { status: 404 })
+        }
+
+        // 事前相談見積では見積番号を入力・変更させない（見積番号は本見積で採番する）。
+        // 送られてきた値は使わず、旧ルールで付いた番号が残っていればそのまま据え置く
+        const isPreConsultation = estimate.estimateType === 'PRE_CONSULTATION'
+        const docNo: string | null = isPreConsultation ? estimate.docNo : data.docNo || null
+
+        if (!isPreConsultation && docNo && !isValidDocNo(docNo)) {
+            return NextResponse.json(
+                { error: '見積番号は空欄、または9桁の数字（例: 202607001）で入力してください' },
+                { status: 400 }
+            )
+        }
+
+        if (!isPreConsultation && docNo) {
+            const duplicate = await prisma.estimate.findUnique({ where: { docNo } })
+            if (duplicate && duplicate.id.toString() !== id) {
+                return NextResponse.json(
+                    { error: `見積番号「${docNo}」は既に他の見積で使用されています` },
+                    { status: 400 }
+                )
+            }
         }
 
         // 会費入金額を再計算
@@ -205,7 +210,7 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
                 where: { id: BigInt(id) },
                 data: {
                     planId: data.planId ? BigInt(data.planId) : undefined,
-                    docNo: data.docNo || null,
+                    docNo,
                     status: data.status,
                     isMember,
                     subtotal: totals.subtotal,

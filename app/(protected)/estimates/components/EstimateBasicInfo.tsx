@@ -9,21 +9,22 @@ import { DOC_NO_LENGTH } from '@/lib/documentUtils'
 
 type Props = {
     control: Control<EstimateFormData>
-    isNew?: boolean
+    /** 見積番号欄を出すか（本見積の編集時のみ。事前相談見積・新規作成では出さない） */
+    showDocNo?: boolean
     disabled?: boolean
     /** 「自動採番」ボタンを押したときの処理。渡されたときだけボタンを出す（本見積の編集時） */
     onAssignDocNo?: () => void
     isAssigningDocNo?: boolean
 }
 
-export function EstimateBasicInfo({ control, isNew, disabled, onAssignDocNo, isAssigningDocNo }: Props) {
+export function EstimateBasicInfo({ control, showDocNo, disabled, onAssignDocNo, isAssigningDocNo }: Props) {
     const docNo = useWatch({ control, name: 'docNo' })
     // 番号が入っているときは押せない（一度付けた番号を自動で付け替えない）
     const canAssignDocNo = !docNo && !isAssigningDocNo
     return (
         <div className="mb-6">
             <div className="flex flex-wrap items-start gap-4">
-                {!isNew && (
+                {showDocNo && (
                     <div style={{ width: onAssignDocNo ? '330px' : '220px' }}>
                         <div className="flex items-end gap-2">
                             <div className="flex-1">

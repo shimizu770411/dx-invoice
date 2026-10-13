@@ -6,7 +6,7 @@ import { BASE_PLAN_ID } from '@/lib/plans'
 export const estimateItemFieldSchema = documentItemFieldSchema
 export const estimateFreeItemFieldSchema = documentFreeItemFieldSchema
 
-// 見積番号: 空欄(自動採番) または yyyymm+3桁連番の9桁数字のみ許可
+// 見積番号: 空欄 または yyyymm+3桁連番の9桁数字のみ許可（本見積で入力・自動採番する。事前相談見積では欄を出さない）
 const docNoSchema = z
     .string()
     .refine((val) => val === '' || isValidDocNo(val), {
