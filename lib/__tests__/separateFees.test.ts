@@ -4,7 +4,7 @@ import {
     parseSeparateFeesBlock,
     buildInvoiceFeeLines,
     calcInvoicePaymentTotal,
-    buildBankTransferText,
+    buildBankTransferLines,
 } from '../separateFees'
 
 // 従来、備考欄に自動入力されていた文言そのもの
@@ -178,7 +178,7 @@ describe('buildInvoiceFeeLines', () => {
     })
 })
 
-describe('buildBankTransferText', () => {
+describe('buildBankTransferLines', () => {
     const bank = {
         name: '琉球銀行',
         branch: '本店営業部',
@@ -187,26 +187,32 @@ describe('buildBankTransferText', () => {
         holder: 'カ）ニホンフェニックス',
     }
 
-    it('銀行名・支店名・口座種別・口座番号・口座名義を全角スペースで並べる', () => {
-        expect(buildBankTransferText(bank)).toBe(
-            'お振込先：琉球銀行　本店営業部　普通　1234567　カ）ニホンフェニックス'
-        )
+    // 1行に詰めると備考欄の幅に収めるため文字が小さくなりすぎるので、口座名義は次の行に分ける。
+    // 2行目は「お振込先：」の幅だけ字下げして、銀行名の位置にそろえる
+    it('1行目に銀行名・支店名・口座種別・口座番号、2行目に口座名義を出す', () => {
+        expect(buildBankTransferLines(bank)).toEqual([
+            'お振込先：琉球銀行　本店営業部　普通　1234567',
+            '　　　　　カ）ニホンフェニックス',
+        ])
     })
 
     it('未登録の項目は区切りごと詰める', () => {
-        expect(buildBankTransferText({ ...bank, branch: null, type: '' })).toBe(
-            'お振込先：琉球銀行　1234567　カ）ニホンフェニックス'
-        )
+        expect(buildBankTransferLines({ ...bank, branch: null, type: '' })).toEqual([
+            'お振込先：琉球銀行　1234567',
+            '　　　　　カ）ニホンフェニックス',
+        ])
     })
 
-    it('すべて未登録なら null（行自体を出さない）', () => {
-        expect(buildBankTransferText({})).toBeNull()
-        expect(buildBankTransferText({ name: '', branch: null, type: undefined, account: '  ' })).toBeNull()
+    it('口座名義が未登録なら1行だけ', () => {
+        expect(buildBankTransferLines({ ...bank, holder: ' ' })).toEqual(['お振込先：琉球銀行　本店営業部　普通　1234567'])
     })
 
-    it('前後の空白は取り除く', () => {
-        expect(buildBankTransferText({ name: '  琉球銀行  ', account: ' 1234567 ' })).toBe(
-            'お振込先：琉球銀行　1234567'
-        )
+    it('口座名義だけ登録されていれば、見出しの行に名義を出す', () => {
+        expect(buildBankTransferLines({ holder: 'カ）ニホンフェニックス' })).toEqual(['お振込先：カ）ニホンフェニックス'])
+    })
+
+    it('すべて未登録なら空（行自体を出さない）', () => {
+        expect(buildBankTransferLines({})).toEqual([])
+        expect(buildBankTransferLines({ name: '', branch: null, type: undefined, account: '  ' })).toEqual([])
     })
 })

@@ -7,7 +7,7 @@ import { getProducts } from '@/lib/products'
 import { withProductsMissingFromMaster } from '@/lib/documentMissingProducts'
 import { getCompanyProfile } from '@/lib/company'
 import { DEFAULT_FREE_ITEM_DISPLAY, FreeItemDisplay, toFreeItemDisplay } from '@/lib/pdfFreeItemDisplay'
-import { buildBankTransferText } from '@/lib/separateFees'
+import { buildBankTransferLines } from '@/lib/separateFees'
 import { getProductPlanSettings, applyPlanOverrides, BASE_PLAN_ID } from '@/lib/plans'
 import { CreateButton } from '@/components/button/CreateButton'
 import { ResetButton } from '@/components/button/ResetButton'
@@ -23,7 +23,7 @@ export default function InvoicePdfPage() {
     const [loading, setLoading] = useState(true)
     const [invoice, setInvoice] = useState<any>(null)
     const [products, setProducts] = useState<any[]>([])
-    const [bankTransferText, setBankTransferText] = useState<string | null>(null)
+    const [bankTransferLines, setBankTransferLines] = useState<string[]>([])
     const [freeItemDisplay, setFreeItemDisplay] = useState<FreeItemDisplay>(DEFAULT_FREE_ITEM_DISPLAY)
     const [generating, setGenerating] = useState(false)
 
@@ -42,8 +42,8 @@ export default function InvoicePdfPage() {
             try {
                 const company = await getCompanyProfile()
                 setFreeItemDisplay(toFreeItemDisplay(company))
-                setBankTransferText(
-                    buildBankTransferText({
+                setBankTransferLines(
+                    buildBankTransferLines({
                         name: company.bank1Name,
                         branch: company.bank1Branch,
                         type: company.bank1Type,
@@ -151,7 +151,7 @@ export default function InvoicePdfPage() {
                 products={products}
                 hideSelectedOptions={hideSelectedOptions}
                 showInvoiceFees
-                bankTransferText={bankTransferText}
+                bankTransferLines={bankTransferLines}
                 freeItemDisplay={freeItemDisplay}
             />
         </div>

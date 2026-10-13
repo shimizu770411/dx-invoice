@@ -161,23 +161,29 @@ export function calcInvoicePaymentTotal(grandTotal: number, flowerFee?: number |
 // 請求書の備考欄の最下部に出す振込先の見出し
 export const BANK_TRANSFER_PREFIX = 'お振込先：'
 
+// 振込先の2行目（口座名義）を「お振込先：」の幅だけ字下げして、1行目の銀行名とそろえる
+const BANK_TRANSFER_INDENT = '　'.repeat(BANK_TRANSFER_PREFIX.length)
+
 /**
- * 自社情報の振込先1から、請求書の備考欄に出す1行を組み立てる。
- * 「お振込先：銀行名　支店名　口座種別　口座番号　口座名義」の並びで、
- * 未登録の項目は区切りごと詰める。すべて未登録なら null を返し、行自体を出さない。
+ * 自社情報の振込先1から、請求書の備考欄に出す行を組み立てる。
+ * 1行目は「お振込先：銀行名　支店名　口座種別　口座番号」、2行目は口座名義。
+ * 1行に詰めると備考欄の幅に収めるため文字が小さくなりすぎるので、口座名義だけ次の行に分ける。
+ * 未登録の項目は区切りごと詰める。すべて未登録なら空配列を返し、行自体を出さない。
  */
-export function buildBankTransferText(bank: {
+export function buildBankTransferLines(bank: {
     name?: string | null
     branch?: string | null
     type?: string | null
     account?: string | null
     holder?: string | null
-}): string | null {
-    const parts = [bank.name, bank.branch, bank.type, bank.account, bank.holder]
+}): string[] {
+    const accountParts = [bank.name, bank.branch, bank.type, bank.account]
         .map((v) => (v ?? '').trim())
         .filter((v) => v !== '')
-    if (parts.length === 0) return null
-    return `${BANK_TRANSFER_PREFIX}${parts.join('　')}`
+    const holder = (bank.holder ?? '').trim()
+    if (accountParts.length === 0) return holder ? [`${BANK_TRANSFER_PREFIX}${holder}`] : []
+    const firstLine = `${BANK_TRANSFER_PREFIX}${accountParts.join('　')}`
+    return holder ? [firstLine, `${BANK_TRANSFER_INDENT}${holder}`] : [firstLine]
 }
 
 export type InvoiceFeeLine = {
