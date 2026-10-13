@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-middleware'
 import { serializeBigInt } from '@/lib/prisma-utils'
 import { calculateDocumentTotals, freeItemUnitPrice, sumMembershipPaidAmount } from '@/lib/documentTotals'
-import { isValidDocNo, toNullableAmount } from '@/lib/documentUtils'
+import { describeDuplicateDocOwner, isValidDocNo, toNullableAmount } from '@/lib/documentUtils'
 import { recordOperationLog } from '@/lib/operationLog'
 import { loadProductNameLookup, pickProductItemName, pickProductVariantName } from '@/lib/documentItemNames'
 import { OperationAction, OperationEntityType } from '@phoenix-jpn/db'
@@ -164,10 +164,21 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
         }
 
         if (!isPreConsultation && docNo) {
-            const duplicate = await prisma.estimate.findUnique({ where: { docNo } })
+            const duplicate = await prisma.estimate.findUnique({
+                where: { docNo },
+                select: {
+                    id: true,
+                    estimateType: true,
+                    customer: { select: { receptionNo: true, deceasedName: true } },
+                },
+            })
             if (duplicate && duplicate.id.toString() !== id) {
+                // 同じ案件の事前相談見積と重なることもあるため、どちらの見積かも添える
+                const typeLabel = duplicate.estimateType === 'PRE_CONSULTATION' ? '事前相談見積' : '本見積'
                 return NextResponse.json(
-                    { error: `見積番号「${docNo}」は既に他の見積で使用されています` },
+                    {
+                        error: `見積番号「${docNo}」は既に他の見積（${describeDuplicateDocOwner(duplicate.customer)}の${typeLabel}）で使用されています`,
+                    },
                     { status: 400 }
                 )
             }

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-middleware'
 import { serializeBigInt } from '@/lib/prisma-utils'
 import { calculateDocumentTotals, freeItemUnitPrice, sumMembershipPaidAmount } from '@/lib/documentTotals'
+import { describeDuplicateDocOwner } from '@/lib/documentUtils'
 import { recordOperationLog } from '@/lib/operationLog'
 import { OperationAction, OperationEntityType } from '@phoenix-jpn/db'
 
@@ -72,10 +73,15 @@ export async function POST(
                 { status: 400 }
             )
         }
-        const duplicate = await prisma.invoice.findUnique({ where: { docNo }, select: { id: true } })
+        const duplicate = await prisma.invoice.findUnique({
+            where: { docNo },
+            select: { id: true, customer: { select: { receptionNo: true, deceasedName: true } } },
+        })
         if (duplicate) {
             return NextResponse.json(
-                { error: `請求番号「${docNo}」は既に他の請求書で使用されているため、請求書を作成できません` },
+                {
+                    error: `請求番号「${docNo}」は既に他の請求書（${describeDuplicateDocOwner(duplicate.customer)}）で使用されているため、請求書を作成できません`,
+                },
                 { status: 400 }
             )
         }

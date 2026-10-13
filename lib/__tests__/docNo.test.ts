@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildDocNoPrefix, buildNextDocNo } from '@/lib/documentUtils'
+import { buildDocNoPrefix, buildNextDocNo, describeDuplicateDocOwner } from '@/lib/documentUtils'
 
 /**
  * 見積番号は「葬儀・告別式の開始日時の年月(yyyymm) + 連番3桁」。
@@ -36,5 +36,22 @@ describe('次の見積番号', () => {
 
     it('形式が正しくない番号（手入力の桁違いなど）は最大値の判定に使わない', () => {
         expect(buildNextDocNo(funeralFrom, ['202610002', '2026100099', null])).toBe('202610003')
+    })
+})
+
+/**
+ * 番号が重複して保存・作成できないとき、重複相手の書類を一覧から探せるように
+ * 一覧に出ている受付No.と故人名を添える。
+ */
+describe('重複相手の書類の説明', () => {
+    it('受付No.と故人名を出す', () => {
+        expect(describeDuplicateDocOwner({ receptionNo: '1029', deceasedName: '山田　太郎' })).toBe(
+            '受付No. 1029・故人 山田　太郎'
+        )
+    })
+
+    it('受付No.や故人名が未入力でも文が崩れない', () => {
+        expect(describeDuplicateDocOwner({ receptionNo: null, deceasedName: '' })).toBe('受付No. -・故人 -')
+        expect(describeDuplicateDocOwner(null)).toBe('受付No. -・故人 -')
     })
 })

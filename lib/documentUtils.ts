@@ -245,6 +245,16 @@ export function buildDocNoPrefix(date: Date | string | null | undefined): string
     return `${yyyy}${mm}`
 }
 
+// 番号が重複したときに、重複相手の書類を一覧から探せるよう案件の受付No.と故人名を添える。
+// 例: 「受付No. 1029・故人 山田太郎」
+export function describeDuplicateDocOwner(
+    customer: { receptionNo?: string | null; deceasedName?: string | null } | null | undefined
+): string {
+    const receptionNo = customer?.receptionNo || '-'
+    const deceasedName = customer?.deceasedName || '-'
+    return `受付No. ${receptionNo}・故人 ${deceasedName}`
+}
+
 // 見積番号の採番: 葬儀・告別式の開始日時の年月 + その年月の既存番号の最大値+1（無ければ001）。
 // existingDocNos には同じ年月で始まる既存番号を渡す（形式の正しくない番号は無視する）。
 export function buildNextDocNo(funeralFrom: Date | string, existingDocNos: (string | null | undefined)[]): string {
