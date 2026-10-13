@@ -1,0 +1,372 @@
+<title>見積番号の新ルールほか</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500&family=Noto+Serif+JP:wght@400;500;600&display=swap">
+<style>
+    :root {
+        --navy: #020e70;
+        --navy-light: #2a3490;
+        --gold: #c4ae6a;
+        --gold-soft: #8a7e5c;
+        --crimson: #9a1f28;
+        --ground: #f7f6f2;
+        --surface: #fffefb;
+        --border: #e5e1d4;
+        --rule: #d4cfc0;
+        --text: #1a1a1a;
+        --muted: #6b6b6b;
+
+        --mincho: 'Noto Serif JP', '游明朝 Medium', 'Yu Mincho', YuMincho, 'Hiragino Mincho ProN', serif;
+        --garamond: 'EB Garamond', 'Noto Serif JP', serif;
+    }
+
+    @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+            --navy: #b9c0ff;
+            --navy-light: #98a2f0;
+            --gold: #d8c488;
+            --gold-soft: #b3a479;
+            --crimson: #ef8f96;
+            --ground: #14141a;
+            --surface: #1c1c24;
+            --border: #33323c;
+            --rule: #45444f;
+            --text: #eceae4;
+            --muted: #a09e98;
+        }
+    }
+
+    :root[data-theme="dark"] {
+        --navy: #b9c0ff;
+        --navy-light: #98a2f0;
+        --gold: #d8c488;
+        --gold-soft: #b3a479;
+        --crimson: #ef8f96;
+        --ground: #14141a;
+        --surface: #1c1c24;
+        --border: #33323c;
+        --rule: #45444f;
+        --text: #eceae4;
+        --muted: #a09e98;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+        margin: 0;
+        padding-block: clamp(32px, 6vw, 72px);
+        padding-left: max(20px, calc((100% - 760px) / 2));
+        padding-right: max(20px, calc((100% - 760px) / 2));
+        background: var(--ground);
+        color: var(--text);
+        font-family: var(--mincho);
+        font-size: 16px;
+        line-height: 1.9;
+        -webkit-font-smoothing: antialiased;
+    }
+
+    .masthead { display: flex; flex-direction: column; gap: 14px; padding-bottom: 26px; border-bottom: 1px solid var(--rule); }
+    .eyebrow {
+        font-family: var(--garamond);
+        font-size: 12px;
+        letter-spacing: 0.34em;
+        text-transform: uppercase;
+        color: var(--gold-soft);
+    }
+    h1 {
+        margin: 0;
+        font-size: clamp(26px, 5vw, 36px);
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        line-height: 1.45;
+        color: var(--navy);
+        text-wrap: balance;
+    }
+    .meta { display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: 13px; color: var(--muted); letter-spacing: 0.08em; }
+    .meta .num { font-family: var(--garamond); font-size: 15px; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+
+    .lede { margin: 26px 0 0; font-size: 16px; color: var(--text); letter-spacing: 0.03em; }
+
+    section { margin-top: 52px; }
+    h2 {
+        margin: 0 0 6px;
+        padding-left: 14px;
+        border-left: 3px solid var(--gold);
+        font-size: 20px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        line-height: 1.5;
+        color: var(--navy);
+        text-wrap: balance;
+    }
+    .sub { margin: 0 0 22px 17px; font-size: 13px; color: var(--muted); letter-spacing: 0.08em; }
+
+    h3 {
+        margin: 30px 0 10px;
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        color: var(--text);
+    }
+
+    p { margin: 0 0 14px; letter-spacing: 0.03em; }
+    p:last-child { margin-bottom: 0; }
+
+    ul { margin: 0 0 14px; padding-left: 1.3em; }
+    li { margin-bottom: 7px; letter-spacing: 0.03em; }
+    li:last-child { margin-bottom: 0; }
+
+    /* これまで / これから の対比 */
+    .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); border: 1px solid var(--border); margin: 18px 0 20px; }
+    .compare > div { background: var(--surface); padding: 18px 20px; }
+    .compare .tag {
+        display: block;
+        margin-bottom: 10px;
+        font-family: var(--garamond);
+        font-size: 11px;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+    }
+    .compare .before .tag { color: var(--muted); }
+    .compare .after .tag { color: var(--navy); }
+    .compare p { font-size: 14.5px; line-height: 1.85; }
+    .compare .after { box-shadow: inset 3px 0 0 var(--gold); }
+
+    /* 帳票の見え方サンプル */
+    .specimen {
+        margin: 18px 0 20px;
+        padding: 20px 22px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        font-size: 13.5px;
+        line-height: 2;
+        letter-spacing: 0.02em;
+        overflow-x: auto;
+    }
+    .specimen .cap {
+        display: block;
+        margin-bottom: 10px;
+        font-family: var(--garamond);
+        font-size: 11px;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        color: var(--gold-soft);
+    }
+    .specimen .line { white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .specimen .ruled { border-bottom: 1px solid var(--text); display: inline-block; min-width: 17em; }
+    .specimen .indent { padding-left: 5.2em; }
+    .specimen .dim { color: var(--muted); }
+
+    table { width: 100%; border-collapse: collapse; margin: 16px 0 20px; font-size: 14px; }
+    caption { text-align: left; padding-bottom: 9px; font-size: 13px; color: var(--muted); letter-spacing: 0.08em; }
+    th, td { padding: 9px 12px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; letter-spacing: 0.03em; }
+    th { font-weight: 600; font-size: 12.5px; letter-spacing: 0.12em; color: var(--gold-soft); border-bottom-color: var(--rule); }
+    td.num { font-family: var(--garamond); font-size: 15px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .table-wrap { overflow-x: auto; }
+
+    /* 対応が必要な項目 */
+    .action { margin-top: 52px; padding: 26px 28px; background: var(--surface); border: 1px solid var(--border); border-top: 3px solid var(--crimson); }
+    .action h2 { border-left: none; padding-left: 0; color: var(--crimson); }
+    .action .sub { margin-left: 0; }
+
+    .docnos { display: flex; flex-wrap: wrap; gap: 7px; margin: 4px 0 18px; padding: 0; list-style: none; }
+    .docnos li {
+        margin: 0;
+        padding: 4px 11px;
+        border: 1px solid var(--rule);
+        font-family: var(--garamond);
+        font-size: 14px;
+        letter-spacing: 0.04em;
+        font-variant-numeric: tabular-nums;
+        color: var(--text);
+    }
+    .docnos li.unnumbered { font-family: var(--mincho); font-size: 12.5px; color: var(--muted); }
+
+    .note { margin-top: 22px; padding-top: 18px; border-top: 1px dotted var(--rule); font-size: 14px; color: var(--muted); }
+
+    footer { margin-top: 56px; padding-top: 22px; border-top: 1px solid var(--rule); font-size: 12.5px; color: var(--muted); letter-spacing: 0.08em; }
+    footer .num { font-family: var(--garamond); font-size: 14px; }
+
+    @media (max-width: 560px) {
+        .compare { grid-template-columns: 1fr; }
+        .specimen { font-size: 12.5px; }
+    }
+</style>
+
+<header class="masthead">
+    <span class="eyebrow">Release Notes</span>
+    <h1>見積番号の新しい採番ルールと、一般書類の価格表示</h1>
+    <div class="meta">
+        <span>玉泉院 葬儀業務システム</span>
+        <span class="num">2026年10月14日</span>
+        <span class="num">0ae55a7</span>
+    </div>
+</header>
+
+<p class="lede">
+    見積番号を、ご提示いただいたルールどおり「本見積で、葬儀・告別式の年月から採番」する形に改めました。
+    請求書は見積番号をそのまま引き継ぎます。
+    あわせて、一般のお客様向けの書類から会員価格を外し、請求書の振込先と備考欄の表示を整えています。
+    本番データでは、事前相談見積に付いていた旧ルールの見積番号を一括で消しています（後述）。
+</p>
+
+<section>
+    <h2>見積番号の採番ルール</h2>
+    <p class="sub">見積画面 / 本見積の作成 / 請求書の作成</p>
+
+    <div class="compare">
+        <div class="before">
+            <span class="tag">これまで</span>
+            <p>事前相談見積を作った時点で、受付日の年月で番号が付いていました。本見積には番号が付かず、請求書は請求書だけで別に番号を振っていたため、同じ案件で見積と請求書の番号が食い違っていました。</p>
+        </div>
+        <div class="after">
+            <span class="tag">これから</span>
+            <p>番号は本見積を作るときに付きます。葬儀・告別式の開始日時の年月（YYYYMM）に、その月の最大の番号＋1を付けます。請求書を作ると、見積番号がそのまま請求番号になります。</p>
+        </div>
+    </div>
+
+    <div class="table-wrap">
+        <table>
+            <caption>書類ごとの番号の付き方</caption>
+            <thead>
+                <tr><th>書類</th><th>番号</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>事前相談見積</td><td>付きません。画面の見積番号欄もなくなりました</td></tr>
+                <tr><td>本見積</td><td>作成時に自動で付きます（告別式の開始日時が入っている場合）</td></tr>
+                <tr><td>請求書</td><td>見積番号をそのまま引き継ぎます</td></tr>
+                <tr><td>領収書</td><td>請求番号と同じです</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3>告別式の日時がまだ決まっていないとき</h3>
+    <p>
+        告別式の開始日時が未入力のまま本見積を作ると、番号なしで作成されます。
+        日時が決まったら案件に入力し、本見積の見積番号欄の横にある<strong>「自動採番」</strong>ボタンを押してください。
+        ボタンは見積番号が空のときだけ押せます。
+    </p>
+
+    <ul>
+        <li>月の判定は日本時間です。月初の早朝の告別式も、その月の番号になります</li>
+        <li>一度付いた番号は、あとから告別式の日付を別の月に変えても変わりません</li>
+        <li>本見積の見積番号と請求書の請求番号は、これまでどおり手で入力・修正もできます</li>
+        <li><strong>見積番号のない本見積からは、請求書を作れません。</strong>「見積番号が未入力です…」と表示されたら、見積画面で番号を入力するか「自動採番」を押してから作り直してください</li>
+    </ul>
+
+    <p class="note">
+        すでに作成済みの請求書の番号はそのままです。過去に請求書だけで振った番号と、新しい見積番号がたまたま同じになった場合は、請求書の作成を止めてお知らせします（次項）。
+    </p>
+</section>
+
+<section>
+    <h2>番号が重複したときのお知らせ</h2>
+    <p class="sub">本見積の更新 / 請求書の更新 / 請求書の作成</p>
+
+    <p>番号が他の書類と重なって保存・作成できないとき、<strong>どの書類と重なっているか</strong>を表示するようにしました。一覧の「No」と故人名で探せます。</p>
+
+    <div class="specimen">
+        <span class="cap">表示例</span>
+        <div class="line">見積番号「202610120」は既に他の見積（受付No. 1100・故人 山田　太郎の本見積）で使用されています</div>
+        <div class="line">請求番号「202607001」は既に他の請求書（受付No. 1050・故人 佐藤　花子）で使用されています</div>
+    </div>
+
+    <ul>
+        <li>ほぼ同時に別の方が同じ月の番号を採番したときは「もう一度押してください」と表示されます。押し直せば次の番号が付きます</li>
+    </ul>
+</section>
+
+<section>
+    <h2>一般の書類に会員価格を出さない</h2>
+    <p class="sub">見積・請求画面 / 見積書・請求書PDF</p>
+
+    <div class="compare">
+        <div class="before">
+            <span class="tag">これまで</span>
+            <p>一般のお客様の書類でも、明細表に「一般価格」と「会員価格」の2列が並んで印字されていました。</p>
+        </div>
+        <div class="after">
+            <span class="tag">これから</span>
+            <p>一般の書類では会員価格の列がなくなり、その分、摘要欄が広くなります。会員の書類は従来どおり2列です。</p>
+        </div>
+    </div>
+
+    <ul>
+        <li>一般の書類では、会費入金額の行も出ません。解約手数料・値引の金額は一般価格の列に出ます</li>
+        <li>画面でも、一般の書類では種類選択の「会員: ¥…」の表示と、控室管理費などの会員価格の入力欄を出しません</li>
+        <li>会員で価格を入力してから一般に切り替えても、会員価格は消えずに残ります。会員に戻すと同じ値で表示されます</li>
+        <li>領収書はもともと選んだ区分の金額だけを出しているため、変更はありません</li>
+    </ul>
+</section>
+
+<section>
+    <h2>請求書の振込先と備考欄</h2>
+    <p class="sub">請求画面「各担当、備考欄」タブ / 請求書PDF</p>
+
+    <h3>振込先の口座名義を2行目に</h3>
+    <p>振込先を1行に詰めていたため、文字がかなり小さく縮んでいました。口座名義を次の行に分け、備考と同じ大きさで印字します。</p>
+
+    <div class="specimen">
+        <span class="cap">請求書の備考欄の最下部</span>
+        <div class="line">お振込先：琉球銀行　本店営業部　普通　1234567</div>
+        <div class="line">　　　　　カ）ニホンフェニックス</div>
+    </div>
+
+    <h3>備考の入力は8行まで</h3>
+    <p>
+        請求書の備考は、これまで11行まで入力できましたが、PDFでは振込先と重なって9行目以降が切れていました。
+        請求書の備考欄と、自社情報の「請求書の備考の初期値」を<strong>8行まで</strong>にしました。見積書は11行のままです。
+    </p>
+</section>
+
+<section>
+    <h2>データ修正</h2>
+    <p class="sub">本番データ / 2026年10月14日実施</p>
+
+    <p>新しいルールに合わせ、<strong>事前相談見積に付いていた旧ルールの見積番号を消しました。</strong>本見積・請求書・領収書の番号には触れていません。</p>
+
+    <div class="table-wrap">
+        <table>
+            <caption>見積番号の付いた件数（修正前 → 修正後）</caption>
+            <thead>
+                <tr><th>書類</th><th>件数</th><th>修正前</th><th>修正後</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>事前相談見積（作成中）</td><td class="num">30</td><td class="num">28</td><td class="num">0</td></tr>
+                <tr><td>事前相談見積（本見積作成済み）</td><td class="num">54</td><td class="num">53</td><td class="num">0</td></tr>
+                <tr><td>本見積</td><td class="num">56</td><td class="num">14</td><td class="num">14</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <ul>
+        <li>修正の直前に、本番データ全体のバックアップを取っています</li>
+        <li>事前相談見積のPDFでは、右上の「受付No.」欄が空欄になります</li>
+        <li>旧番号が消えたことで、本見積の番号が事前相談見積の番号と重なって番号が飛ぶことはなくなります</li>
+    </ul>
+</section>
+
+<div class="action">
+    <h2>対応をお願いしたいこと</h2>
+    <p class="sub">番号のない本見積</p>
+
+    <p>
+        これまで本見積には番号が付いていなかったため、<strong>番号のない本見積が残っています</strong>。
+        まだ請求書を作っていないものは、そのままでは請求書を作れません。
+    </p>
+
+    <h3>手順</h3>
+    <ul>
+        <li>案件に葬儀・告別式の開始日時が入っているか確認し、なければ入力</li>
+        <li>本見積を開き、見積番号欄の横の「自動採番」を押す</li>
+        <li>番号が付いたことを確認してから、請求書を作成</li>
+    </ul>
+
+    <p class="note">
+        請求書を作成済みの本見積は編集できないため、番号はそのままで問題ありません。
+    </p>
+</div>
+
+<footer>
+    玉泉院 葬儀業務システム ／ 2026年10月14日リリース ／ <span class="num">25</span> ファイル変更
+</footer>
