@@ -5,7 +5,8 @@ const TOAST_DURATION_MS = 3000
 
 // バリデーションエラー(400)の場合のみ、サーバーが返した具体的な理由をそのまま表示する。
 // 500系はユーザーに見せるべきでない内部情報を含みうるため対象外。
-function extractValidationErrorMessage(error: unknown): string | undefined {
+// 操作固有のエラーで理由を見せたい場合は handleOperationError(error, extractValidationErrorMessage(error) ?? '〇〇に失敗しました') と使う。
+export function extractValidationErrorMessage(error: unknown): string | undefined {
     if (!axios.isAxiosError(error)) return undefined
     if (error.response?.status !== 400) return undefined
     const message = error.response?.data?.error

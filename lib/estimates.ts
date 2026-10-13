@@ -90,6 +90,13 @@ export async function updateEstimate(id: string, data: any): Promise<Estimate> {
     return response.data
 }
 
+// 本見積の見積番号を自動採番してその場で保存する。採番された番号を返す
+export async function assignEstimateDocNo(id: string): Promise<string> {
+    const response = await apiClient.post<{ docNo: string | null }>(`/estimates/${id}/doc-no`)
+    if (!response.data?.docNo) throw new Error('見積番号を採番できませんでした')
+    return response.data.docNo
+}
+
 export async function confirmEstimate(id: string): Promise<{ id: string }> {
     const response = await apiClient.post<{ id: string }>(`/estimates/${id}/confirm`)
     return response.data

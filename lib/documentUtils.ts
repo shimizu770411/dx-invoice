@@ -228,18 +228,33 @@ export function buildDocumentFreeItems<T extends DocumentFreeItemBase>(
     ]
 }
 
-// docNo 採番: reception_at の年月（yyyymm）プレフィックスを返す
-export function buildDocNoPrefix(receptionAt: Date | string | null | undefined): string {
-    const date = receptionAt ? new Date(receptionAt) : new Date()
-    const yyyy = date.getFullYear()
-    const mm = String(date.getMonth() + 1).padStart(2, '0')
+// docNo 採番の年月は日本時間で決める。サーバー(本番はUTC)の時刻のまま年月を取ると、
+// 月初 0〜9時の日時が前月扱いになる。
+const DOC_NO_TIME_ZONE = 'Asia/Tokyo'
+const docNoYearMonthFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: DOC_NO_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+})
+
+// docNo 採番: 日時の年月（yyyymm、日本時間）プレフィックスを返す
+export function buildDocNoPrefix(date: Date | string | null | undefined): string {
+    const parts = docNoYearMonthFormatter.formatToParts(date ? new Date(date) : new Date())
+    const yyyy = parts.find((p) => p.type === 'year')?.value ?? ''
+    const mm = parts.find((p) => p.type === 'month')?.value ?? ''
     return `${yyyy}${mm}`
 }
 
+// 見積番号の採番: 葬儀・告別式の開始日時の年月 + その年月の既存番号の最大値+1（無ければ001）。
+// existingDocNos には同じ年月で始まる既存番号を渡す（形式の正しくない番号は無視する）。
+export function buildNextDocNo(funeralFrom: Date | string, existingDocNos: (string | null | undefined)[]): string {
+    const prefix = buildDocNoPrefix(funeralFrom)
+    const latest = pickLatestValidDocNo(existingDocNos.filter((d) => d?.startsWith(prefix)))
+    return buildDocNo(prefix, latest)
+}
+
 // docNo 採番: プレフィックスと最新 docNo から次の連番 docNo を返す
-// override が指定されている場合（フォームから送られてきた値）はそちらを優先する
-export function buildDocNo(prefix: string, latestDocNo: string | null | undefined, override?: string): string {
-    if (override) return override
+export function buildDocNo(prefix: string, latestDocNo: string | null | undefined): string {
     const nextSeq = latestDocNo ? parseInt(latestDocNo.slice(6)) + 1 : 1
     return `${prefix}${String(nextSeq).padStart(3, '0')}`
 }

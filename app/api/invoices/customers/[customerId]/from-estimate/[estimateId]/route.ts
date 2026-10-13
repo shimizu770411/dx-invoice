@@ -3,7 +3,6 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-middleware'
 import { serializeBigInt } from '@/lib/prisma-utils'
 import { calculateDocumentTotals, freeItemUnitPrice, sumMembershipPaidAmount } from '@/lib/documentTotals'
-import { buildDocNoPrefix, buildDocNo, pickLatestValidDocNo } from '@/lib/documentUtils'
 import { recordOperationLog } from '@/lib/operationLog'
 import { OperationAction, OperationEntityType } from '@phoenix-jpn/db'
 
@@ -62,14 +61,24 @@ export async function POST(
             estimate.isMember
         )
 
-        // docNo の自動採番: customers.reception_atの年月(yyyymm) + 同プレフィックスの最大連番+1(3桁)
-        const prefix = buildDocNoPrefix(estimate.customer.receptionAt)
-        const candidateDocs = await prisma.invoice.findMany({
-            where: { docNo: { startsWith: prefix } },
-            select: { docNo: true },
-        })
-        const latestDocNo = pickLatestValidDocNo(candidateDocs.map((d) => d.docNo))
-        const autoDocNo = buildDocNo(prefix, latestDocNo)
+        // 請求番号は見積番号をそのまま引き継ぐ（請求書だけで別に採番しない）。
+        // 見積番号が無いまま作ると番号の無い請求書ができてしまうため、先に見積側で番号を付けてもらう
+        const docNo = estimate.docNo
+        if (!docNo) {
+            return NextResponse.json(
+                {
+                    error: '見積番号が未入力です。見積画面で見積番号を入力するか「自動採番」してから請求書を作成してください',
+                },
+                { status: 400 }
+            )
+        }
+        const duplicate = await prisma.invoice.findUnique({ where: { docNo }, select: { id: true } })
+        if (duplicate) {
+            return NextResponse.json(
+                { error: `請求番号「${docNo}」は既に他の請求書で使用されているため、請求書を作成できません` },
+                { status: 400 }
+            )
+        }
 
         // 請求書本体・明細・フリー項目は必ずまとめて作成する。
         // 途中で失敗すると、フリー項目の無い請求書が残る
@@ -78,7 +87,7 @@ export async function POST(
                 data: {
                     customerId: estimate.customerId,
                     planId: estimate.planId,
-                    docNo: autoDocNo,
+                    docNo,
                     status: 'DRAFT',
                     isMember: estimate.isMember,
                     subtotal: totals.subtotal,

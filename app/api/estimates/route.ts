@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-middleware'
 import { serializeBigInt } from '@/lib/prisma-utils'
 import { calculateDocumentTotals, freeItemUnitPrice, sumMembershipPaidAmount } from '@/lib/documentTotals'
-import { buildDocNoPrefix, buildDocNo, isValidDocNo, pickLatestValidDocNo, toNullableAmount } from '@/lib/documentUtils'
+import { isValidDocNo, toNullableAmount } from '@/lib/documentUtils'
 import { recordOperationLog } from '@/lib/operationLog'
 import { loadProductNameLookup, pickProductItemName, pickProductVariantName } from '@/lib/documentItemNames'
 import { OperationAction, OperationEntityType } from '@phoenix-jpn/db'
@@ -160,14 +160,9 @@ export async function POST(request: NextRequest) {
 
         const altarType = data.altarType && VALID_ALTAR_TYPES.includes(data.altarType) ? data.altarType : null
 
-        // docNo の自動採番: customers.reception_atの年月(yyyymm) + 同プレフィックスの最大連番+1(3桁)
-        const prefix = buildDocNoPrefix(customer.receptionAt)
-        const candidateDocs = await prisma.estimate.findMany({
-            where: { docNo: { startsWith: prefix } },
-            select: { docNo: true },
-        })
-        const latestDocNo = pickLatestValidDocNo(candidateDocs.map((d) => d.docNo))
-        const docNo = buildDocNo(prefix, latestDocNo, data.docNo)
+        // ここで作るのは事前相談見積なので自動採番しない（見積番号は本見積で採番する）。
+        // 手入力された番号があればそれを保存する
+        const docNo = data.docNo || null
 
         // 保存時点の商品名・種類名を控えるための名称引き当て（商品マスタの改名を発行済み書類に波及させないため）
         const nameLookup = await loadProductNameLookup(data.items || [])

@@ -9,7 +9,7 @@ import { caseStepButtonStyle } from './caseStepButtonStyle'
 import { PaymentDialog } from './PaymentDialog'
 import { createInvoiceFromEstimate } from '@/lib/invoices'
 import { toast } from '@/hooks/use-toast'
-import { handleOperationError } from '@/lib/errorHandler'
+import { extractValidationErrorMessage, handleOperationError } from '@/lib/errorHandler'
 
 /**
  * 案件に紐づく画面（情報編集・見積・請求書・供花）を行き来するための切替バー。
@@ -73,7 +73,7 @@ export function CaseNavBar({ customerId, current, currentEstimateId, isDirty = f
             queryClient.invalidateQueries({ queryKey: ['customers'] })
             router.push(`/invoices/${newInvoice.id}`)
         } catch (error) {
-            handleOperationError(error, '請求書の作成に失敗しました')
+            handleOperationError(error, extractValidationErrorMessage(error) ?? '請求書の作成に失敗しました')
         } finally {
             setCreatingInvoice(false)
         }

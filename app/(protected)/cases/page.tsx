@@ -13,7 +13,7 @@ import { caseStepButtonStyle } from '@/components/case/caseStepButtonStyle'
 import { PaymentDialog } from '@/components/case/PaymentDialog'
 import { createInvoiceFromEstimate } from '@/lib/invoices'
 import { toast } from '@/hooks/use-toast'
-import { handleOperationError } from '@/lib/errorHandler'
+import { extractValidationErrorMessage, handleOperationError } from '@/lib/errorHandler'
 import { CaseSearchForm } from './components/CaseSearchForm'
 import { useDateFormat } from '@/hooks/useDateFormat'
 
@@ -362,7 +362,7 @@ export default function CasesPage() {
                                             queryClient.invalidateQueries({ queryKey: ['customers'] })
                                             router.push(`/invoices/${newInvoice.id}`)
                                         } catch (error) {
-                                            handleOperationError(error, '請求書の作成に失敗しました')
+                                            handleOperationError(error, extractValidationErrorMessage(error) ?? '請求書の作成に失敗しました')
                                         } finally {
                                             setCreatingInvoiceForId(null)
                                         }

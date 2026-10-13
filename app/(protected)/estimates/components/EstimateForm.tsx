@@ -16,7 +16,8 @@ import { EstimateBasicInfo } from './EstimateBasicInfo'
 import { ProductVariant } from '@/lib/products'
 import { allowedServiceFlags, resolveUnitPriceMember, resolveVariantChange } from '@/lib/itemPricing'
 import { getPlanSurcharges, PlanSurcharge } from '@/lib/planSurcharges'
-import { confirmEstimate } from '@/lib/estimates'
+import { assignEstimateDocNo, confirmEstimate } from '@/lib/estimates'
+import { extractValidationErrorMessage, handleOperationError } from '@/lib/errorHandler'
 import { toast } from '@/hooks/use-toast'
 import { PdfExportDialog } from '@/components/document/PdfExportDialog'
 import { usePdfExportTrigger } from '@/hooks/usePdfExportTrigger'
@@ -71,6 +72,7 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
         handleSubmit,
         setValue,
         getValues,
+        resetField,
         formState: { isSubmitting, isDirty, errors },
     } = methods
 
@@ -377,10 +379,30 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
             queryClient.invalidateQueries({ queryKey: ['customers'] })
             toast({ title: '本見積を作成しました', variant: 'success', duration: 2000 })
             router.push(`/estimates/${result.id}`)
-        } catch (e: any) {
-            toast({ title: '本見積の作成に失敗しました', variant: 'destructive', duration: 3000 })
+        } catch (error) {
+            // 採番の衝突など、サーバーが理由を返した場合はそれを見せる
+            handleOperationError(error, extractValidationErrorMessage(error) ?? '本見積の作成に失敗しました')
         } finally {
             setIsConfirming(false)
+        }
+    }
+
+    const [isAssigningDocNo, setIsAssigningDocNo] = useState(false)
+
+    // 本見積の作成時に葬儀・告別式の開始日時が未入力で番号が付かなかった見積に、後から採番する。
+    // 番号はサーバー側でその場で保存されるので、画面の値も「保存済み」として差し替え、
+    // 未保存の変更があるとは扱わない（他の入力中の変更には影響しない）
+    const handleAssignDocNo = async () => {
+        if (!estimate) return
+        setIsAssigningDocNo(true)
+        try {
+            const docNo = await assignEstimateDocNo(estimate.id)
+            resetField('docNo', { defaultValue: docNo })
+            toast({ title: `見積番号「${docNo}」を採番しました`, variant: 'success', duration: 2000 })
+        } catch (error) {
+            handleOperationError(error, extractValidationErrorMessage(error) ?? '見積番号の採番に失敗しました')
+        } finally {
+            setIsAssigningDocNo(false)
         }
     }
 
@@ -515,6 +537,12 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                                     control={control}
                                     isNew={mode === 'create'}
                                     disabled={isLocked}
+                                    onAssignDocNo={
+                                        mode === 'edit' && estimate?.estimateType === 'FORMAL' && !isLocked
+                                            ? handleAssignDocNo
+                                            : undefined
+                                    }
+                                    isAssigningDocNo={isAssigningDocNo}
                                 />
                                 {(errors.items?.root?.message ?? (errors.items as any)?.message) && (
                                     <p

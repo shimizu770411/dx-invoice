@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-middleware'
 import { serializeBigInt } from '@/lib/prisma-utils'
+import { findNextEstimateDocNo, isDocNoConflictError } from '@/lib/estimateDocNo'
 
 // 事前相談見積 → 本見積（FORMAL）への確定
 // ① 元レコードを PRE_CONSULTATION に固定（読み取り専用化）
@@ -17,6 +18,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
         const source = await prisma.estimate.findUnique({
             where: { id: BigInt(id) },
             include: {
+                customer: { select: { funeralFrom: true } },
                 items: {
                     include: { freeItems: true },
                     orderBy: { sortNo: 'asc' },
@@ -31,6 +33,8 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
             return NextResponse.json({ error: 'この見積はすでに本見積です' }, { status: 400 })
         }
 
+        const funeralFrom = source.customer?.funeralFrom ?? null
+
         const newEstimate = await prisma.$transaction(async (tx) => {
             // 元レコードを読み取り専用（PRE_CONSULTATION + CONFIRMED = 本見積作成済みを示す）
             await tx.estimate.update({
@@ -38,12 +42,17 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
                 data: { estimateType: 'PRE_CONSULTATION', status: 'CONFIRMED' },
             })
 
+            // 見積番号は本見積で採番する（葬儀・告別式の開始日時の年月 + 連番）。
+            // 開始日時がまだ決まっていなければ番号なしで作り、見積画面の「自動採番」で後から付ける。
+            // 事前相談見積に付いていた番号は引き継がない
+            const docNo = funeralFrom ? await findNextEstimateDocNo(tx, funeralFrom) : null
+
             // 新レコード（FORMAL）を作成
             const created = await tx.estimate.create({
                 data: {
                     customerId: source.customerId,
                     planId: source.planId,
-                    docNo: null, // 本見積の docNo は別途採番
+                    docNo,
                     status: 'DRAFT',
                     estimateType: 'FORMAL',
                     isMember: source.isMember,
@@ -128,6 +137,12 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
 
         return NextResponse.json(serializeBigInt({ id: newEstimate.id.toString() }))
     } catch (error: any) {
+        if (isDocNoConflictError(error)) {
+            return NextResponse.json(
+                { error: '見積番号の採番が他の操作と重なりました。もう一度本見積を作成してください' },
+                { status: 400 }
+            )
+        }
         console.error('Confirm estimate error:', error)
         return NextResponse.json({ error: 'Internal server error', message: error.message }, { status: 500 })
     }
