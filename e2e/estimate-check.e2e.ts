@@ -111,6 +111,17 @@ describe('見積画面: チェックの付け外し', () => {
         await pickVariants(page, VARIANT_GROUP, ['Cセット', '49日もち'])
         await setQty(page, VARIANT_GROUP, 2)
         await saveAndExpectConsistent(session, page, pdfPage, 'estimate', 'グループ商品を数量2')
+        // 開き直した画面でも数量2のまま（保存時に1へ戻されていないこと）
+        expect((await getQtys(page, VARIANT_GROUP))[0], '開き直した後の数量').toBe(2)
+        // PDFでも選んだ種類の行に数量が出る
+        const pdfText = await pdfPage.evaluate(() => document.querySelector('#estimate-pdf-content')?.textContent ?? '')
+        expect(pdfText, 'PDFに数量の表記').toMatch(/Cセット[^]*?数量: 2/)
+        // 目視確認用（E2E_SCREENSHOT_DIR を指定したときだけ）。裏に回ったタブは撮影できないので前に出す
+        if (process.env.E2E_SCREENSHOT_DIR) {
+            await pdfPage.bringToFront()
+            await pdfPage.screenshot({ path: `${process.env.E2E_SCREENSHOT_DIR}/variant-group-qty2.png`, fullPage: true })
+            await page.bringToFront()
+        }
     })
 
     it('6. 一般に切り替えて保存すると、合計が一致し、PDFに会員価格の列が出ない', async () => {

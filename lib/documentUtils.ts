@@ -122,6 +122,8 @@ export function expandVariantGroupItems<T extends { qty: number; groupSelections
         try {
             const selections: Record<string, string[]> = JSON.parse(item.groupSelections)
             const groups = pi.variantGroups || []
+            // 画面で入れた数量を各行に引き継ぐ（以前は常に1にしていて、画面の合計だけが多くなっていた）
+            const groupQty = Number(item.qty) > 0 ? Number(item.qty) : 1
             const rows: T[] = []
             for (const group of groups) {
                 const selectedIds = selections[String(group.id)] || []
@@ -143,13 +145,13 @@ export function expandVariantGroupItems<T extends { qty: number; groupSelections
                         multiSelectVariantIds: JSON.stringify(selectedIds),
                         unitPriceGeneral: totalGeneral,
                         unitPriceMember: totalMember,
-                        qty: 1,
+                        qty: groupQty,
                         description: selectedVariants.map((v: any) => v.name).join('、'),
                         groupSelections: null,
                     })
                     rows.push({
                         ...mergedRow,
-                        amount: calcDocumentItemAmount(mergedRow, 1, isMember),
+                        amount: calcDocumentItemAmount(mergedRow, groupQty, isMember),
                         noChargeScope: resolveNoChargeScope(mergedRow),
                         noChargeReason: resolveNoChargeReason(mergedRow, isMember),
                     })
@@ -165,13 +167,13 @@ export function expandVariantGroupItems<T extends { qty: number; groupSelections
                         productVariantGroupId: String(group.id),
                         unitPriceGeneral: v.priceGeneral,
                         unitPriceMember: v.priceMember,
-                        qty: 1,
+                        qty: groupQty,
                         description: v.name,
                         groupSelections: null,
                     })
                     rows.push({
                         ...groupRow,
-                        amount: calcDocumentItemAmount(groupRow, 1, isMember),
+                        amount: calcDocumentItemAmount(groupRow, groupQty, isMember),
                         noChargeScope: resolveNoChargeScope(groupRow),
                         noChargeReason: resolveNoChargeReason(groupRow, isMember),
                     })
