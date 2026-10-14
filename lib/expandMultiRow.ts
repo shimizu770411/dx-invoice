@@ -70,7 +70,9 @@ export function computeMultiRowAmount(args: {
 }): number {
     const sign = args.sign === -1 ? -1 : 1
     if (args.calcType === 'FIXED') {
-        return args.unitPrice * sign
+        // 固定料金は数量によらず単価そのまま。ただしチェックを外した（数量0の）行は保存されないので、
+        // 0 円として扱う。ここで単価を返すと画面の合計だけが保存値・PDFより多くなる
+        return (args.qty || 0) > 0 ? args.unitPrice * sign : 0
     }
     return args.unitPrice * (args.qty || 0) * sign
 }

@@ -126,6 +126,14 @@ describe('calcDocumentItemAmount', () => {
         expect(calcDocumentItemAmount(row, 5, false)).toBe(10000)
     })
 
+    it('固定料金の加算行でも、チェックを外して数量0なら 0 円になる', () => {
+        // 会葬礼状の「礼状版代（固定）」のように、チェックを外した行は保存されない。
+        // 画面だけ固定料金を数えると、画面の合計が保存値・PDFより多くなる（見積159で発生）
+        const row = item({ productRowId: '1', calcType: 'FIXED', sign: 1, unitPriceGeneral: 3000, unitPriceMember: 3000 })
+        expect(calcDocumentItemAmount(row, 0, false)).toBe(0)
+        expect(calcDocumentItemAmount(row, 0, true)).toBe(0)
+    })
+
     it('固定料金の加算行がセット対象なら 0 円になる', () => {
         const row = item({
             productRowId: '1',
@@ -173,6 +181,22 @@ describe('画面の合計と保存される金額の整合', () => {
         expect(apiTotals.subtotal).toBe(formTotals.subtotal)
         expect(apiTotals.tax).toBe(formTotals.tax)
         expect(apiTotals.grandTotal).toBe(formTotals.grandTotal)
+    })
+
+    it('チェックを外した固定料金の行があっても、画面の合計と保存値が一致する', () => {
+        const withUncheckedFixed = [
+            ...items,
+            item({ qty: 0, productRowId: '1', calcType: 'FIXED', sign: 1, unitPriceGeneral: 3000, unitPriceMember: 3000 }),
+        ]
+        const formTotals = calculateDocumentFormTotals(withUncheckedFixed, undefined, false, customer)
+        // 保存時は数量0の行を除いてから金額を入れる
+        const savedItems = withUncheckedFixed
+            .filter((it) => it.qty > 0)
+            .map((it) => ({ amount: calcDocumentItemAmount(it, it.qty, false) }))
+        const apiTotals = calculateDocumentTotals(savedItems, formTotals.membershipPaidAmount, [], false)
+
+        expect(formTotals.subtotal).toBe(apiTotals.subtotal)
+        expect(formTotals.grandTotal).toBe(apiTotals.grandTotal)
     })
 
     it('セット扱い・サービス扱いの金額は合計に含まれない', () => {
