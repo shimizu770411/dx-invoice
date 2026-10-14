@@ -93,7 +93,8 @@ describe('見積画面: チェックの付け外し', () => {
         await fillLinkedFreeRow(page, WITH_LINKED_FREE_ROW, { name: 'E2E追加', qty: 2, general: 5000, member: 4000 })
         const { id } = await saveAndExpectConsistent(session, page, pdfPage, 'estimate', '追加行あり')
         const withRow = await readSaved(session, 'estimate', id)
-        const savedFreeNames = (withRow.raw.items ?? []).flatMap((it: any) => (it.freeItems ?? []).map((f: any) => f.productItemName))
+        // 自由入力行は取得APIで書類の直下（freeItems）にまとめて返る
+        const savedFreeNames = (withRow.raw.freeItems ?? []).map((f: any) => f.productItemName)
         expect(savedFreeNames, '追加行が保存される').toContain('E2E追加')
 
         await setChecked(page, WITH_LINKED_FREE_ROW, false)
@@ -101,9 +102,7 @@ describe('見積画面: チェックの付け外し', () => {
         expect(linked === null || linked.qty === 0, '外すと追加行の数量が0（または非表示）').toBe(true)
         const { id: id2 } = await saveAndExpectConsistent(session, page, pdfPage, 'estimate', '追加行の親を外した後')
         const without = await readSaved(session, 'estimate', id2)
-        const remaining = (without.raw.items ?? [])
-            .flatMap((it: any) => it.freeItems ?? [])
-            .filter((f: any) => f.productItemName === 'E2E追加' && Number(f.qty) > 0)
+        const remaining = (without.raw.freeItems ?? []).filter((f: any) => f.productItemName === 'E2E追加' && Number(f.qty) > 0)
         expect(remaining, '数量1以上の追加行が残らない').toHaveLength(0)
     })
 

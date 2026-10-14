@@ -141,17 +141,26 @@ export async function fillLinkedFreeRow(
     await settle(page)
 }
 
-// 合計欄（小計・消費税・合計・会費入金額・差引合計）
+// 画面下部に固定表示される合計欄（小計・消費税・合計・会費入金・差引合計）。
+// 見積は「小　計」、請求書は「小計」と表記が違うため、空白を除いて見出しを照合する
 export async function readScreenTotals(page: Page): Promise<ScreenTotals> {
     const texts = await page.evaluate(() => {
-        const labels = ['小　計', '消費税（10%）', '合　計', '会費入金額', '差引合計']
-        const all = Array.from(document.querySelectorAll('div'))
+        const labels = ['小計', '消費税', '合計', '会費入金', '差引合計']
+        const spans = Array.from(document.querySelectorAll('span'))
+        // 同じ見出しの文字が画面の別の場所にもあるため、隣に金額（¥）が並んでいるものだけを合計欄とみなす
         return labels.map((label) => {
-            const el = all.find((d) => d.children.length === 0 && d.textContent?.trim() === label)
-            return el?.nextElementSibling?.textContent ?? ''
+            const el = spans.find(
+                (s) =>
+                    s.children.length === 0 &&
+                    (s.textContent ?? '').replace(/\s/g, '') === label &&
+                    (s.nextElementSibling?.textContent ?? '').includes('¥')
+            )
+            return el ? (el.nextElementSibling?.textContent ?? '') : null
         })
     })
-    const [subtotal, tax, total, membershipPaidAmount, grandTotal] = texts.map(toNumber)
+    const missing = texts.findIndex((t) => t === null)
+    if (missing >= 0) throw new Error(`E2E: 画面の合計欄（${['小計', '消費税', '合計', '会費入金', '差引合計'][missing]}）が見つかりません`)
+    const [subtotal, tax, total, membershipPaidAmount, grandTotal] = (texts as string[]).map(toNumber)
     return { subtotal, tax, total, membershipPaidAmount: Math.abs(membershipPaidAmount), grandTotal }
 }
 
@@ -177,7 +186,8 @@ export async function save(page: Page): Promise<string> {
     const before = page.url()
     const clicked = await page.evaluate(() => {
         const button = Array.from(document.querySelectorAll('button')).find((b) =>
-            /^(登\s*録|更新|更新（本見積）)$/.test(b.textContent?.trim() ?? '')
+            // 見積は「登　録」「更新」「更新（本見積）」、請求書は「更　新」
+            /^(登\s*録|更\s*新|更新（本見積）)$/.test(b.textContent?.trim() ?? '')
         )
         if (!button || (button as HTMLButtonElement).disabled) return false
         ;(button as HTMLButtonElement).click()
