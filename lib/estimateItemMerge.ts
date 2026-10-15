@@ -8,6 +8,31 @@ import { expandMultiRowToItems } from '@/lib/expandMultiRow'
 // 画面のフックから切り離してあるのは、プラン切替と読み込みで挙動が変わる分岐が多く、
 // 単体テストで固定しておきたいため。
 
+/**
+ * 重箱のように種類のグループで選ぶ商品は、保存時に種類ごとの行へ分かれる（expandVariantGroupItems）。
+ * 開き直すときに、その行から画面の1行（代表行）の単価と数量を組み立て直す。見積・請求書の両方で使う。
+ * 各行の数量がそろっていれば「単価＝各種類の単価の合計・数量＝その数量」に戻す。
+ * そろっていなければ、金額を変えないよう「単価×数量の合計を単価・数量1」にする（以前の組み立て方）。
+ */
+export function buildVariantGroupRepresentative(
+    groupRows: Array<{ qty?: number | null; unitPriceGeneral: number; unitPriceMember: number }>
+): { unitPriceGeneral: number; unitPriceMember: number; qty: number } {
+    const qtys = groupRows.map((r) => r.qty || 1)
+    const sameQty = qtys.every((q) => q === qtys[0])
+    if (sameQty) {
+        return {
+            unitPriceGeneral: groupRows.reduce((s, r) => s + r.unitPriceGeneral, 0),
+            unitPriceMember: groupRows.reduce((s, r) => s + r.unitPriceMember, 0),
+            qty: qtys[0] ?? 1,
+        }
+    }
+    return {
+        unitPriceGeneral: groupRows.reduce((s, r, i) => s + r.unitPriceGeneral * qtys[i], 0),
+        unitPriceMember: groupRows.reduce((s, r, i) => s + r.unitPriceMember * qtys[i], 0),
+        qty: 1,
+    }
+}
+
 // 新規作成時: 商品マスタ → 初期明細行（プラン限定セット化商品は、その適用範囲が現在の会員区分に合う場合のみ qty=1）
 export function buildNewEstimateItems(filteredProducts: ProductItem[], isMember: boolean): EstimateItem[] {
     const ordered: EstimateItem[] = []
@@ -143,9 +168,7 @@ export function buildEstimateItemsForProduct(
             return [{
                 productItemId: product.id,
                 description: product.defaultDescription ?? '',
-                unitPriceGeneral: groupExisting.reduce((s, gi) => s + gi.unitPriceGeneral * (gi.qty || 1), 0),
-                unitPriceMember: groupExisting.reduce((s, gi) => s + gi.unitPriceMember * (gi.qty || 1), 0),
-                qty: 1,
+                ...buildVariantGroupRepresentative(groupExisting),
                 amount: 0,
                 sortNo: startSortNo,
                 productItem: { ...product },

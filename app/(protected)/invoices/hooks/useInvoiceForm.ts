@@ -19,6 +19,7 @@ import {
 import { useDocumentItems } from '@/hooks/useDocumentItems'
 import { expandEachModeItems, expandVariantGroupItems, buildDocumentFreeItems, isFreeItemToSave, MATURITY_SERVICE_NAME, CANCELLATION_FEE_NAME, EXECUTION_SURCHARGE_NAME, EXECUTION_SURCHARGE_AMOUNT } from '@/lib/documentUtils'
 import { useDocumentProductSearch } from '@/hooks/useDocumentProductSearch'
+import { buildVariantGroupRepresentative } from '@/lib/estimateItemMerge'
 import { InvoiceFormData } from '../schemas/InvoiceFormSchema'
 
 
@@ -146,9 +147,8 @@ export function useInvoiceEdit(invoiceId: string, reset: UseFormReset<InvoiceFor
                         mergedItems.push({
                             productItemId: product.id,
                             description: product.defaultDescription ?? '',
-                            unitPriceGeneral: groupExisting.reduce((s, gi) => s + gi.unitPriceGeneral * (gi.qty || 1), 0),
-                            unitPriceMember: groupExisting.reduce((s, gi) => s + gi.unitPriceMember * (gi.qty || 1), 0),
-                            qty: 1,
+                            // 見積と同じ組み立て方にする（数量2で保存したものは数量2のまま戻す）
+                            ...buildVariantGroupRepresentative(groupExisting),
                             amount: 0,
                             sortNo: mergedItems.length,
                             productItem: { ...product },
@@ -227,7 +227,9 @@ export function useInvoiceEdit(invoiceId: string, reset: UseFormReset<InvoiceFor
 
             const loadedFreeItems: InvoiceFreeItem[] = (invoiceData as any).freeItems || []
 
-            const paddedFreeItems = buildDocumentFreeItems(loadedFreeItems, mergedItems, [MATURITY_SERVICE_NAME, CANCELLATION_FEE_NAME])
+            // 固定行は満期サービス・施行割増券・解約手数料の3つ。以前は施行割増券が漏れていて、
+            // 請求書では施行割増券を入力できなかった
+            const paddedFreeItems = buildDocumentFreeItems(loadedFreeItems, mergedItems, FIXED_ROW_NAMES)
             setItems(mergedItems)
             setFreeItems(paddedFreeItems)
 

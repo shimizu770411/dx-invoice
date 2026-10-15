@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildMergedEstimateItems } from '@/lib/estimateItemMerge'
+import { buildMergedEstimateItems, buildVariantGroupRepresentative } from '@/lib/estimateItemMerge'
 
 /**
  * 見積を開いたとき、担当者が外した初期セット品のチェックが復活してしまう不具合の再発防止。
@@ -111,5 +111,38 @@ describe('保存済み明細がある商品', () => {
     it('読み込み時は保存済みの数量をそのまま保つ', () => {
         const row = merge(product({ isSoleSetParentChild: true }), false, false, existing({ qty: 3 }))[0]
         expect(row.qty).toBe(3)
+    })
+})
+
+/**
+ * 重箱のように種類のグループで選ぶ商品は、保存時に種類ごとの行へ分かれる。
+ * 開き直すときは、その行から画面の1行（代表行）の単価と数量を組み立て直す。
+ * 数量2で保存したものは数量2のまま戻し、単価×数量が保存時の金額と一致しなければならない。
+ */
+describe('種類のグループで選ぶ商品の代表行', () => {
+    const row = (qty: number, general: number, member: number) => ({ qty, unitPriceGeneral: general, unitPriceMember: member })
+
+    it('各行の数量がそろっていれば、単価は各種類の単価の合計、数量はその数量', () => {
+        expect(buildVariantGroupRepresentative([row(2, 15200, 15200), row(2, 4170, 4170)])).toEqual({
+            unitPriceGeneral: 19370,
+            unitPriceMember: 19370,
+            qty: 2,
+        })
+    })
+
+    it('数量1で保存された既存の書類は、今までと同じ単価・数量1になる', () => {
+        expect(buildVariantGroupRepresentative([row(1, 15200, 14000), row(1, 4170, 4000)])).toEqual({
+            unitPriceGeneral: 19370,
+            unitPriceMember: 18000,
+            qty: 1,
+        })
+    })
+
+    it('数量がそろっていない行は、金額が変わらないよう単価×数量の合計を単価にして数量1にする', () => {
+        expect(buildVariantGroupRepresentative([row(2, 1000, 1000), row(3, 500, 500)])).toEqual({
+            unitPriceGeneral: 3500,
+            unitPriceMember: 3500,
+            qty: 1,
+        })
     })
 })
