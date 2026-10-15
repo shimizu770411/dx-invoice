@@ -170,9 +170,9 @@ export async function fillFreeRow(
     ]
     if (memberInput) entries.push([memberInput, String(values.member)])
     for (const [input, value] of entries) {
-        // 金額欄は選択中に「-」を打つと置き換えではなく符号の反転になるため、一度消してから打つ
+        // 利用者と同じく、入力済みの値を選択したまま打ち直す。
+        // 2026-10-15、マイナスの金額を選択して「-」から打ち直すと「-」が消え、プラスで入っていた
         await input.click({ clickCount: 3 })
-        await page.keyboard.press('Backspace')
         await input.type(value)
     }
     await page.keyboard.press('Tab')
