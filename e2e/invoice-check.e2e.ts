@@ -7,6 +7,7 @@ import { assertLocalEnvironment } from './helpers/env'
 import { gotoAndSettle, openSession, type Session } from './helpers/session'
 import { cleanupTestCases, createTestCase } from './helpers/testData'
 import {
+    fillFreeRow,
     fillLinkedFreeRow,
     getLinkedFreeRow,
     getQtys,
@@ -21,6 +22,7 @@ const PARENT_ALTAR = '式場祭壇'
 const MULTI_ROW_WITH_FIXED = '会葬礼状'
 const WITH_LINKED_FREE_ROW = '控室管理費'
 const EXECUTION_SURCHARGE_ROW = '施行割増券'
+const NEGATIVE_FREE_ROW = 'E2E値引'
 
 describe('請求書画面: チェックの付け外し', () => {
     let session: Session
@@ -96,5 +98,14 @@ describe('請求書画面: チェックの付け外し', () => {
             EXECUTION_SURCHARGE_ROW
         )
         expect(hasRow, `${EXECUTION_SURCHARGE_ROW} の行`).toBe(true)
+    })
+
+    it('11. 請求書でも自由項目にマイナスの金額を入れると、書類の会員区分の価格で合計が減る', async () => {
+        const invoice = await readSaved(session, 'invoice', invoiceId)
+        const before = await readScreenTotals(page)
+        await fillFreeRow(page, { name: NEGATIVE_FREE_ROW, qty: 2, general: -15000, member: -10000 })
+        const { screen } = await saveAndExpectConsistent(session, page, pdfPage, 'invoice', '請求書の自由項目にマイナス')
+        const discount = (invoice.isMember ? -10000 : -15000) * 2
+        expect(screen.subtotal, '小計がマイナス分だけ減る').toBe(before.subtotal + discount)
     })
 })

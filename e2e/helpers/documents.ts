@@ -28,7 +28,11 @@ export async function readPdf(page: Page, kind: DocKind, id: string): Promise<Pd
     const contentId = `#${kind}-pdf-content`
     await page.waitForSelector(`${contentId} tfoot`)
     return page.evaluate((sel: string) => {
-        const num = (t: string | null | undefined) => Number((t ?? '').replace(/[^\d-]/g, '') || '0')
+        // PDFは負値を「▲12,000」と会計表記で印字する
+        const num = (t: string | null | undefined) => {
+            const value = Number((t ?? '').replace(/[^\d]/g, '') || '0')
+            return /[▲−-]/.test(t ?? '') ? -value : value
+        }
         const table = document.querySelector(`${sel} tfoot`)!.closest('table')!
         const headers = Array.from(table.querySelectorAll('thead th')).map((th) => (th.textContent ?? '').replace(/\s/g, ''))
         const rowFor = (label: string) =>

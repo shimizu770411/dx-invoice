@@ -141,6 +141,44 @@ export async function fillLinkedFreeRow(
     await settle(page)
 }
 
+// 明細表下部の「自由」行に品名・数量・一般価格・会員価格を入れる。
+// 品名が同じ行があればその行を書き換え、無ければ空いている自由行にチェックを入れて使う。
+// 会員価格の欄は会員の書類でだけ表示されるため、一般の書類では member を無視する
+export async function fillFreeRow(
+    page: Page,
+    values: { name: string; qty: number; general: number; member: number }
+): Promise<void> {
+    const handle = await page.evaluateHandle((target: string) => {
+        const freeRows = Array.from(document.querySelectorAll<HTMLTableRowElement>('table tbody tr')).filter(
+            (tr) => tr.querySelectorAll('td')[2]?.textContent?.trim() === '自由'
+        )
+        const nameOf = (tr: HTMLTableRowElement) => tr.querySelector<HTMLInputElement>('input[type=text]')?.value ?? ''
+        return freeRows.find((tr) => nameOf(tr) === target) ?? freeRows.find((tr) => nameOf(tr) === '') ?? null
+    }, values.name)
+    const row = handle.asElement() as ElementHandle<HTMLTableRowElement> | null
+    if (!row) throw new Error('E2E: 使える自由行がありません')
+    const checkbox = await row.$('input[type=checkbox]')
+    if (checkbox && !(await checkbox.evaluate((cb) => (cb as HTMLInputElement).checked))) {
+        await checkbox.click()
+        await settle(page)
+    }
+    const [nameInput, qtyInput, generalInput, memberInput] = await row.$$('input:not([type=checkbox])')
+    const entries: [ElementHandle, string][] = [
+        [nameInput, values.name],
+        [qtyInput, String(values.qty)],
+        [generalInput, String(values.general)],
+    ]
+    if (memberInput) entries.push([memberInput, String(values.member)])
+    for (const [input, value] of entries) {
+        // 金額欄は選択中に「-」を打つと置き換えではなく符号の反転になるため、一度消してから打つ
+        await input.click({ clickCount: 3 })
+        await page.keyboard.press('Backspace')
+        await input.type(value)
+    }
+    await page.keyboard.press('Tab')
+    await settle(page)
+}
+
 // 画面下部に固定表示される合計欄（小計・消費税・合計・会費入金・差引合計）。
 // 見積は「小　計」、請求書は「小計」と表記が違うため、空白を除いて見出しを照合する
 export async function readScreenTotals(page: Page): Promise<ScreenTotals> {
