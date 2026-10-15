@@ -340,7 +340,7 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
                         <div className="rounded border-2 border-black px-4 py-2">
                             <div className="flex items-center gap-2 justify-between">
                                 <span className="text-md font-bold">金額</span>
-                                <span className="text-3xl font-black">¥{grandTotal.toLocaleString()} −</span>
+                                <span className="text-3xl font-black">¥{fmtAmount(grandTotal)} −</span>
                             </div>
                         </div>
                     </div>
@@ -529,7 +529,7 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
                             </tfoot>
                         </table>
                         <div className="border border-x-0 border-black px-4 py-1 text-right bg-black text-white">
-                            <p className="text-lg font-bold">差引合計: ¥{grandTotal.toLocaleString()}</p>
+                            <p className="text-lg font-bold">差引合計: ¥{fmtAmount(grandTotal)}</p>
                         </div>
                     </div>
 
