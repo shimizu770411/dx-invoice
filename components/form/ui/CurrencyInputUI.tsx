@@ -1,5 +1,8 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { NumericFormat } from 'react-number-format'
+
+// 入力途中の「-」だけの状態。数値ではないため、フォームには空として渡る
+const MINUS_ONLY = '-'
 
 interface CurrencyInputUIProps {
     value?: string | number
@@ -26,6 +29,10 @@ export function CurrencyInputUI({
     prefix,
     suffix,
 }: CurrencyInputUIProps) {
+    // 入力済みの金額を選択して「-」を打つと、フォームの値が金額から空に変わり、
+    // それを受けて表示も空に戻されて「-」が消える（続けて打った数字がプラスで入る）。
+    // 「-」だけの間は表示をこちらで保持し、数字が続いた時点でマイナスの金額として確定させる
+    const [minusOnly, setMinusOnly] = useState(false)
     return (
         <div>
             {label && (
@@ -37,8 +44,10 @@ export function CurrencyInputUI({
             <div className="flex w-full items-center">
                 {prefix && <span className="mr-2 flex-shrink-0">{prefix}</span>}
                 <NumericFormat
-                    value={value}
+                    value={minusOnly ? MINUS_ONLY : value}
+                    valueIsNumericString={minusOnly}
                     onValueChange={(values) => {
+                        setMinusOnly(values.value === MINUS_ONLY)
                         onChange(values.floatValue ?? '')
                     }}
                     onBlur={onBlur}

@@ -8,6 +8,7 @@ import { assertLocalEnvironment } from './helpers/env'
 import { gotoAndSettle, openSession, type Session } from './helpers/session'
 import { cleanupTestCases, createTestCase } from './helpers/testData'
 import {
+    fillFreeRow,
     fillLinkedFreeRow,
     getLinkedFreeRow,
     getQtys,
@@ -28,6 +29,9 @@ const MULTI_ROW_WITH_FIXED = '会葬礼状' // 「礼状版代（固定）」の
 const MULTI_ROW_CHILD = '霊柩車' // 親祭壇の子で、車種（固定）＋距離加算の2行
 const WITH_LINKED_FREE_ROW = '控室管理費'
 const VARIANT_GROUP = '重箱'
+const NEGATIVE_FREE_ROW = 'E2E値引'
+// 明細の合計を確実に上回るマイナス額
+const BEYOND_ALL_ITEMS = 10_000_000
 
 describe('見積画面: チェックの付け外し', () => {
     let session: Session
@@ -129,5 +133,24 @@ describe('見積画面: チェックの付け外し', () => {
         await saveAndExpectConsistent(session, page, pdfPage, 'estimate', '一般に切り替え')
         const pdf = await readPdf(pdfPage, 'estimate', estimateId)
         expect(pdf.headers, 'PDFの見出し').not.toContain('会員価格')
+    })
+
+    it('10. 自由項目にマイナスの金額を入れると、その分だけ合計が減り、明細を上回れば差引合計もマイナスになる', async () => {
+        // 直前の場面で一般の書類に切り替えているので、一般価格で計算される。
+        // 直前の場面はPDFのタブを前に出したまま終わるため、編集画面を前に戻してから操作する
+        await page.bringToFront()
+        const before = await readScreenTotals(page)
+        await fillFreeRow(page, { name: NEGATIVE_FREE_ROW, qty: 1, general: -30000, member: -20000 })
+        const { id, screen } = await saveAndExpectConsistent(session, page, pdfPage, 'estimate', '自由項目にマイナス')
+        expect(screen.subtotal, '小計がマイナス分だけ減る').toBe(before.subtotal - 30000)
+        const saved = await readSaved(session, 'estimate', id)
+        const row = (saved.raw.freeItems ?? []).find((f: any) => f.productItemName === NEGATIVE_FREE_ROW)
+        expect(Number(row?.unitPriceGeneral), 'マイナスの一般価格が保存される').toBe(-30000)
+
+        await fillFreeRow(page, { name: NEGATIVE_FREE_ROW, qty: 1, general: -BEYOND_ALL_ITEMS, member: -BEYOND_ALL_ITEMS })
+        const { screen: negative } = await saveAndExpectConsistent(session, page, pdfPage, 'estimate', '明細を上回るマイナス')
+        expect(negative.subtotal, '小計がマイナス').toBeLessThan(0)
+        expect(negative.tax, '消費税がマイナス').toBeLessThan(0)
+        expect(negative.grandTotal, '差引合計がマイナス').toBeLessThan(0)
     })
 })
