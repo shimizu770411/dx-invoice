@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin } from '@/lib/auth-middleware'
 import { serializeBigInt } from '@/lib/prisma-utils'
+import { VARIANT_FIELDS, diffFields } from '@/lib/masterChangeDiff'
+import {
+    MasterChangeAction,
+    MasterChangeTargetType,
+    buildDefaultSetClearedChanges,
+    loadVariantSnapshot,
+    recordMasterChange,
+    variantTargetName,
+} from '@/lib/masterChangeLog'
 
 export async function PUT(
     request: NextRequest,
@@ -29,22 +38,38 @@ export async function PUT(
         // 初期セットがONになる場合、setPriceは0扱い
         if (data.isDefaultSet === true) data.setPrice = 0
 
+        const productItemId = BigInt(params.id)
+        const variantId = BigInt(params.variantId)
         const updated = await prisma.$transaction(async (tx) => {
+            const before = await loadVariantSnapshot(tx, variantId)
             // 初期セットONなら、同商品の他種類の isDefaultSet を OFF に
+            const clearedChanges =
+                data.isDefaultSet === true ? await buildDefaultSetClearedChanges(tx, productItemId, variantId) : []
             if (data.isDefaultSet === true) {
                 await tx.productVariant.updateMany({
                     where: {
-                        productItemId: BigInt(params.id),
-                        id: { not: BigInt(params.variantId) },
+                        productItemId,
+                        id: { not: variantId },
                     },
                     data: { isDefaultSet: false },
                 })
             }
-            return tx.productVariant.update({
-                where: { id: BigInt(params.variantId) },
+            const variant = await tx.productVariant.update({
+                where: { id: variantId },
                 data,
                 include: { store: true },
             })
+
+            const after = await loadVariantSnapshot(tx, variantId)
+            await recordMasterChange(tx, {
+                userId: authResult.payload.sub,
+                targetType: MasterChangeTargetType.PRODUCT_VARIANT,
+                action: MasterChangeAction.UPDATE,
+                targetId: productItemId,
+                targetName: variantTargetName(after?.productName ?? '', variant.name),
+                changes: [...diffFields(before, after, VARIANT_FIELDS), ...clearedChanges],
+            })
+            return variant
         })
         return NextResponse.json(serializeBigInt(updated))
     } catch (error: any) {
@@ -71,18 +96,29 @@ export async function DELETE(
         ])
         const inUse = estimateRefs + invoiceRefs > 0
 
-        if (inUse) {
-            // 使用履歴あり → 論理削除（isActive=false）
-            await prisma.productVariant.update({
-                where: { id: variantId },
-                data: { isActive: false },
+        await prisma.$transaction(async (tx) => {
+            const before = await loadVariantSnapshot(tx, variantId)
+            if (inUse) {
+                // 使用履歴あり → 論理削除（isActive=false）
+                await tx.productVariant.update({
+                    where: { id: variantId },
+                    data: { isActive: false },
+                })
+            } else {
+                // 未使用 → 物理削除
+                await tx.productVariant.delete({ where: { id: variantId } })
+            }
+            await recordMasterChange(tx, {
+                userId: authResult.payload.sub,
+                targetType: MasterChangeTargetType.PRODUCT_VARIANT,
+                action: inUse ? MasterChangeAction.DEACTIVATE : MasterChangeAction.DELETE,
+                targetId: BigInt(params.id),
+                targetName: variantTargetName(before?.productName ?? '', before?.name ?? ''),
+                changes: inUse ? diffFields(before, before && { ...before, isActive: false }, VARIANT_FIELDS) : [],
             })
-            return NextResponse.json({ deleted: 'logical' })
-        }
+        })
 
-        // 未使用 → 物理削除
-        await prisma.productVariant.delete({ where: { id: variantId } })
-        return NextResponse.json({ deleted: 'physical' })
+        return NextResponse.json({ deleted: inUse ? 'logical' : 'physical' })
     } catch (error: any) {
         console.error('Delete variant error:', error)
         return NextResponse.json({ error: 'Internal server error', message: error.message }, { status: 500 })

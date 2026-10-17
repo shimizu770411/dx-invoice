@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, requireAdmin } from '@/lib/auth-middleware'
 import { serializeBigInt } from '@/lib/prisma-utils'
+import { buildPlanSettingChanges } from '@/lib/masterChangeDiff'
+import {
+    MASTER_SAVE_TX_TIMEOUT_MS,
+    MasterChangeAction,
+    MasterChangeTargetType,
+    recordMasterChange,
+} from '@/lib/masterChangeLog'
 
 export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
     const params = await props.params
@@ -73,11 +80,23 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
             .map((s: any) => BigInt(s.productItemId))
         const productItems = await prisma.productItem.findMany({
             where: { id: { in: productItemIds } },
-            select: { id: true, isSetParent: true, isSetChild: true, variants: { select: { id: true } } },
+            select: {
+                id: true,
+                name: true,
+                isSetParent: true,
+                isSetChild: true,
+                variants: { select: { id: true, name: true } },
+            },
         })
         const productItemMap = new Map(productItems.map((p) => [p.id.toString(), p]))
+        const variantName = (product: (typeof productItems)[number], variantId: bigint | null) =>
+            variantId ? (product.variants.find((v) => v.id === variantId)?.name ?? null) : null
 
         await prisma.$transaction(async (tx) => {
+            const beforeSettings = await tx.productPlanSetting.findMany({ where: { planId } })
+            const beforeMap = new Map(beforeSettings.map((b) => [b.productItemId.toString(), b]))
+            const changeItems: Parameters<typeof buildPlanSettingChanges>[0] = []
+
             for (const s of settings) {
                 if (!s || s.productItemId === undefined) continue
                 const productItemId = BigInt(s.productItemId)
@@ -107,8 +126,37 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
                         update: { isVisible, setableScope, overrideDefaultVariantId },
                     })
                 }
+
+                const prev = beforeMap.get(productItemId.toString())
+                changeItems.push({
+                    productName: product.name,
+                    before: prev
+                        ? {
+                              isVisible: prev.isVisible,
+                              setableScope: prev.setableScope,
+                              overrideDefaultVariantName: variantName(product, prev.overrideDefaultVariantId),
+                          }
+                        : null,
+                    after: isDefault
+                        ? null
+                        : {
+                              isVisible,
+                              setableScope,
+                              overrideDefaultVariantName: variantName(product, overrideDefaultVariantId),
+                          },
+                })
             }
-        })
+
+            const plan = await tx.plan.findUnique({ where: { id: planId }, select: { name: true } })
+            await recordMasterChange(tx, {
+                userId: authResult.payload.sub,
+                targetType: MasterChangeTargetType.PLAN_PRODUCT_SETTING,
+                action: MasterChangeAction.UPDATE,
+                targetId: planId,
+                targetName: plan?.name ?? '',
+                changes: buildPlanSettingChanges(changeItems),
+            })
+        }, { timeout: MASTER_SAVE_TX_TIMEOUT_MS })
 
         return NextResponse.json({ count: settings.length })
     } catch (error: any) {

@@ -62,7 +62,8 @@ export const caseFormSchema = z.object({
     estimateDisplayName: z.string().max(8, '8文字以内で入力してください').optional(),
 
     // 喪主情報
-    chiefMournerName: z.coerce.string().min(1, '必須です'),
+    // 任意項目。未登録の案件は null で返るため、文字列 "null" にせず空文字として扱う
+    chiefMournerName: z.string().nullish().transform((v) => v ?? ''),
     chiefMournerRelation: z.string().optional(),
     chiefMournerPostalCode: z.string().optional().default(''),
     chiefMournerCityId: z.string().optional(),

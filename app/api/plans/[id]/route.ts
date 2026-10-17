@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin } from '@/lib/auth-middleware'
 import { serializeBigInt } from '@/lib/prisma-utils'
+import { PLAN_FIELDS, diffFields } from '@/lib/masterChangeDiff'
+import { MasterChangeAction, MasterChangeTargetType, recordMasterChange } from '@/lib/masterChangeLog'
 
 // 基本プラン（id=1）は Estimate/Invoice の plan_id デフォルト値が参照しているため削除不可
 const BASE_PLAN_ID = BigInt(1)
@@ -18,9 +20,22 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
         if (body.sortNo !== undefined) data.sortNo = Number(body.sortNo) || 0
         if (body.isActive !== undefined) data.isActive = Boolean(body.isActive)
 
-        const updated = await prisma.plan.update({
-            where: { id: BigInt(params.id) },
-            data,
+        const id = BigInt(params.id)
+        const updated = await prisma.$transaction(async (tx) => {
+            const before = await tx.plan.findUnique({ where: { id } })
+            const plan = await tx.plan.update({
+                where: { id },
+                data,
+            })
+            await recordMasterChange(tx, {
+                userId: authResult.payload.sub,
+                targetType: MasterChangeTargetType.PLAN,
+                action: MasterChangeAction.UPDATE,
+                targetId: id,
+                targetName: plan.name,
+                changes: diffFields(before, plan, PLAN_FIELDS),
+            })
+            return plan
         })
         return NextResponse.json(serializeBigInt(updated))
     } catch (error: any) {
@@ -40,9 +55,21 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
             return NextResponse.json({ error: '基本プランは削除できません' }, { status: 400 })
         }
 
-        const updated = await prisma.plan.update({
-            where: { id },
-            data: { isActive: false },
+        const updated = await prisma.$transaction(async (tx) => {
+            const before = await tx.plan.findUnique({ where: { id } })
+            const plan = await tx.plan.update({
+                where: { id },
+                data: { isActive: false },
+            })
+            await recordMasterChange(tx, {
+                userId: authResult.payload.sub,
+                targetType: MasterChangeTargetType.PLAN,
+                action: MasterChangeAction.DEACTIVATE,
+                targetId: id,
+                targetName: plan.name,
+                changes: diffFields(before, plan, PLAN_FIELDS),
+            })
+            return plan
         })
         return NextResponse.json(serializeBigInt(updated))
     } catch (error: any) {

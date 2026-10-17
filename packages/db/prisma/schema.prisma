@@ -78,6 +78,24 @@ enum OperationEntityType {
   FLOWER
 }
 
+// 商品マスタ・プラン設定の変更履歴の対象
+enum MasterChangeTargetType {
+  PRODUCT
+  PRODUCT_VARIANT
+  PRODUCT_SET
+  PRODUCT_ORDER
+  PLAN
+  PLAN_PRODUCT_SETTING
+  PLAN_SURCHARGE
+}
+
+enum MasterChangeAction {
+  CREATE
+  UPDATE
+  DELETE
+  DEACTIVATE
+}
+
 model User {
   id         BigInt   @id @default(autoincrement())
   name       String   @db.VarChar(100)
@@ -97,6 +115,7 @@ model User {
   clerkConfirmedInvoices    Invoice[] @relation("InvoiceClerkConfirmedBy")
   approverConfirmedInvoices Invoice[] @relation("InvoiceApproverConfirmedBy")
   operationLogs             OperationLog[]
+  masterChangeLogs          MasterChangeLog[]
 
   @@map("users")
 }
@@ -831,4 +850,27 @@ model OperationLog {
   @@index([userId, occurredAt])
   @@index([entityType, action, occurredAt])
   @@map("operation_logs")
+}
+
+// 商品マスタ・プラン設定を「誰が・いつ・何をどう変えたか」の履歴。1回の保存操作＝1行。
+// 変更本体と同じトランザクションで書き、記録できなければ保存ごと失敗させる（lib/masterChangeLog.ts）。
+// 商品は物理削除されることがあるため、対象名は記録時点の値を targetName に持つ。
+// targetId は商品系（商品・種類・セット子商品）なら商品ID、プラン系ならプランID、商品並び順は null。
+model MasterChangeLog {
+  id         BigInt                 @id @default(autoincrement())
+  userId     BigInt?                @map("user_id")
+  targetType MasterChangeTargetType @map("target_type")
+  action     MasterChangeAction
+  targetId   BigInt?                @map("target_id")
+  targetName String                 @db.VarChar(200) @map("target_name")
+  // 変わった項目の一覧 [{ label, before, after, subject? }]（subject はプラン別設定などで対象商品名を持つ）
+  changes    Json                   @default("[]")
+  occurredAt DateTime               @default(now()) @db.Timestamptz(6) @map("occurred_at")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([occurredAt])
+  @@index([userId, occurredAt])
+  @@index([targetType, targetId])
+  @@map("master_change_logs")
 }

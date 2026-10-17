@@ -36,11 +36,16 @@ describe('caseFormSchema — 必須フィールド', () => {
         }
     })
 
-    it('chiefMournerName が空だとエラー', () => {
+    it('chiefMournerName は任意（空でも登録できる）', () => {
         const result = caseFormSchema.safeParse({ ...validBase, chiefMournerName: '' })
-        expect(result.success).toBe(false)
-        if (!result.success) {
-            expect(result.error.flatten().fieldErrors.chiefMournerName).toBeDefined()
+        expect(result.success).toBe(true)
+    })
+
+    it('chiefMournerName が未登録(null)の案件を開いても、文字列 "null" にならず空のまま', () => {
+        const result = caseFormSchema.safeParse({ ...validBase, chiefMournerName: null })
+        expect(result.success).toBe(true)
+        if (result.success) {
+            expect(result.data.chiefMournerName).toBe('')
         }
     })
 

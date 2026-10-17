@@ -6,7 +6,8 @@ export const documentItemFieldSchema = z.object({
     description: z.string(),
 })
 
-// 満期サービスは控除扱いのため 0 以下（負値=控除、0=未利用）。それ以外のフリー項目は 0 以上。
+// 満期サービスは控除扱いのため 0 以下（負値=控除、0=未利用）。
+// 自由入力行は値引・返金などを書けるよう負値も許可する。商品に紐付く追加行は 0 以上。
 export const documentFreeItemFieldSchema = z
     .object({
         parentProductItemId: z.string().nullable().optional(),
@@ -33,8 +34,8 @@ export const documentFreeItemFieldSchema = z
                     message: `施行割増券は${EXECUTION_SURCHARGE_AMOUNT.toLocaleString()}円固定です`,
                 })
             }
-        } else {
-            // 固定行以外は一般価格・会員価格の両方を持つ（固定行は一般価格の欄だけを使う）
+        } else if (data.parentProductItemId) {
+            // 追加行は一般価格・会員価格の両方を持つ（固定行は一般価格の欄だけを使う）
             for (const path of ['unitPriceGeneral', 'unitPriceMember'] as const) {
                 if (data[path] < 0) {
                     ctx.addIssue({

@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, requireAdmin } from '@/lib/auth-middleware'
 import { serializeBigInt } from '@/lib/prisma-utils'
+import { VARIANT_FIELDS, diffFields } from '@/lib/masterChangeDiff'
+import {
+    MasterChangeAction,
+    MasterChangeTargetType,
+    buildDefaultSetClearedChanges,
+    loadVariantSnapshot,
+    recordMasterChange,
+    variantTargetName,
+} from '@/lib/masterChangeLog'
 
 export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
     const params = await props.params
@@ -41,6 +50,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
 
         const created = await prisma.$transaction(async (tx) => {
             // 初期セット ON の場合、同商品の他種類の isDefaultSet を OFF に
+            const clearedChanges = isDefaultSet ? await buildDefaultSetClearedChanges(tx, productItemId, null) : []
             if (isDefaultSet) {
                 await tx.productVariant.updateMany({
                     where: { productItemId },
@@ -56,7 +66,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
                 })
                 sortNo = (max._max.sortNo ?? -1) + 1
             }
-            return tx.productVariant.create({
+            const variant = await tx.productVariant.create({
                 data: {
                     productItemId,
                     storeId: body.storeId ? BigInt(body.storeId) : null,
@@ -74,6 +84,17 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
                 },
                 include: { store: true },
             })
+
+            const after = await loadVariantSnapshot(tx, variant.id)
+            await recordMasterChange(tx, {
+                userId: authResult.payload.sub,
+                targetType: MasterChangeTargetType.PRODUCT_VARIANT,
+                action: MasterChangeAction.CREATE,
+                targetId: productItemId,
+                targetName: variantTargetName(after?.productName ?? '', variant.name),
+                changes: [...diffFields(null, after, VARIANT_FIELDS), ...clearedChanges],
+            })
+            return variant
         })
         return NextResponse.json(serializeBigInt(created), { status: 201 })
     } catch (error: any) {

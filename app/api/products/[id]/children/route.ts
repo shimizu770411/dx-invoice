@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, requireAdmin } from '@/lib/auth-middleware'
 import { serializeBigInt } from '@/lib/prisma-utils'
+import { SET_CHILD_FIELDS, diffCollection } from '@/lib/masterChangeDiff'
+import { MasterChangeAction, MasterChangeTargetType, recordMasterChange } from '@/lib/masterChangeLog'
 
 /**
  * 親商品に紐づく子商品一覧を取得 (GET) または一括設定 (PUT)
@@ -35,6 +37,16 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
 
         const parentId = BigInt(params.id)
         await prisma.$transaction(async (tx) => {
+            const loadLinks = async () =>
+                (
+                    await tx.productSet.findMany({
+                        where: { parentId },
+                        include: { child: { select: { name: true } } },
+                        orderBy: { sortNo: 'asc' },
+                    })
+                ).map((l) => ({ childId: l.childId.toString(), name: l.child.name, sortNo: l.sortNo }))
+            const before = await loadLinks()
+
             await tx.productSet.deleteMany({ where: { parentId } })
             if (childIds.length > 0) {
                 await tx.productSet.createMany({
@@ -45,6 +57,20 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
                     })),
                 })
             }
+
+            const parent = await tx.productItem.findUnique({ where: { id: parentId }, select: { name: true } })
+            await recordMasterChange(tx, {
+                userId: authResult.payload.sub,
+                targetType: MasterChangeTargetType.PRODUCT_SET,
+                action: MasterChangeAction.UPDATE,
+                targetId: parentId,
+                targetName: parent?.name ?? '',
+                changes: diffCollection(before, await loadLinks(), {
+                    key: (l) => l.childId,
+                    subject: (l) => `子商品「${l.name}」`,
+                    defs: SET_CHILD_FIELDS,
+                }),
+            })
         })
 
         return NextResponse.json({ ok: true, count: childIds.length })

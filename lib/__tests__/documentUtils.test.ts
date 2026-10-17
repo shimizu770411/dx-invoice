@@ -97,6 +97,29 @@ describe('グループ商品の展開', () => {
         expect(rows[1].noChargeScope).toBe('NONE')
         expect(rows[1].amount).toBe(10000)
     })
+
+    // 2026-10-14、画面で数量2にしても保存時に数量1へ戻され、画面の合計だけが多くなっていた
+    it('画面の数量を、展開後の各行の数量と金額に反映する', () => {
+        const rows = expandVariantGroupItems([buildItem({ qty: 2 })], false)
+        expect(rows.map((r) => r.qty)).toEqual([2, 2])
+        expect(rows[1].amount).toBe(20000)
+    })
+
+    it('まとめ表示の行にも画面の数量を反映する', () => {
+        const merged = buildItem({
+            qty: 2,
+            productItem: {
+                hasVariantGroups: true,
+                variantGroups: [
+                    { id: 10, selectionType: 'MULTI', variants: [variant(1, 'A', false), variant(2, 'B', false)] },
+                ],
+            },
+        })
+        const rows = expandVariantGroupItems([merged], false)
+        expect(rows).toHaveLength(1)
+        expect(rows[0].qty).toBe(2)
+        expect(rows[0].amount).toBe(40000) // (10,000 + 10,000) × 2
+    })
 })
 describe('フリー行追加がONの商品の親リンク行', () => {
     // 控室管理費のように「フリー行追加」が ON の商品。

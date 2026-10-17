@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, requireAdmin } from '@/lib/auth-middleware'
 import { serializeBigInt } from '@/lib/prisma-utils'
+import { buildProductChanges } from '@/lib/masterChangeDiff'
+import {
+    MasterChangeAction,
+    MasterChangeTargetType,
+    loadProductSnapshot,
+    recordMasterChange,
+} from '@/lib/masterChangeLog'
 
 export async function GET(request: NextRequest) {
     try {
@@ -80,66 +87,77 @@ export async function POST(request: NextRequest) {
         const normalizeScope = (v: unknown) =>
             SCOPE_VALUES.includes(v as any) ? (v as (typeof SCOPE_VALUES)[number]) : 'NONE'
 
-        const created = await prisma.productItem.create({
-            data: {
-                name: body.name,
-                isActive: body.isActive !== false,
-                isSetParent: Boolean(body.isSetParent),
-                isSetChild: Boolean(body.isSetChild),
-                serviceableScope: normalizeScope(body.serviceableScope),
-                setableScope: normalizeScope(body.setableScope),
-                isMaturityServiceable: Boolean(body.isMaturityServiceable),
-                isMultiRow: Boolean(body.isMultiRow),
-                canAddFreeRow: Boolean(body.canAddFreeRow),
-                hasVariantGroups: Boolean(body.hasVariantGroups),
-                overwriteDescriptionOnVariantChange: Boolean(body.overwriteDescriptionOnVariantChange),
-                showProductVariantName: Boolean(body.showProductVariantName),
-                showQtyInDescription: Boolean(body.showQtyInDescription),
-                defaultDescription: body.defaultDescription || null,
-                variantGroups: Array.isArray(body.groups)
-                    ? {
-                          create: body.groups.map((g: any, gIdx: number) => ({
-                              label: typeof g.label === 'string' ? g.label : '',
-                              selectionType: g.selectionType === 'MULTI' ? 'MULTI' : 'SINGLE',
-                              isRequired: Boolean(g.isRequired),
-                              mergeDisplay: g.mergeDisplay !== false,
-                              sortNo: gIdx,
-                          })),
-                      }
-                    : undefined,
-                rows: Array.isArray(body.rows)
-                    ? {
-                          create: body.rows.map((row: any, rowIdx: number) => ({
-                              label: typeof row.label === 'string' ? row.label : '',
-                              calcType: row.calcType === 'FIXED' ? 'FIXED' : 'UNIT_PRICE_X_QTY',
-                              defaultQty: Number.isFinite(Number(row.defaultQty))
-                                  ? Number(row.defaultQty)
-                                  : 1,
-                              hasReturn: Boolean(row.hasReturn),
-                              sortNo: rowIdx,
-                              isActive: row.isActive !== false,
-                              variants: {
-                                  create: (Array.isArray(row.variants) ? row.variants : []).map(
-                                      (v: any, vIdx: number) => ({
-                                          label: typeof v.label === 'string' ? v.label : '',
-                                          imageUrl:
-                                              typeof v.imageUrl === 'string' && v.imageUrl
-                                                  ? v.imageUrl
-                                                  : null,
-                                          unitPrice: Number.isFinite(Number(v.unitPrice))
-                                              ? Number(v.unitPrice)
-                                              : 0,
-                                          isDefault: Boolean(v.isDefault),
-                                          sortNo: vIdx,
-                                          isActive: v.isActive !== false,
-                                      })
-                                  ),
-                              },
-                          })),
-                      }
-                    : undefined,
-            },
-            include: { variants: true, rows: { include: { variants: true } }, variantGroups: { include: { variants: true } } },
+        const created = await prisma.$transaction(async (tx) => {
+            const item = await tx.productItem.create({
+                data: {
+                    name: body.name,
+                    isActive: body.isActive !== false,
+                    isSetParent: Boolean(body.isSetParent),
+                    isSetChild: Boolean(body.isSetChild),
+                    serviceableScope: normalizeScope(body.serviceableScope),
+                    setableScope: normalizeScope(body.setableScope),
+                    isMaturityServiceable: Boolean(body.isMaturityServiceable),
+                    isMultiRow: Boolean(body.isMultiRow),
+                    canAddFreeRow: Boolean(body.canAddFreeRow),
+                    hasVariantGroups: Boolean(body.hasVariantGroups),
+                    overwriteDescriptionOnVariantChange: Boolean(body.overwriteDescriptionOnVariantChange),
+                    showProductVariantName: Boolean(body.showProductVariantName),
+                    showQtyInDescription: Boolean(body.showQtyInDescription),
+                    defaultDescription: body.defaultDescription || null,
+                    variantGroups: Array.isArray(body.groups)
+                        ? {
+                              create: body.groups.map((g: any, gIdx: number) => ({
+                                  label: typeof g.label === 'string' ? g.label : '',
+                                  selectionType: g.selectionType === 'MULTI' ? 'MULTI' : 'SINGLE',
+                                  isRequired: Boolean(g.isRequired),
+                                  mergeDisplay: g.mergeDisplay !== false,
+                                  sortNo: gIdx,
+                              })),
+                          }
+                        : undefined,
+                    rows: Array.isArray(body.rows)
+                        ? {
+                              create: body.rows.map((row: any, rowIdx: number) => ({
+                                  label: typeof row.label === 'string' ? row.label : '',
+                                  calcType: row.calcType === 'FIXED' ? 'FIXED' : 'UNIT_PRICE_X_QTY',
+                                  defaultQty: Number.isFinite(Number(row.defaultQty))
+                                      ? Number(row.defaultQty)
+                                      : 1,
+                                  hasReturn: Boolean(row.hasReturn),
+                                  sortNo: rowIdx,
+                                  isActive: row.isActive !== false,
+                                  variants: {
+                                      create: (Array.isArray(row.variants) ? row.variants : []).map(
+                                          (v: any, vIdx: number) => ({
+                                              label: typeof v.label === 'string' ? v.label : '',
+                                              imageUrl:
+                                                  typeof v.imageUrl === 'string' && v.imageUrl
+                                                      ? v.imageUrl
+                                                      : null,
+                                              unitPrice: Number.isFinite(Number(v.unitPrice))
+                                                  ? Number(v.unitPrice)
+                                                  : 0,
+                                              isDefault: Boolean(v.isDefault),
+                                              sortNo: vIdx,
+                                              isActive: v.isActive !== false,
+                                          })
+                                      ),
+                                  },
+                              })),
+                          }
+                        : undefined,
+                },
+                include: { variants: true, rows: { include: { variants: true } }, variantGroups: { include: { variants: true } } },
+            })
+            await recordMasterChange(tx, {
+                userId: authResult.payload.sub,
+                targetType: MasterChangeTargetType.PRODUCT,
+                action: MasterChangeAction.CREATE,
+                targetId: item.id,
+                targetName: item.name,
+                changes: buildProductChanges(null, await loadProductSnapshot(tx, item.id)),
+            })
+            return item
         })
 
         return NextResponse.json(serializeBigInt(created), { status: 201 })

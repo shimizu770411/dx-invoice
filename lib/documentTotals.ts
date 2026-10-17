@@ -97,9 +97,10 @@ export function calcFreeItemsSubtotal(freeItems: FreeItemForTotal[] | undefined,
  * 会費入金額を差し引いた差引合計。
  * 会費入金は互助会員が事前に積み立てたお金なので、会員の書類でのみ差し引く。
  * 一般の書類でこれが登録されている場合は会員区分の設定漏れなので、保存時に確認する。
+ * 自由入力行のマイナス金額や会費入金額が合計を上回る場合は、0 で止めずマイナスのまま返す。
  */
 export function calcGrandTotal(total: number, membershipPaidAmount: number, isMember: boolean): number {
-    return Math.max(0, total - (isMember ? membershipPaidAmount : 0))
+    return total - (isMember ? membershipPaidAmount : 0)
 }
 
 type MembershipLike = {

@@ -345,6 +345,40 @@ describe('自由入力行の一般価格・会員価格', () => {
     })
 })
 
+describe('自由入力行のマイナス金額', () => {
+    const items = [item({ qty: 1, unitPriceGeneral: 100000, unitPriceMember: 80000 })]
+    const freeItems = [{ productItemName: '値引', unitPriceGeneral: -30000, unitPriceMember: -20000, qty: 1 }]
+
+    it('小計・消費税・合計からマイナス分が差し引かれる', () => {
+        const general = calculateDocumentFormTotals(items, undefined, false, null, freeItems)
+        expect(general).toMatchObject({ subtotal: 70000, tax: 7000, total: 77000, grandTotal: 77000 })
+        const member = calculateDocumentFormTotals(items, undefined, true, null, freeItems)
+        expect(member).toMatchObject({ subtotal: 60000, tax: 6000, total: 66000, grandTotal: 66000 })
+    })
+
+    it('明細を上回るマイナスでは合計・差引合計もマイナスになる', () => {
+        const big = [{ productItemName: '返金', unitPriceGeneral: -150000, unitPriceMember: -150000, qty: 1 }]
+        const totals = calculateDocumentFormTotals(items, undefined, false, null, big)
+        expect(totals).toMatchObject({ subtotal: -50000, tax: -5000, total: -55000, grandTotal: -55000 })
+    })
+
+    it('会費入金額が合計を上回る場合も差引合計を 0 で止めない', () => {
+        const customer = { memberships: [{ paymentAmount: 100000 }] }
+        const totals = calculateDocumentFormTotals(items, undefined, true, customer, [])
+        expect(totals.total).toBe(88000)
+        expect(totals.grandTotal).toBe(-12000)
+    })
+
+    it('保存される合計も画面と同じくマイナスになる', () => {
+        for (const isMember of [true, false]) {
+            const formTotals = calculateDocumentFormTotals(items, undefined, isMember, null, freeItems)
+            const amount = isMember ? 80000 : 100000
+            const apiTotals = calculateDocumentTotals([{ amount }], 0, freeItems, isMember)
+            expect(apiTotals).toEqual(formTotals)
+        }
+    })
+})
+
 describe('会費入金額の内訳行', () => {
     // 合計欄に出す「会費入金額」の内訳。
     // 互助会員（1・2行目）は 1回の入金額 × 入金回数、けやき（3行目）は手入力の割引額。

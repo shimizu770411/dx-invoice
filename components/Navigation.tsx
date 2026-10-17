@@ -19,6 +19,7 @@ export default function Navigation() {
         { href: '/users', label: '社員' },
         ...(currentUser?.isAdmin ? [{ href: '/company', label: '設定' }] : []),
         { href: '/reports/operations', label: 'ログ' },
+        ...(currentUser?.isAdmin ? [{ href: '/reports/master-changes', label: '変更履歴' }] : []),
     ]
 
     const isActive = (href: string) => {
@@ -30,6 +31,8 @@ export default function Navigation() {
         if (href === '/company') return pathname === '/company' || pathname?.startsWith('/company/')
         if (href === '/reports/operations')
             return pathname === '/reports/operations' || pathname?.startsWith('/reports/operations/')
+        if (href === '/reports/master-changes')
+            return pathname === '/reports/master-changes' || pathname?.startsWith('/reports/master-changes/')
         return pathname === href
     }
 

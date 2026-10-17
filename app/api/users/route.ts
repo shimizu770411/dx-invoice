@@ -44,9 +44,8 @@ export async function GET(request: NextRequest) {
                 createdAt: true,
                 updatedAt: true,
             },
-            orderBy: {
-                createdAt: 'desc',
-            },
+            // 非表示（退職者処理）ユーザーは、有効なユーザーの後ろにまとめる
+            orderBy: [{ isActive: 'desc' }, { createdAt: 'desc' }],
         })
 
         // レスポンスを返す
