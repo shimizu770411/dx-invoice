@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, requireAdmin } from '@/lib/auth-middleware'
 import { serializeBigInt } from '@/lib/prisma-utils'
+import { SURCHARGE_FIELDS, diffCollection } from '@/lib/masterChangeDiff'
+import { MasterChangeAction, MasterChangeTargetType, recordMasterChange } from '@/lib/masterChangeLog'
 
 // プランごとの親祭壇の増額選択肢。
 // 見積・請求書の明細画面はここの選択肢を読み、選ばれた額を一般単価・会員単価の両方に上乗せして保存する。
@@ -45,7 +47,7 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
             }))
 
         const saved = await prisma.$transaction(async (tx) => {
-            const existing = await tx.planSurcharge.findMany({ where: { planId }, select: { id: true } })
+            const existing = await tx.planSurcharge.findMany({ where: { planId } })
             const keptIds = new Set(
                 valid.filter((s: { id: bigint | null }) => s.id).map((s: { id: bigint | null }) => s.id!.toString())
             )
@@ -70,10 +72,26 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
                 }
             }
 
-            return tx.planSurcharge.findMany({
+            const after = await tx.planSurcharge.findMany({
                 where: { planId, isActive: true },
                 orderBy: [{ sortNo: 'asc' }, { id: 'asc' }],
             })
+
+            const toSnapshot = (s: (typeof after)[number]) => ({ ...s, id: s.id.toString() })
+            const plan = await tx.plan.findUnique({ where: { id: planId }, select: { name: true } })
+            await recordMasterChange(tx, {
+                userId: authResult.payload.sub,
+                targetType: MasterChangeTargetType.PLAN_SURCHARGE,
+                action: MasterChangeAction.UPDATE,
+                targetId: planId,
+                targetName: plan?.name ?? '',
+                changes: diffCollection(existing.filter((e) => e.isActive).map(toSnapshot), after.map(toSnapshot), {
+                    key: (s) => s.id,
+                    subject: (s) => `増額「${s.label}」`,
+                    defs: SURCHARGE_FIELDS,
+                }),
+            })
+            return after
         })
 
         return NextResponse.json(serializeBigInt(saved))

@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, requireAdmin } from '@/lib/auth-middleware'
 import { serializeBigInt } from '@/lib/prisma-utils'
+import { buildProductChanges } from '@/lib/masterChangeDiff'
+import {
+    MASTER_SAVE_TX_TIMEOUT_MS,
+    MasterChangeAction,
+    MasterChangeTargetType,
+    loadProductSnapshot,
+    recordMasterChange,
+} from '@/lib/masterChangeLog'
 
 export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
     const params = await props.params
@@ -93,30 +101,57 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
         if (body.defaultDescription !== undefined)
             updateData.defaultDescription = body.defaultDescription || null
 
-        // ProductItem 自体の更新（明細行のリレーション処理は別途）
-        // セット親/セット子から一般商品に変更された場合、この商品が関わる親子紐付けは無効になるため合わせて削除する
+        const productItemId = BigInt(params.id)
+
+        // バリアントグループの削除可否は、書き込みを始める前に確かめる。
+        // （以前は途中で400を返しており、それまでの本体・明細行の変更だけが保存されていた）
+        let removedGroupIds: bigint[] = []
+        if (Array.isArray(body.groups)) {
+            const existingGroups = await prisma.productVariantGroup.findMany({
+                where: { productItemId },
+                select: { id: true },
+            })
+            const sentIds = new Set(
+                body.groups.filter((g: any) => g.id).map((g: any) => String(g.id))
+            )
+            removedGroupIds = existingGroups.filter((g) => !sentIds.has(String(g.id))).map((g) => g.id)
+            const variantCount = await prisma.productVariant.count({
+                where: { groupId: { in: removedGroupIds }, isActive: true },
+            })
+            if (variantCount > 0) {
+                return NextResponse.json(
+                    {
+                        error: 'BadRequest',
+                        message:
+                            'グループ配下に有効な種類（バリアント）が残っているため削除できません。先に配下の種類を削除してください。',
+                    },
+                    { status: 400 }
+                )
+            }
+        }
+
+        // 本体・明細行・グループ・変更履歴を1トランザクションで保存し、途中で失敗したら何も残さない
         await prisma.$transaction(async (tx) => {
+            const before = await loadProductSnapshot(tx, productItemId)
+
+            // セット親/セット子から一般商品に変更された場合、この商品が関わる親子紐付けは無効になるため合わせて削除する
             await tx.productItem.update({
-                where: { id: BigInt(params.id) },
+                where: { id: productItemId },
                 data: updateData,
             })
             if (body.isSetChild !== undefined && !Boolean(body.isSetChild)) {
                 await tx.productSet.deleteMany({
-                    where: { childId: BigInt(params.id) },
+                    where: { childId: productItemId },
                 })
             }
             if (body.isSetParent !== undefined && !Boolean(body.isSetParent)) {
                 await tx.productSet.deleteMany({
-                    where: { parentId: BigInt(params.id) },
+                    where: { parentId: productItemId },
                 })
             }
-        })
 
-        // 明細行構成（複数行構成商品時のみ）: body.rows があれば全置換
-        // delete → re-create を1トランザクションにまとめ、再作成が途中で失敗しても
-        // 削除だけが確定してデータが消える事態を防ぐ
-        if (Array.isArray(body.rows)) {
-            await prisma.$transaction(async (tx) => {
+            // 明細行構成（複数行構成商品時のみ）: body.rows があれば全置換
+            if (Array.isArray(body.rows)) {
                 await tx.productRow.deleteMany({
                     where: { productItemId: BigInt(params.id) },
                 })
@@ -162,65 +197,53 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
                         },
                     })
                 }
-            })
-        }
-
-        // バリアントグループ（重箱等の「基本セット＋追加オプション」構成）: body.groups があれば同期
-        if (Array.isArray(body.groups)) {
-            const existingGroups = await prisma.productVariantGroup.findMany({
-                where: { productItemId: BigInt(params.id) },
-                select: { id: true },
-            })
-            const sentIds = new Set(
-                body.groups.filter((g: any) => g.id).map((g: any) => String(g.id))
-            )
-            const removedGroups = existingGroups.filter((g) => !sentIds.has(String(g.id)))
-
-            for (const g of removedGroups) {
-                const variantCount = await prisma.productVariant.count({
-                    where: { groupId: g.id, isActive: true },
-                })
-                if (variantCount > 0) {
-                    return NextResponse.json(
-                        {
-                            error: 'BadRequest',
-                            message:
-                                'グループ配下に有効な種類（バリアント）が残っているため削除できません。先に配下の種類を削除してください。',
-                        },
-                        { status: 400 }
-                    )
-                }
-                await prisma.productVariantGroup.delete({ where: { id: g.id } })
             }
 
-            for (const [gIdx, g] of body.groups.entries()) {
-                const selectionType = g.selectionType === 'MULTI' ? 'MULTI' : 'SINGLE'
-                const mergeDisplay = g.mergeDisplay !== false
-                if (g.id) {
-                    await prisma.productVariantGroup.update({
-                        where: { id: BigInt(g.id) },
-                        data: {
-                            label: typeof g.label === 'string' ? g.label : '',
-                            selectionType,
-                            isRequired: Boolean(g.isRequired),
-                            mergeDisplay,
-                            sortNo: gIdx,
-                        },
-                    })
-                } else {
-                    await prisma.productVariantGroup.create({
-                        data: {
-                            productItemId: BigInt(params.id),
-                            label: typeof g.label === 'string' ? g.label : '',
-                            selectionType,
-                            isRequired: Boolean(g.isRequired),
-                            mergeDisplay,
-                            sortNo: gIdx,
-                        },
-                    })
+            // バリアントグループ（重箱等の「基本セット＋追加オプション」構成）: body.groups があれば同期
+            if (Array.isArray(body.groups)) {
+                if (removedGroupIds.length > 0) {
+                    await tx.productVariantGroup.deleteMany({ where: { id: { in: removedGroupIds } } })
+                }
+
+                for (const [gIdx, g] of body.groups.entries()) {
+                    const selectionType = g.selectionType === 'MULTI' ? 'MULTI' : 'SINGLE'
+                    const mergeDisplay = g.mergeDisplay !== false
+                    if (g.id) {
+                        await tx.productVariantGroup.update({
+                            where: { id: BigInt(g.id) },
+                            data: {
+                                label: typeof g.label === 'string' ? g.label : '',
+                                selectionType,
+                                isRequired: Boolean(g.isRequired),
+                                mergeDisplay,
+                                sortNo: gIdx,
+                            },
+                        })
+                    } else {
+                        await tx.productVariantGroup.create({
+                            data: {
+                                productItemId,
+                                label: typeof g.label === 'string' ? g.label : '',
+                                selectionType,
+                                isRequired: Boolean(g.isRequired),
+                                mergeDisplay,
+                                sortNo: gIdx,
+                            },
+                        })
+                    }
                 }
             }
-        }
+
+            const after = await loadProductSnapshot(tx, productItemId)
+            await recordMasterChange(tx, {
+                userId: authResult.payload.sub,
+                targetType: MasterChangeTargetType.PRODUCT,
+                action: MasterChangeAction.UPDATE,
+                targetId: productItemId,
+                targetName: after?.name ?? body.name,
+                changes: buildProductChanges(before, after),
+            })
+        }, { timeout: MASTER_SAVE_TX_TIMEOUT_MS })
 
         const updated = await prisma.productItem.findUnique({
             where: { id: BigInt(params.id) },
@@ -270,6 +293,15 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
 
         // 関連レコードと商品本体を物理削除（トランザクション）
         await prisma.$transaction(async (tx) => {
+            const before = await loadProductSnapshot(tx, productId)
+            await recordMasterChange(tx, {
+                userId: authResult.payload.sub,
+                targetType: MasterChangeTargetType.PRODUCT,
+                action: MasterChangeAction.DELETE,
+                targetId: productId,
+                targetName: before?.name ?? '',
+                changes: [],
+            })
             // 親子セット関係を削除
             await tx.productSet.deleteMany({
                 where: { OR: [{ parentId: productId }, { childId: productId }] },
