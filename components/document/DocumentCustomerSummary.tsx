@@ -12,10 +12,10 @@ export function DocumentCustomerSummary({ customer }: Props) {
     const formatDate = useDateFormat()
 
     const labelStyle: React.CSSProperties = {
-        fontFamily: 'var(--font-garamond)',
-        fontSize: '10px',
+        fontFamily: 'var(--font-mincho)',
+        fontSize: '12px',
         color: 'var(--brand-gold-soft)',
-        letterSpacing: '0.25em',
+        letterSpacing: '0.15em',
         fontWeight: 500,
         display: 'block',
         marginBottom: '4px',
@@ -42,14 +42,14 @@ export function DocumentCustomerSummary({ customer }: Props) {
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-8">
                     <div>
-                        <span style={labelStyle}>DECEASED</span>
+                        <span style={labelStyle}>故人名</span>
                         <span style={valueStyle}>
                             故 {customer.deceasedName} 様
                         </span>
                     </div>
                     {customer.store && (
                         <div>
-                            <span style={labelStyle}>STORE</span>
+                            <span style={labelStyle}>担当店舗</span>
                             <span
                                 className="font-mincho"
                                 style={{
@@ -100,15 +100,15 @@ export function DocumentCustomerSummary({ customer }: Props) {
                     style={{ borderTop: '1px solid var(--brand-border)' }}
                 >
                     <div>
-                        <span style={labelStyle}>RECEPTION</span>
+                        <span style={labelStyle}>受付日</span>
                         <span style={valueStyle}>{formatDate(customer.receptionAt)}</span>
                     </div>
                     <div>
-                        <span style={labelStyle}>CHIEF MOURNER</span>
+                        <span style={labelStyle}>喪主名</span>
                         <span style={valueStyle}>{customer.chiefMournerName}</span>
                     </div>
                     <div>
-                        <span style={labelStyle}>ADDRESS</span>
+                        <span style={labelStyle}>住所</span>
                         <span style={valueStyle}>{customer.chiefMournerAddress || '—'}</span>
                     </div>
                 </div>

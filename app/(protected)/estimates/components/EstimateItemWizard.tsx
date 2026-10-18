@@ -269,7 +269,7 @@ export function EstimateItemWizard({
                                 letterSpacing: '0.25em',
                             }}
                         >
-                            STEP
+                            ステップ
                         </span>
                         <span
                             className="font-garamond"
@@ -311,20 +311,6 @@ export function EstimateItemWizard({
                 {/* 商品タイトル / フリー項目タイトル */}
                 <div className="mb-5 flex items-end justify-between">
                     <div>
-                        <p
-                            className="font-garamond mb-1"
-                            style={{
-                                fontSize: '11px',
-                                color: 'var(--brand-gold-soft)',
-                                letterSpacing: '0.3em',
-                            }}
-                        >
-                            {isMaturityStep
-                                ? 'MATURITY SERVICE'
-                                : step.kind === 'free'
-                                  ? 'FREE ITEM'
-                                  : 'PRODUCT'}
-                        </p>
                         <h2
                             className="font-mincho"
                             style={{

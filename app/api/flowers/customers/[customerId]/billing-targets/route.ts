@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-middleware'
 import { serializeBigInt } from '@/lib/prisma-utils'
+import { LATEST_FLOWER_PAYMENT_INCLUDE, toFlowerPaymentState } from '@/lib/flowerPayment'
 import * as crypto from 'crypto'
 
 function generateBillToKey(name: string, address: string, tel?: string): string {
@@ -22,18 +23,14 @@ export async function GET(request: NextRequest, props: { params: Promise<{ custo
             where: { customerId: BigInt(customerId) },
             include: {
                 items: {
-                    include: { flower: true },
+                    include: { flower: { include: LATEST_FLOWER_PAYMENT_INCLUDE } },
                     orderBy: { id: 'asc' },
-                },
-                payments: {
-                    where: { targetType: 'FLOWER_TARGET' as any },
-                    orderBy: { createdAt: 'desc' },
-                    take: 1,
                 },
             },
             orderBy: { createdAt: 'asc' },
         })
 
+        // 入金は供花1件ごと。請求先の入金状況は画面側で供花から求める（lib/flowerTotals.ts）
         const result = targets.map((target) => ({
             id: target.id.toString(),
             customerId: target.customerId.toString(),
@@ -41,12 +38,11 @@ export async function GET(request: NextRequest, props: { params: Promise<{ custo
             billToAddress: target.billToAddress,
             billToTel: target.billToTel,
             billToKey: target.billToKey,
-            isPaid: target.payments[0]?.status === 'PAID',
-            paidAt: target.payments[0]?.status === 'PAID' ? target.payments[0].paidAt : null,
-            flowers: target.items.map((item) => ({
-                ...item.flower,
-                id: item.flower.id.toString(),
-                customerId: item.flower.customerId.toString(),
+            flowers: target.items.map(({ flower: { payments, ...flower } }) => ({
+                ...flower,
+                id: flower.id.toString(),
+                customerId: flower.customerId.toString(),
+                ...toFlowerPaymentState(payments),
             })),
         }))
 

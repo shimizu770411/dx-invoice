@@ -17,17 +17,6 @@ export function InvoiceBasicInfo({ control, disabled }: Props) {
             <div className="flex flex-wrap items-start gap-4">
                 <div style={{ width: '220px' }}>
                     <FormInput name="docNo" control={control} label="請求番号" placeholder="例: 202607001" disabled={disabled} maxLength={DOC_NO_LENGTH} />
-                    <p
-                        className="font-mincho"
-                        style={{
-                            marginTop: '6px',
-                            fontSize: '11px',
-                            color: 'var(--brand-text-muted)',
-                            letterSpacing: '0.05em',
-                        }}
-                    >
-                        空欄で自動採番。手入力する場合は yyyymm+連番3桁の9桁数字。
-                    </p>
                 </div>
                 <div style={{ width: '160px' }}>
                     <FormSelect
@@ -42,6 +31,18 @@ export function InvoiceBasicInfo({ control, disabled }: Props) {
                     />
                 </div>
             </div>
+            {/* 請求番号の説明は、番号欄の幅で折り返さないよう行全体に出す */}
+            <p
+                className="font-mincho"
+                style={{
+                    marginTop: '6px',
+                    fontSize: '11px',
+                    color: 'var(--brand-text-muted)',
+                    letterSpacing: '0.05em',
+                }}
+            >
+                空欄で自動採番。手入力する場合は 年4桁・月2桁・連番3桁の9桁の数字（例: 202610001）。
+            </p>
         </div>
     )
 }

@@ -37,8 +37,8 @@ export function UserTable({ users, onEdit, currentUserId, currentUserIsAdmin }: 
                 <thead>
                     <tr>
                         <th style={{ ...thStyle, textAlign: 'left' }}>名前</th>
-                        <th style={{ ...thStyle, textAlign: 'left' }}>TEL</th>
-                        <th style={{ ...thStyle, textAlign: 'left' }}>Email</th>
+                        <th style={{ ...thStyle, textAlign: 'left' }}>電話番号</th>
+                        <th style={{ ...thStyle, textAlign: 'left' }}>メールアドレス</th>
                         <th style={{ ...thStyle, textAlign: 'center', width: '110px' }}>ロール</th>
                         <th style={{ ...thStyle, textAlign: 'center', width: '100px' }}>管理者</th>
                         <th style={{ ...thStyle, textAlign: 'center', width: '140px' }}>操作</th>
@@ -105,7 +105,9 @@ export function UserTable({ users, onEdit, currentUserId, currentUserIsAdmin }: 
                                                     ? 'var(--brand-navy)'
                                                     : user.role === 'CLERK'
                                                       ? '#e8ede0'
-                                                      : 'var(--brand-ivory)',
+                                                      : user.role === 'ACCOUNTING'
+                                                        ? '#f3ead6'
+                                                        : 'var(--brand-ivory)',
                                             color:
                                                 user.role === 'APPROVER'
                                                     ? '#ffffff'
@@ -166,7 +168,7 @@ export function UserTable({ users, onEdit, currentUserId, currentUserIsAdmin }: 
                                                     fontWeight: 600,
                                                 }}
                                             >
-                                                PW変更要
+                                                パスワード変更要
                                             </span>
                                         )}
                                     </div>

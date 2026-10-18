@@ -779,17 +779,6 @@ export default function ProductEditPage() {
                 style={{ borderBottom: '1px solid var(--brand-border)' }}
             >
                 <div>
-                    <p
-                        className="font-garamond mb-2"
-                        style={{
-                            fontSize: '12px',
-                            color: 'var(--brand-gold-soft)',
-                            letterSpacing: '0.3em',
-                            fontWeight: 500,
-                        }}
-                    >
-                        PRODUCT · EDIT
-                    </p>
                     <h1
                         className="font-mincho"
                         style={{
@@ -1330,17 +1319,6 @@ export default function ProductEditPage() {
                             backgroundColor: '#fcf9f0',
                         }}
                     >
-                        <p
-                            className="font-garamond mb-1"
-                            style={{
-                                fontSize: '11px',
-                                color: 'var(--brand-gold-soft)',
-                                letterSpacing: '0.3em',
-                                fontWeight: 500,
-                            }}
-                        >
-                            SET CHILDREN
-                        </p>
                         <p
                             className="font-mincho mb-3"
                             style={{

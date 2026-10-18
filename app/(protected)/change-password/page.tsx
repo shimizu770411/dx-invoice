@@ -95,12 +95,6 @@ export default function ChangePasswordPage() {
                     className="mb-8 pb-6"
                     style={{ borderBottom: '2px solid var(--brand-navy)' }}
                 >
-                    <p
-                        className="font-garamond mb-2"
-                        style={{ fontSize: '11px', color: 'var(--brand-gold-soft)', letterSpacing: '0.35em' }}
-                    >
-                        PASSWORD CHANGE
-                    </p>
                     <h1
                         className="font-mincho"
                         style={{ fontSize: '26px', fontWeight: 600, color: 'var(--brand-navy)', letterSpacing: '0.2em' }}

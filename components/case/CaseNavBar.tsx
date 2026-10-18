@@ -225,7 +225,7 @@ export function CaseNavBar({ customerId, current, currentEstimateId, isDirty = f
                             maxWidth: '200px',
                         }}
                     >
-                        受付No. {progress.receptionNo}
+                        受付番号 {progress.receptionNo}
                     </span>
                 )}
 

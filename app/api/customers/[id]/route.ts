@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/auth-middleware'
+import { requireAdmin, requireAuth } from '@/lib/auth-middleware'
 import { serializeBigInt } from '@/lib/prisma-utils'
 import { prisma } from '@/lib/prisma'
+import { deleteCaseWithArchive } from '@/lib/caseDeletion'
+
+// 関連データの保存（テーブルごとにJSON化）と削除を1トランザクションで行うため、既定の5秒では足りない場合がある
+const CASE_DELETION_TX_TIMEOUT_MS = 30_000
 
 export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
     const params = await props.params
@@ -201,6 +205,27 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
         )
     } catch (error: any) {
         console.error('Update customer error:', error)
+        return NextResponse.json({ error: 'Internal server error', message: error.message }, { status: 500 })
+    }
+}
+
+// 案件の削除（管理者のみ）。関連データ一式を削除済みテーブルへ保存してから消す（lib/caseDeletion.ts）
+export async function DELETE(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+    const params = await props.params
+    try {
+        const authResult = await requireAdmin(request)
+        if (authResult instanceof NextResponse) return authResult
+
+        const result = await prisma.$transaction(
+            (tx) => deleteCaseWithArchive(tx, BigInt(params.id), authResult.payload.sub),
+            { timeout: CASE_DELETION_TX_TIMEOUT_MS }
+        )
+        if (!result) {
+            return NextResponse.json({ error: '案件が見つかりません' }, { status: 404 })
+        }
+        return NextResponse.json(serializeBigInt(result))
+    } catch (error: any) {
+        console.error('Delete customer error:', error)
         return NextResponse.json({ error: 'Internal server error', message: error.message }, { status: 500 })
     }
 }

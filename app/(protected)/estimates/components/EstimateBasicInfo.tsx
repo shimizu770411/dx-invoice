@@ -42,17 +42,6 @@ export function EstimateBasicInfo({ control, showDocNo, disabled, onAssignDocNo,
                                 </button>
                             )}
                         </div>
-                        <p
-                            className="font-mincho"
-                            style={{
-                                marginTop: '6px',
-                                fontSize: '11px',
-                                color: 'var(--brand-text-muted)',
-                                letterSpacing: '0.05em',
-                            }}
-                        >
-                            本見積の作成時に葬儀・告別式の開始年月で自動採番。手入力する場合は yyyymm+連番3桁の9桁数字。
-                        </p>
                     </div>
                 )}
                 <div style={{ width: '160px' }}>
@@ -77,6 +66,20 @@ export function EstimateBasicInfo({ control, showDocNo, disabled, onAssignDocNo,
                     />
                 </div>
             </div>
+            {/* 見積番号の説明は、番号欄の幅で折り返さないよう行全体に出す */}
+            {showDocNo && (
+                <p
+                    className="font-mincho"
+                    style={{
+                        marginTop: '6px',
+                        fontSize: '11px',
+                        color: 'var(--brand-text-muted)',
+                        letterSpacing: '0.05em',
+                    }}
+                >
+                    本見積の作成時に葬儀・告別式の開始年月で自動採番。手入力する場合は 年4桁・月2桁・連番3桁の9桁の数字（例: 202610001）。
+                </p>
+            )}
         </div>
     )
 }

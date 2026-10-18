@@ -49,17 +49,6 @@ export default function OperationLogReportPage() {
                 style={{ borderBottom: '1px solid var(--brand-border)' }}
             >
                 <div>
-                    <p
-                        className="font-garamond mb-2"
-                        style={{
-                            fontSize: '12px',
-                            color: 'var(--brand-gold-soft)',
-                            letterSpacing: '0.3em',
-                            fontWeight: 500,
-                        }}
-                    >
-                        OPERATION LOG REPORT
-                    </p>
                     <h1
                         className="font-mincho"
                         style={{

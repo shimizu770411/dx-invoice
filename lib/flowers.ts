@@ -25,6 +25,9 @@ export interface Flower {
     deliveryTo?: string
     amount: number
     flowerBillingTargetId?: string | null
+    // 入金は供花1件ごと（請求先一覧の取得時に付く）
+    isPaid?: boolean
+    paidAt?: string | null
 }
 
 export interface FlowerBillingTarget {
@@ -34,8 +37,6 @@ export interface FlowerBillingTarget {
     billToAddress: string
     billToTel?: string
     billToKey?: string
-    isPaid?: boolean
-    paidAt?: string | null
     flowers: Flower[]
 }
 

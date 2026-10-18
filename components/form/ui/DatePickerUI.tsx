@@ -22,7 +22,7 @@ export function DatePickerUI({
     value = '',
     onChange,
     label,
-    placeholder = 'YYYY-MM-DD を選択',
+    placeholder = '日付を選択',
     disabled,
     error,
     minYear,

@@ -87,18 +87,6 @@ export function BillingTargetDialog({ open, onOpenChange, customerId, target, on
                         borderBottom: '1px solid var(--brand-border)',
                     }}
                 >
-                    <p
-                        className="font-garamond"
-                        style={{
-                            fontSize: '11px',
-                            color: 'var(--brand-gold-soft)',
-                            letterSpacing: '0.3em',
-                            fontWeight: 500,
-                            marginBottom: '4px',
-                        }}
-                    >
-                        {isEdit ? 'EDIT BILL TO' : 'REGISTER BILL TO'}
-                    </p>
                     <h2
                         className="font-mincho"
                         style={{
@@ -135,7 +123,7 @@ export function BillingTargetDialog({ open, onOpenChange, customerId, target, on
                             <FormInput
                                 name="billToTel"
                                 control={control}
-                                label="請求先TEL"
+                                label="請求先電話番号"
                                 placeholder="例: 090-1234-5678"
                             />
                         </div>

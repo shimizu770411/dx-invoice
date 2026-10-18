@@ -30,6 +30,9 @@ export interface DataTableProps<T> {
     rowKey: (item: T, index: number) => string | number
     // この値が変化するたびに1ページ目へリセットする（検索・フィルター実行時など）
     resetKey?: unknown
+    // true のとき列幅を固定配分にする（width 指定の列はその幅、未指定の列は残りを均等に分ける）。
+    // 既定（false）は中身に応じて自動配分
+    fixedLayout?: boolean
 }
 
 export function DataTable<T>({
@@ -42,6 +45,7 @@ export function DataTable<T>({
     emptyMessage = 'データがありません',
     rowKey,
     resetKey,
+    fixedLayout = false,
 }: DataTableProps<T>) {
     const [sortKey, setSortKey] = useState<string | null>(null)
     const [sortDir, setSortDir] = useState<SortDirection>('asc')
@@ -103,7 +107,10 @@ export function DataTable<T>({
         >
             <div className="flex flex-1 flex-col overflow-hidden">
                 <div className="flex-1 overflow-auto">
-                    <table className="w-full border-collapse bg-white">
+                    <table
+                        className="w-full border-collapse bg-white"
+                        style={fixedLayout ? { tableLayout: 'fixed' } : undefined}
+                    >
                         <thead>
                             <tr>
                                 {columns.map((col) => (

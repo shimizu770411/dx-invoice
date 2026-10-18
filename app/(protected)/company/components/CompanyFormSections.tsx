@@ -35,14 +35,6 @@ const sectionHeaderStyle: React.CSSProperties = {
     borderBottom: '1px solid var(--brand-border)',
 }
 
-const enLabelStyle: React.CSSProperties = {
-    fontFamily: 'var(--font-garamond)',
-    fontSize: '11px',
-    color: 'var(--brand-gold-soft)',
-    letterSpacing: '0.3em',
-    fontWeight: 500,
-}
-
 const jpLabelStyle: React.CSSProperties = {
     fontFamily: 'var(--font-mincho)',
     fontSize: '18px',
@@ -75,7 +67,6 @@ export function BasicInfoSection() {
     return (
         <section style={sectionStyle}>
             <div style={sectionHeaderStyle}>
-                <span style={enLabelStyle}>BASIC</span>
                 <h2 style={jpLabelStyle}>基本情報</h2>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -105,7 +96,7 @@ export function BasicInfoSection() {
                     <FormInput
                         name="companyTel"
                         control={control}
-                        label="TEL"
+                        label="電話番号"
                         type="tel"
                         required
                         error={errors.companyTel}
@@ -138,17 +129,6 @@ function BankSection({ bankNumber }: { bankNumber: BankNumber }) {
     return (
         <div style={subSectionStyle}>
             <div style={subSectionHeaderStyle}>
-                <span
-                    style={{
-                        fontFamily: 'var(--font-garamond)',
-                        fontSize: '11px',
-                        color: 'var(--brand-gold-soft)',
-                        letterSpacing: '0.3em',
-                        fontWeight: 500,
-                    }}
-                >
-                    BANK {bankNumber}
-                </span>
                 <h3
                     style={{
                         fontFamily: 'var(--font-mincho)',
@@ -200,7 +180,6 @@ export function BankInfoSection() {
     return (
         <section style={sectionStyle}>
             <div style={sectionHeaderStyle}>
-                <span style={enLabelStyle}>BANK ACCOUNTS</span>
                 <h2 style={jpLabelStyle}>振込先情報</h2>
             </div>
 
@@ -269,7 +248,6 @@ export function RemarksDefaultSection() {
     return (
         <section style={sectionStyle}>
             <div style={sectionHeaderStyle}>
-                <span style={enLabelStyle}>REMARKS DEFAULT</span>
                 <h2 style={jpLabelStyle}>備考初期値設定</h2>
             </div>
             <p
@@ -481,23 +459,11 @@ export function SystemSettingsSection() {
     return (
         <section style={sectionStyle}>
             <div style={sectionHeaderStyle}>
-                <span style={enLabelStyle}>SYSTEM</span>
                 <h2 style={jpLabelStyle}>システム設定</h2>
             </div>
 
             <div style={subSectionStyle}>
                 <div style={subSectionHeaderStyle}>
-                    <span
-                        style={{
-                            fontFamily: 'var(--font-garamond)',
-                            fontSize: '11px',
-                            color: 'var(--brand-gold-soft)',
-                            letterSpacing: '0.3em',
-                            fontWeight: 500,
-                        }}
-                    >
-                        DATE FORMAT
-                    </span>
                     <h3
                         style={{
                             fontFamily: 'var(--font-mincho)',
@@ -566,17 +532,6 @@ export function SystemSettingsSection() {
 
             <div style={subSectionStyle}>
                 <div style={subSectionHeaderStyle}>
-                    <span
-                        style={{
-                            fontFamily: 'var(--font-garamond)',
-                            fontSize: '11px',
-                            color: 'var(--brand-gold-soft)',
-                            letterSpacing: '0.3em',
-                            fontWeight: 500,
-                        }}
-                    >
-                        PDF EXPORT
-                    </span>
                     <h3
                         style={{
                             fontFamily: 'var(--font-mincho)',
@@ -729,17 +684,6 @@ export function SystemSettingsSection() {
 
             <div style={subSectionStyle}>
                 <div style={subSectionHeaderStyle}>
-                    <span
-                        style={{
-                            fontFamily: 'var(--font-garamond)',
-                            fontSize: '11px',
-                            color: 'var(--brand-gold-soft)',
-                            letterSpacing: '0.3em',
-                            fontWeight: 500,
-                        }}
-                    >
-                        COMPANY SEAL
-                    </span>
                     <h3
                         style={{
                             fontFamily: 'var(--font-mincho)',

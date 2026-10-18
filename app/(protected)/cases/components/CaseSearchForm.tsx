@@ -100,16 +100,6 @@ export function CaseSearchForm({ formParams, setFormParams, onSearch, onReset, i
                 }}
             >
                 <span className="flex items-center gap-3">
-                    <span
-                        className="font-garamond"
-                        style={{
-                            fontSize: '11px',
-                            color: 'var(--brand-gold-soft)',
-                            letterSpacing: '0.3em',
-                        }}
-                    >
-                        SEARCH
-                    </span>
                     <span>検索条件</span>
                 </span>
                 {open ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
@@ -151,7 +141,7 @@ export function CaseSearchForm({ formParams, setFormParams, onSearch, onReset, i
                             <DatePickerUI
                                 value={formParams.receptionFromInput || ''}
                                 onChange={(receptionFromInput) => setFormParams({ ...formParams, receptionFromInput })}
-                                label="受付日（From）"
+                                label="受付日（開始）"
                                 placeholder="日付を選択"
                                 minYear={2025}
                             />
@@ -161,7 +151,7 @@ export function CaseSearchForm({ formParams, setFormParams, onSearch, onReset, i
                             <DatePickerUI
                                 value={formParams.receptionToInput || ''}
                                 onChange={(receptionToInput) => setFormParams({ ...formParams, receptionToInput })}
-                                label="受付日（To）"
+                                label="受付日（終了）"
                                 placeholder="日付を選択"
                                 minYear={2025}
                             />
@@ -171,7 +161,7 @@ export function CaseSearchForm({ formParams, setFormParams, onSearch, onReset, i
                             <DatePickerUI
                                 value={formParams.funeralFromInput || ''}
                                 onChange={(funeralFromInput) => setFormParams({ ...formParams, funeralFromInput })}
-                                label="葬儀日（From）"
+                                label="葬儀日（開始）"
                                 placeholder="日付を選択"
                                 minYear={2025}
                             />
@@ -181,7 +171,7 @@ export function CaseSearchForm({ formParams, setFormParams, onSearch, onReset, i
                             <DatePickerUI
                                 value={formParams.funeralToInput || ''}
                                 onChange={(funeralToInput) => setFormParams({ ...formParams, funeralToInput })}
-                                label="葬儀日（To）"
+                                label="葬儀日（終了）"
                                 placeholder="日付を選択"
                                 minYear={2025}
                             />

@@ -179,7 +179,7 @@ export function BankBranchSelector({ bankNumber }: Props) {
                         if (currentBankName) searchBanks(currentBankName)
                         setBankOpen(true)
                     }}
-                    placeholder="銀行名 or 銀行コード（例: 琉球 / 0187）"
+                    placeholder="銀行名または銀行コード（例: 琉球 / 0187）"
                     style={inputStyle}
                 />
                 {bankCode && (
@@ -194,7 +194,7 @@ export function BankBranchSelector({ bankNumber }: Props) {
                             letterSpacing: '0.15em',
                         }}
                     >
-                        CODE: {bankCode}
+                        銀行コード：{bankCode}
                     </span>
                 )}
                 {bankOpen && (
