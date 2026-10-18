@@ -1,11 +1,13 @@
 import apiClient from './api';
 
-export type UserRole = 'STAFF' | 'CLERK' | 'APPROVER'
+// ACCOUNTING（経理）は請求書の確認欄を持たないロール（確認できるのは担当者・事務員・決裁者のみ）
+export type UserRole = 'STAFF' | 'CLERK' | 'APPROVER' | 'ACCOUNTING'
 
 export const USER_ROLE_LABELS: Record<UserRole, string> = {
   STAFF: '担当者',
   CLERK: '事務員',
   APPROVER: '決裁者',
+  ACCOUNTING: '経理',
 }
 
 export interface User {

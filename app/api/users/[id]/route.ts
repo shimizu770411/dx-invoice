@@ -108,7 +108,7 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
         if (data.birthDate !== undefined) {
             updateData.birthDate = data.birthDate ? new Date(data.birthDate) : null
         }
-        if (canManageRole && data.role !== undefined && ['STAFF', 'CLERK', 'APPROVER'].includes(data.role)) {
+        if (canManageRole && data.role !== undefined && ['STAFF', 'CLERK', 'APPROVER', 'ACCOUNTING'].includes(data.role)) {
             updateData.role = data.role
         }
         if (canManageRole && data.isAdmin !== undefined) updateData.isAdmin = data.isAdmin === true
