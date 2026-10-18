@@ -16,7 +16,6 @@ export function ChiefMournerTab() {
                 name="chiefMournerName"
                 control={control}
                 label="喪主名"
-                required
                 error={errors.chiefMournerName}
             />
 
