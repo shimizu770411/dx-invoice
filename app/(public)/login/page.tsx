@@ -43,30 +43,9 @@ export default function LoginPage() {
             <div className="w-full max-w-md">
                 {/* ヘッダー部：装飾 + タイトル */}
                 <div className="text-center mb-12">
-                    <p
-                        className="tracking-[0.4em] mb-4"
-                        style={{
-                            fontFamily: '"EB Garamond", serif',
-                            fontSize: '15px',
-                            color: '#8a7e5c',
-                            fontWeight: 500,
-                        }}
-                    >
-                        FUNERAL MANAGEMENT
-                    </p>
-                    <div className="flex items-center justify-center gap-4 mb-6">
-                        <span className="block h-px w-12" style={{ backgroundColor: '#c4ae6a' }} />
-                        <span
-                            style={{
-                                fontFamily: '"EB Garamond", serif',
-                                fontSize: '13px',
-                                color: '#c4ae6a',
-                                letterSpacing: '0.2em',
-                            }}
-                        >
-                            SYSTEM
-                        </span>
-                        <span className="block h-px w-12" style={{ backgroundColor: '#c4ae6a' }} />
+                    {/* 装飾の金線（画面の表記は日本語のみのため、英字の見出しは置かない） */}
+                    <div className="flex items-center justify-center mb-6">
+                        <span className="block h-px w-24" style={{ backgroundColor: '#c4ae6a' }} />
                     </div>
                     <h1
                         className="font-medium"
@@ -271,7 +250,7 @@ export default function LoginPage() {
                             letterSpacing: '0.25em',
                         }}
                     >
-                        — Since 1981 —
+                        — 1981年創業 —
                     </p>
                 </div>
             </div>

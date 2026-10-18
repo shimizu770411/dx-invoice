@@ -1,5 +1,6 @@
 import apiClient from './api'
 import type { CaseProgress } from './caseProgress'
+import type { CaseDeletionSummary } from './caseDeletionMessage'
 
 export interface CustomerListItem {
     id: string
@@ -64,6 +65,25 @@ export async function createCustomer(data: any) {
 
 export async function updateCustomer(id: string, data: any) {
     const response = await apiClient.put(`/customers/${id}`, data)
+    return response.data
+}
+
+export interface CaseDeletionPreview {
+    receptionNo: string | null
+    deceasedName: string
+    summary: CaseDeletionSummary
+}
+
+/** 案件を削除したときに一緒に消える件数（削除前の確認メッセージ用・管理者のみ） */
+export async function getCaseDeletionPreview(id: string): Promise<CaseDeletionPreview> {
+    const response = await apiClient.get<CaseDeletionPreview>(`/customers/${id}/deletion-summary`)
+    if (!response.data) throw new Error('案件が見つかりません')
+    return response.data
+}
+
+/** 案件を削除する（管理者のみ）。関連データ一式は削除履歴に保存されてから消える */
+export async function deleteCustomer(id: string) {
+    const response = await apiClient.delete(`/customers/${id}`)
     return response.data
 }
 

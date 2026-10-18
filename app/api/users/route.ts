@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
                 password: hashedPassword,
                 email: data.email || null,
                 birthDate: data.birthDate ? new Date(data.birthDate) : null,
-                role: canManageRole && ['STAFF', 'CLERK', 'APPROVER'].includes(data.role) ? data.role : 'STAFF',
+                role: canManageRole && ['STAFF', 'CLERK', 'APPROVER', 'ACCOUNTING'].includes(data.role) ? data.role : 'STAFF',
                 isAdmin: canManageRole && data.isAdmin === true,
                 requirePasswordChange: data.requirePasswordChange === true,
             },

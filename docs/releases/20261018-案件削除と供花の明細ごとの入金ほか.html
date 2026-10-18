@@ -1,0 +1,349 @@
+<title>案件削除と供花の入金ほか</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500&family=Noto+Serif+JP:wght@400;500;600&display=swap">
+<style>
+    :root {
+        --navy: #020e70;
+        --navy-light: #2a3490;
+        --gold: #c4ae6a;
+        --gold-soft: #8a7e5c;
+        --crimson: #9a1f28;
+        --ground: #f7f6f2;
+        --surface: #fffefb;
+        --border: #e5e1d4;
+        --rule: #d4cfc0;
+        --text: #1a1a1a;
+        --muted: #6b6b6b;
+
+        --mincho: 'Noto Serif JP', '游明朝 Medium', 'Yu Mincho', YuMincho, 'Hiragino Mincho ProN', serif;
+        --garamond: 'EB Garamond', 'Noto Serif JP', serif;
+    }
+
+    @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+            --navy: #b9c0ff;
+            --navy-light: #98a2f0;
+            --gold: #d8c488;
+            --gold-soft: #b3a479;
+            --crimson: #ef8f96;
+            --ground: #14141a;
+            --surface: #1c1c24;
+            --border: #33323c;
+            --rule: #45444f;
+            --text: #eceae4;
+            --muted: #a09e98;
+        }
+    }
+
+    :root[data-theme="dark"] {
+        --navy: #b9c0ff;
+        --navy-light: #98a2f0;
+        --gold: #d8c488;
+        --gold-soft: #b3a479;
+        --crimson: #ef8f96;
+        --ground: #14141a;
+        --surface: #1c1c24;
+        --border: #33323c;
+        --rule: #45444f;
+        --text: #eceae4;
+        --muted: #a09e98;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+        margin: 0;
+        padding-block: clamp(32px, 6vw, 72px);
+        padding-left: max(20px, calc((100% - 760px) / 2));
+        padding-right: max(20px, calc((100% - 760px) / 2));
+        background: var(--ground);
+        color: var(--text);
+        font-family: var(--mincho);
+        font-size: 16px;
+        line-height: 1.9;
+        -webkit-font-smoothing: antialiased;
+    }
+
+    .masthead { display: flex; flex-direction: column; gap: 14px; padding-bottom: 26px; border-bottom: 1px solid var(--rule); }
+    .eyebrow {
+        font-family: var(--garamond);
+        font-size: 12px;
+        letter-spacing: 0.34em;
+        text-transform: uppercase;
+        color: var(--gold-soft);
+    }
+    h1 {
+        margin: 0;
+        font-size: clamp(26px, 5vw, 36px);
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        line-height: 1.45;
+        color: var(--navy);
+        text-wrap: balance;
+    }
+    .meta { display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: 13px; color: var(--muted); letter-spacing: 0.08em; }
+    .meta .num { font-family: var(--garamond); font-size: 15px; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+
+    .lede { margin: 26px 0 0; font-size: 16px; color: var(--text); letter-spacing: 0.03em; }
+
+    section { margin-top: 52px; }
+    h2 {
+        margin: 0 0 6px;
+        padding-left: 14px;
+        border-left: 3px solid var(--gold);
+        font-size: 20px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        line-height: 1.5;
+        color: var(--navy);
+        text-wrap: balance;
+    }
+    .sub { margin: 0 0 22px 17px; font-size: 13px; color: var(--muted); letter-spacing: 0.08em; }
+
+    h3 {
+        margin: 30px 0 10px;
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        color: var(--text);
+    }
+
+    p { margin: 0 0 14px; letter-spacing: 0.03em; }
+    p:last-child { margin-bottom: 0; }
+
+    ul { margin: 0 0 14px; padding-left: 1.3em; }
+    li { margin-bottom: 7px; letter-spacing: 0.03em; }
+    li:last-child { margin-bottom: 0; }
+
+    /* これまで / これから の対比 */
+    .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); border: 1px solid var(--border); margin: 18px 0 20px; }
+    .compare > div { background: var(--surface); padding: 18px 20px; }
+    .compare .tag {
+        display: block;
+        margin-bottom: 10px;
+        font-family: var(--garamond);
+        font-size: 11px;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+    }
+    .compare .before .tag { color: var(--muted); }
+    .compare .after .tag { color: var(--navy); }
+    .compare p { font-size: 14.5px; line-height: 1.85; }
+    .compare .after { box-shadow: inset 3px 0 0 var(--gold); }
+
+    /* 帳票の見え方サンプル */
+    .specimen {
+        margin: 18px 0 20px;
+        padding: 20px 22px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        font-size: 13.5px;
+        line-height: 2;
+        letter-spacing: 0.02em;
+        overflow-x: auto;
+    }
+    .specimen .cap {
+        display: block;
+        margin-bottom: 10px;
+        font-family: var(--garamond);
+        font-size: 11px;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        color: var(--gold-soft);
+    }
+    .specimen .line { white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .specimen .ruled { border-bottom: 1px solid var(--text); display: inline-block; min-width: 17em; }
+    .specimen .indent { padding-left: 5.2em; }
+    .specimen .dim { color: var(--muted); }
+
+    table { width: 100%; border-collapse: collapse; margin: 16px 0 20px; font-size: 14px; }
+    caption { text-align: left; padding-bottom: 9px; font-size: 13px; color: var(--muted); letter-spacing: 0.08em; }
+    th, td { padding: 9px 12px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; letter-spacing: 0.03em; }
+    th { font-weight: 600; font-size: 12.5px; letter-spacing: 0.12em; color: var(--gold-soft); border-bottom-color: var(--rule); }
+    td.num { font-family: var(--garamond); font-size: 15px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .table-wrap { overflow-x: auto; }
+
+    /* 対応が必要な項目 */
+    .action { margin-top: 52px; padding: 26px 28px; background: var(--surface); border: 1px solid var(--border); border-top: 3px solid var(--crimson); }
+    .action h2 { border-left: none; padding-left: 0; color: var(--crimson); }
+    .action .sub { margin-left: 0; }
+
+    .docnos { display: flex; flex-wrap: wrap; gap: 7px; margin: 4px 0 18px; padding: 0; list-style: none; }
+    .docnos li {
+        margin: 0;
+        padding: 4px 11px;
+        border: 1px solid var(--rule);
+        font-family: var(--garamond);
+        font-size: 14px;
+        letter-spacing: 0.04em;
+        font-variant-numeric: tabular-nums;
+        color: var(--text);
+    }
+    .docnos li.unnumbered { font-family: var(--mincho); font-size: 12.5px; color: var(--muted); }
+
+    .note { margin-top: 22px; padding-top: 18px; border-top: 1px dotted var(--rule); font-size: 14px; color: var(--muted); }
+
+    footer { margin-top: 56px; padding-top: 22px; border-top: 1px solid var(--rule); font-size: 12.5px; color: var(--muted); letter-spacing: 0.08em; }
+    footer .num { font-family: var(--garamond); font-size: 14px; }
+
+    @media (max-width: 560px) {
+        .compare { grid-template-columns: 1fr; }
+        .specimen { font-size: 12.5px; }
+    }
+</style>
+
+<header class="masthead">
+    <span class="eyebrow">Release Notes</span>
+    <h1>案件の削除と削除履歴、供花の入金を1件ごとに</h1>
+    <div class="meta">
+        <span>玉泉院 葬儀業務システム</span>
+        <span class="num">2026年10月18日</span>
+        <span class="num">7e20b21</span>
+    </div>
+</header>
+
+<p class="lede">
+    管理者が案件を削除できるようにし、削除した案件は削除履歴に残すようにしました。
+    供花の入金は、請求先ごとのまとめて入金から、供花1件ごとの入金に変えています。
+    あわせて、商品マスタ・プラン設定の変更履歴、社員ロール「経理」の追加、見積・請求書の金額まわりの修正を反映しました。
+</p>
+
+<section>
+    <h2>案件の削除と削除履歴</h2>
+    <p class="sub">案件一覧 / 「削除履歴」画面（管理者のみ）</p>
+
+    <p>
+        案件一覧の各行の右端に<strong>「削除」</strong>ボタンを追加しました。管理者でログインしたときだけ表示されます。
+        押すと、一緒に消える見積・請求書・入金・供花の件数を確認で表示し、了承すると案件ごとまとめて削除します。
+    </p>
+
+    <div class="specimen">
+        <span class="cap">確認の表示例</span>
+        <div class="line">受付番号1100 山田　太郎 の案件を削除します。</div>
+        <div class="line">見積2件・請求書1件・入金1件・供花3件も一緒に削除されます。</div>
+        <div class="line">※入金データがあります。</div>
+        <div class="line dim">削除したデータは削除履歴に保存されます。よろしいですか？</div>
+    </div>
+
+    <ul>
+        <li>削除する前に、案件と関連するデータ一式をそのまま保存してから消します。保存できなかったときは削除も行いません</li>
+        <li>メニューの<strong>「削除履歴」</strong>（管理者のみ）で、いつ・誰が・どの案件を消したかと、一緒に消えた件数を確認できます。開いた直後は直近30日分を表示し、削除日・受付番号・故人名・喪主名で絞り込めます</li>
+        <li>画面からの復旧はできません。誤って消した場合はご連絡ください。保存してあるデータから戻します</li>
+    </ul>
+</section>
+
+<section>
+    <h2>供花の入金を1件ごとに</h2>
+    <p class="sub">供花画面 / 供花の領収書一括印刷</p>
+
+    <div class="compare">
+        <div class="before">
+            <span class="tag">これまで</span>
+            <p>入金は請求先ごとに「まとめて入金」していました。同じ請求先の供花のうち、一部だけ入金があった場合を記録できませんでした。</p>
+        </div>
+        <div class="after">
+            <span class="tag">これから</span>
+            <p>供花の明細1件ごとに「入金完了」「入金取消」を押します。請求先には、中の供花の状況から<strong>入金済／一部入金／未入金</strong>を表示します。</p>
+        </div>
+    </div>
+
+    <ul>
+        <li>画面上部に、案件全体の<strong>請求額合計・入金額合計・未入金額合計</strong>を表示します（絞り込みに関係なく案件全体の額です）</li>
+        <li>「すべて／入金済み／未入金」で供花の明細を絞り込めます。件数も表示します</li>
+        <li>画面の金額はすべて<strong>税抜</strong>に揃えました。税込の金額は請求書・領収書のPDFで出ます</li>
+        <li>入金済みの供花は、金額や請求先が領収書と食い違わないよう、編集・削除できません。直す場合は先に「入金取消」を押してください</li>
+        <li>領収書の一括印刷には、入金済みの供花だけが載ります</li>
+        <li>画面・請求書・領収書・入金記録で、税込額の計算を同じものに揃えました</li>
+    </ul>
+
+    <p class="note">
+        これまで請求先単位で入金済みにしていたものは、その請求先の供花すべてを入金済みとして、入金日もそのまま引き継いでいます。
+    </p>
+</section>
+
+<section>
+    <h2>商品マスタ・プラン設定の変更履歴</h2>
+    <p class="sub">「変更履歴」画面（管理者のみ）</p>
+
+    <p>
+        商品・種類・セットの中身・並び順・プラン・プラン別の商品設定・増額の選択肢を登録・変更・削除したときに、
+        <strong>誰が・いつ・何をどう変えたか</strong>を記録するようにしました。メニューの「変更履歴」で確認できます。
+    </p>
+
+    <ul>
+        <li>変わった項目だけを「変更前 → 変更後」で残します。内容を変えずに保存した場合は記録しません</li>
+        <li>期間・担当者・種類・対象の名前で絞り込めます</li>
+        <li>記録できなかったときは、変更そのものも保存しません</li>
+    </ul>
+
+    <h3>あわせて直した不具合</h3>
+    <p>商品の編集で、保存が途中でエラーになっても、それまでの変更だけが保存されてしまうことがありました。すべて保存するか、何も保存しないかのどちらかになるよう直しています。</p>
+</section>
+
+<section>
+    <h2>見積・請求書の修正</h2>
+    <p class="sub">見積画面 / 請求画面 / 見積書・請求書・領収書PDF</p>
+
+    <h3>自由項目でマイナスの金額を入力できるように</h3>
+    <p>
+        自由入力の行で、一般価格・会員価格にマイナスの金額を入れられるようにしました。値引きや調整に使えます。
+        会費入金を差し引いた差引合計がマイナスになる場合も、0で止めずにマイナスのまま出します。
+    </p>
+    <ul>
+        <li>領収書のPDFでも、マイナスの金額は他の書類と同じ「▲」で表示します</li>
+        <li>商品に付く追加行はこれまでどおり0以上、満期サービスは0以下のままです</li>
+    </ul>
+
+    <h3>直した不具合</h3>
+    <ul>
+        <li><strong>重箱のようにグループから選ぶ商品で、数量を2以上にしても保存すると1に戻っていた</strong>のを直しました。画面の合計だけが多く見えていました。開き直したときも保存した数量で表示します</li>
+        <li><strong>チェックを外した固定料金の行（会葬礼状の版代など）が、画面の合計にだけ足されていた</strong>のを直しました。画面の合計が、保存された金額・PDFより多くなっていました</li>
+        <li>請求書で<strong>施行割増券</strong>を入力できなかったのを直しました</li>
+        <li>金額欄で入力済みの数字を選択したまま「-」から打ち直すと、「-」が消えてプラスで入っていたのを直しました（すべての画面の金額欄に効きます）</li>
+    </ul>
+
+    <p class="note">
+        見積・請求画面でチェックの付け外しや数量を変えたあと、「画面の合計」「保存された金額」「PDFの合計」が一致するかを自動で確かめる検査を導入しました。今回の修正もこの検査で確認しています。
+    </p>
+</section>
+
+<section>
+    <h2>案件・社員まわり</h2>
+    <p class="sub">案件画面 / 社員画面</p>
+
+    <ul>
+        <li><strong>喪主名を必須から外しました。</strong>喪主が決まっていない段階でも、空のまま案件を登録・更新できます</li>
+        <li>社員のロールに<strong>「経理」</strong>を追加しました（決裁者の次に並びます）。経理は請求書の確認欄（担当者・事務員・決裁者）を押せません</li>
+        <li>社員一覧で、非表示にした社員（退職者）を有効な社員の後ろに並べるようにしました</li>
+    </ul>
+</section>
+
+<section>
+    <h2>画面表記の日本語化</h2>
+    <p class="sub">全画面 / 見積書・請求書PDF</p>
+
+    <ul>
+        <li>日本語の見出しと重なっていた英字の小見出しを外し、英字だけだった表記を日本語にしました</li>
+        <li>見積書・請求書PDFの明細の上に出ていた「Selected Items」を外しました</li>
+        <li>見積番号・請求番号の欄の説明文が、欄の幅で細かく折り返されていたのを1行で読めるようにしました</li>
+    </ul>
+</section>
+
+<div class="action">
+    <h2>ご確認いただきたいこと</h2>
+    <p class="sub">供花の入金 / 経理担当の社員</p>
+
+    <h3>供花の入金状況</h3>
+    <p>
+        これまで請求先単位で入金済みにしていた供花は、中の供花すべてを入金済みとして引き継いでいます。
+        実際には一部しか入金がなかった請求先があれば、該当する供花の「入金取消」を押して未入金に戻してください。
+    </p>
+
+    <h3>経理担当の方のロール</h3>
+    <p>経理の方を「経理」ロールに切り替える場合は、社員画面で各社員のロールを変更してください。</p>
+</div>
+
+<footer>
+    玉泉院 葬儀業務システム ／ 2026年10月18日リリース ／ <span class="num">118</span> ファイル変更
+</footer>

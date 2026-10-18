@@ -112,17 +112,6 @@ export default function ProductsPage() {
                 style={{ borderBottom: '1px solid var(--brand-border)' }}
             >
                 <div>
-                    <p
-                        className="font-garamond mb-2"
-                        style={{
-                            fontSize: '12px',
-                            color: 'var(--brand-gold-soft)',
-                            letterSpacing: '0.3em',
-                            fontWeight: 500,
-                        }}
-                    >
-                        PRODUCT MASTER
-                    </p>
                     <h1
                         className="font-mincho"
                         style={{
@@ -356,8 +345,8 @@ export default function ProductsPage() {
                                         }}
                                     >
                                         {orderMode
-                                            ? `No.${String(idx + 1).padStart(3, '0')}`
-                                            : `No.${String(p.sortNo || idx + 1).padStart(3, '0')}`}
+                                            ? `番号${String(idx + 1).padStart(3, '0')}`
+                                            : `番号${String(p.sortNo || idx + 1).padStart(3, '0')}`}
                                     </span>
                                     <h2
                                         className="font-mincho"
@@ -440,14 +429,14 @@ export default function ProductsPage() {
                                     )}
                                 </div>
                                 <span
-                                    className="font-garamond"
+                                    className="font-mincho"
                                     style={{
                                         fontSize: '13px',
                                         color: 'var(--brand-text-muted)',
                                         letterSpacing: '0.15em',
                                     }}
                                 >
-                                    {p.variants.length} VARIANTS {orderMode ? '' : '›'}
+                                    種類 {p.variants.length}件 {orderMode ? '' : '›'}
                                 </span>
                             </div>
 

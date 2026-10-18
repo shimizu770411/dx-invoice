@@ -147,12 +147,6 @@ export function AgeCalculatorDialog({ open, onClose, onConfirm, baseDate }: AgeC
             >
                 {/* ヘッダー */}
                 <div className="mb-6 pb-4" style={{ borderBottom: '1px solid var(--brand-border)' }}>
-                    <p
-                        className="font-garamond mb-2"
-                        style={{ fontSize: '11px', color: 'var(--brand-gold-soft)', letterSpacing: '0.3em', fontWeight: 500 }}
-                    >
-                        AGE CALCULATION
-                    </p>
                     <h2
                         className="font-mincho"
                         style={{ fontSize: '20px', fontWeight: 600, color: 'var(--brand-navy)', letterSpacing: '0.2em' }}
@@ -235,10 +229,10 @@ export function AgeCalculatorDialog({ open, onClose, onConfirm, baseDate }: AgeC
                     }}
                 >
                     <p
-                        className="font-garamond mb-2"
-                        style={{ fontSize: '11px', color: 'var(--brand-gold-soft)', letterSpacing: '0.3em' }}
+                        className="font-mincho mb-2"
+                        style={{ fontSize: '12px', color: 'var(--brand-gold-soft)', letterSpacing: '0.15em' }}
                     >
-                        RESULT
+                        算出結果
                     </p>
                     {age !== null ? (
                         <div

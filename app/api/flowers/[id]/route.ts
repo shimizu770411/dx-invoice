@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth-middleware'
 import { serializeBigInt } from '@/lib/prisma-utils'
 import { recordOperationLog } from '@/lib/operationLog'
+import { isFlowerPaid } from '@/lib/flowerPayment'
 import { OperationAction, OperationEntityType } from '@phoenix-jpn/db'
 
 export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
@@ -61,6 +62,10 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
 
         if (!flower) {
             return NextResponse.json({ error: '供花が見つかりません' }, { status: 404 })
+        }
+        // 入金済みの供花は金額や請求先を変えられない（入金額・領収書と食い違うため。先に入金取消が必要）
+        if (await isFlowerPaid(prisma, flower.id)) {
+            return NextResponse.json({ error: '入金済みの供花は編集できません。先に入金を取り消してください' }, { status: 400 })
         }
 
         // 供花の更新と請求先の紐付け替えは必ずまとめて行う。紐付けは「削除してから作り直す」ため、
@@ -144,6 +149,9 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
 
         if (!flower) {
             return NextResponse.json({ error: '供花が見つかりません' }, { status: 404 })
+        }
+        if (await isFlowerPaid(prisma, flower.id)) {
+            return NextResponse.json({ error: '入金済みの供花は削除できません。先に入金を取り消してください' }, { status: 400 })
         }
 
         // 紐付けの削除と供花の削除は必ずまとめて行う。

@@ -21,12 +21,13 @@ export async function cancelInvoicePayment(
   return response.data;
 }
 
-export async function createFlowerTargetPayment(targetId: string) {
-  const response = await apiClient.post(`/payments/flower-target/${targetId}/paid`);
+// 供花の入金は供花1件ごと（請求先単位のまとめて入金は廃止）
+export async function createFlowerPayment(flowerId: string) {
+  const response = await apiClient.post(`/payments/flower/${flowerId}/paid`);
   return response.data;
 }
 
-export async function cancelFlowerTargetPayment(targetId: string) {
-  const response = await apiClient.post(`/payments/flower-target/${targetId}/cancel`);
+export async function cancelFlowerPayment(flowerId: string) {
+  const response = await apiClient.post(`/payments/flower/${flowerId}/cancel`);
   return response.data;
 }

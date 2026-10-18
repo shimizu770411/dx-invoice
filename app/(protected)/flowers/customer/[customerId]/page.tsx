@@ -4,14 +4,60 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { getBillingTargets, deleteFlower, Flower, FlowerBillingTarget } from '@/lib/flowers'
 import { getCustomer } from '@/lib/customers'
-import { createFlowerTargetPayment, cancelFlowerTargetPayment } from '@/lib/payments'
+import { createFlowerPayment, cancelFlowerPayment } from '@/lib/payments'
 import { toast } from '@/hooks/use-toast'
+import { extractValidationErrorMessage, handleOperationError } from '@/lib/errorHandler'
+import { useDateFormat } from '@/hooks/useDateFormat'
 import { FlowerCustomerInfo } from '../../components/FlowerCustomerInfo'
 import { FlowerFormDialog } from '../../components/FlowerFormDialog'
 import { BillingTargetDialog } from '../../components/BillingTargetDialog'
 import { DataTable } from '@/components/table/DataTable'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { CaseNavBar } from '@/components/case/CaseNavBar'
+import {
+    calcFlowerTargetTotal,
+    countFlowers,
+    filterFlowerTargets,
+    getFlowerTargetPaymentStatus,
+    summarizeFlowerTargets,
+    type FlowerPaymentFilter,
+    type FlowerTargetPaymentStatus,
+} from '@/lib/flowerTotals'
+
+// 供花（明細）の入金状況での絞り込み（CUSTOMER INFO と請求先一覧の間に出す）
+const PAYMENT_FILTER_OPTIONS: { value: FlowerPaymentFilter; label: string }[] = [
+    { value: 'ALL', label: 'すべて' },
+    { value: 'PAID', label: '入金済み' },
+    { value: 'UNPAID', label: '未入金' },
+]
+
+const TARGET_STATUS_LABELS: Record<FlowerTargetPaymentStatus, string> = {
+    PAID: '入金済',
+    PARTIAL: '一部入金',
+    UNPAID: '未入金',
+}
+
+// 入金状況の表示（入金済=金、一部入金=紺、未入金=赤）
+function paymentBadgeStyle(status: FlowerTargetPaymentStatus): React.CSSProperties {
+    const colors = {
+        PAID: { border: 'var(--brand-gold)', text: 'var(--brand-gold-soft)', bg: 'rgba(196, 174, 106, 0.1)' },
+        PARTIAL: { border: 'var(--brand-navy)', text: 'var(--brand-navy)', bg: 'rgba(1, 8, 62, 0.05)' },
+        UNPAID: { border: 'var(--brand-red)', text: 'var(--brand-red)', bg: 'rgba(154, 31, 40, 0.08)' },
+    }[status]
+    return {
+        letterSpacing: '0.15em',
+        fontWeight: 500,
+        borderWidth: '1px',
+        borderStyle: 'solid',
+        borderColor: colors.border,
+        color: colors.text,
+        backgroundColor: colors.bg,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        whiteSpace: 'nowrap',
+    }
+}
 
 type ActionVariant = 'navy' | 'gold' | 'alert' | 'done' | 'accent' | 'muted'
 
@@ -112,6 +158,9 @@ export default function FlowersListPage() {
         open: false,
         target: null,
     })
+    const [paymentFilter, setPaymentFilter] = useState<FlowerPaymentFilter>('ALL')
+    const [payingFlowerId, setPayingFlowerId] = useState<string | null>(null)
+    const formatDate = useDateFormat()
 
     const loadData = useCallback(async () => {
         try {
@@ -145,25 +194,31 @@ export default function FlowersListPage() {
         }
     }
 
-    const handlePayment = async (targetId: string, isPaid: boolean) => {
+    // 入金は供花1件ごと（請求先単位のまとめて入金は廃止）
+    const handlePayment = async (flower: Flower) => {
+        if (payingFlowerId) return
+        setPayingFlowerId(flower.id)
         try {
-            if (isPaid) {
-                await cancelFlowerTargetPayment(targetId)
+            if (flower.isPaid) {
+                await cancelFlowerPayment(flower.id)
                 toast({ title: '入金を取り消しました', variant: 'success', duration: 2000 })
             } else {
-                await createFlowerTargetPayment(targetId)
+                await createFlowerPayment(flower.id)
                 toast({ title: '入金完了にしました', variant: 'success', duration: 2000 })
             }
-            loadData()
+            await loadData()
         } catch (error) {
-            console.error('Failed to update payment:', error)
-            toast({ title: '入金処理に失敗しました', variant: 'destructive', duration: 3000 })
+            handleOperationError(error, extractValidationErrorMessage(error) ?? '入金処理に失敗しました')
+        } finally {
+            setPayingFlowerId(null)
         }
     }
 
-    const getTargetTotal = (target: FlowerBillingTarget) => {
-        return target.flowers.reduce((sum, f) => sum + f.amount, 0)
-    }
+    // 合計は絞り込みに関係なく案件全体で出す
+    const totals = summarizeFlowerTargets(targets)
+    // 絞り込みは供花（明細）単位。請求先の合計・入金状況は絞り込み前の全供花で出す
+    const visibleTargets = filterFlowerTargets(targets, paymentFilter)
+    const fullTargetById = new Map(targets.map((t) => [t.id, t]))
 
     if (loading) {
         return (
@@ -183,7 +238,6 @@ export default function FlowersListPage() {
 
             {/* ページヘッダー */}
             <PageHeader
-                eyebrow="FLOWER LIST"
                 title="供花一覧"
                 actions={
                     <>
@@ -222,10 +276,59 @@ export default function FlowersListPage() {
             />
 
             {/* 顧客情報サマリー */}
-            {customer && <FlowerCustomerInfo customer={customer} />}
+            {customer && <FlowerCustomerInfo customer={customer} totals={totals} />}
+
+            {/* 入金状況での絞り込み（案件一覧のクイックフィルターと同じ見た目） */}
+            {targets.length > 0 && (
+                <div className="mb-4 flex items-center justify-end gap-3">
+                    <span
+                        className="font-mincho"
+                        style={{
+                            fontSize: '12px',
+                            color: 'var(--brand-gold-soft)',
+                            letterSpacing: '0.15em',
+                            marginRight: '4px',
+                        }}
+                    >
+                        絞り込み
+                    </span>
+                    {PAYMENT_FILTER_OPTIONS.map(({ value, label }) => {
+                        const active = paymentFilter === value
+                        return (
+                            <button
+                                key={value}
+                                onClick={() => setPaymentFilter(value)}
+                                className="px-6 py-2 transition-colors font-mincho"
+                                style={{
+                                    fontSize: '15px',
+                                    letterSpacing: '0.15em',
+                                    fontWeight: 500,
+                                    border: active ? '1px solid var(--brand-navy)' : '1px solid var(--brand-navy-light)',
+                                    backgroundColor: active ? 'var(--brand-navy)' : '#ffffff',
+                                    color: active ? '#ffffff' : 'var(--brand-navy)',
+                                }}
+                            >
+                                {label}（{countFlowers(targets, value)}）
+                            </button>
+                        )
+                    })}
+                </div>
+            )}
 
             {/* 供花一覧（請求先単位） */}
-            {targets.length === 0 ? (
+            {targets.length > 0 && visibleTargets.length === 0 ? (
+                <p
+                    className="font-mincho"
+                    style={{
+                        color: 'var(--brand-text-muted)',
+                        letterSpacing: '0.15em',
+                        padding: '32px 0',
+                        textAlign: 'center',
+                    }}
+                >
+                    {paymentFilter === 'PAID' ? '入金済みの供花はありません' : '未入金の供花はありません'}
+                </p>
+            ) : targets.length === 0 ? (
                 <p
                     className="font-mincho"
                     style={{
@@ -238,10 +341,11 @@ export default function FlowersListPage() {
                     請求先が登録されていません
                 </p>
             ) : (
-                targets.map((target) => {
-                    const total = getTargetTotal(target)
-                    const tax = Math.round(total * 0.1)
-                    const totalWithTax = total + tax
+                visibleTargets.map((target) => {
+                    const fullTarget = fullTargetById.get(target.id) ?? target
+                    // 画面の金額は明細に合わせて税抜で統一する（税込は請求書・領収書PDFで出す）
+                    const { subtotal } = calcFlowerTargetTotal(fullTarget)
+                    const targetStatus = getFlowerTargetPaymentStatus(fullTarget)
                     return (
                         <div
                             key={target.id}
@@ -264,15 +368,15 @@ export default function FlowersListPage() {
                                 <div>
                                     <div className="flex items-center gap-3 mb-1">
                                         <p
-                                            className="font-garamond"
+                                            className="font-mincho"
                                             style={{
-                                                fontSize: '10px',
+                                                fontSize: '12px',
                                                 color: 'var(--brand-gold-soft)',
-                                                letterSpacing: '0.3em',
+                                                letterSpacing: '0.15em',
                                                 fontWeight: 500,
                                             }}
                                         >
-                                            BILL TO
+                                            請求先
                                         </p>
                                         <button
                                             onClick={() => setTargetDialogState({ open: true, target })}
@@ -312,23 +416,23 @@ export default function FlowersListPage() {
                                         }}
                                     >
                                         <p>{target.billToAddress}</p>
-                                        {target.billToTel && <p>TEL: {target.billToTel}</p>}
+                                        {target.billToTel && <p>電話：{target.billToTel}</p>}
                                     </div>
                                 </div>
 
                                 <div className="flex flex-col items-end gap-3">
-                                    {target.flowers.length > 0 && (
+                                    {fullTarget.flowers.length > 0 && (
                                         <div className="text-right">
                                             <p
-                                                className="font-garamond"
+                                                className="font-mincho"
                                                 style={{
-                                                    fontSize: '10px',
+                                                    fontSize: '12px',
                                                     color: 'var(--brand-gold-soft)',
-                                                    letterSpacing: '0.3em',
+                                                    letterSpacing: '0.15em',
                                                     marginBottom: '2px',
                                                 }}
                                             >
-                                                TOTAL (TAX INCL.)
+                                                合計（税抜）
                                             </p>
                                             <p
                                                 className="font-mincho"
@@ -339,78 +443,41 @@ export default function FlowersListPage() {
                                                     letterSpacing: '0.05em',
                                                 }}
                                             >
-                                                ¥{totalWithTax.toLocaleString()}
+                                                ¥{subtotal.toLocaleString()}
                                             </p>
                                         </div>
                                     )}
                                     <div className="flex items-center gap-2">
-                                        {!target.isPaid && (
-                                            <button
-                                                onClick={() =>
-                                                    setDialogState({
-                                                        open: true,
-                                                        flower: null,
-                                                        initialBillingTargetId: target.id,
-                                                    })
-                                                }
-                                                style={{
-                                                    ...actionButtonStyle('navy'),
-                                                    gap: '4px',
-                                                }}
+                                        <button
+                                            onClick={() =>
+                                                setDialogState({
+                                                    open: true,
+                                                    flower: null,
+                                                    initialBillingTargetId: target.id,
+                                                })
+                                            }
+                                            style={{
+                                                ...actionButtonStyle('navy'),
+                                                gap: '4px',
+                                            }}
+                                        >
+                                            <span
+                                                className="material-symbols-outlined"
+                                                style={{ fontSize: '18px', lineHeight: 1 }}
+                                                aria-hidden
                                             >
-                                                <span
-                                                    className="material-symbols-outlined"
-                                                    style={{ fontSize: '18px', lineHeight: 1 }}
-                                                    aria-hidden
-                                                >
-                                                    add
-                                                </span>
-                                                この請求先で追加
-                                            </button>
-                                        )}
-                                        {target.flowers.length > 0 && (
-                                            <>
-                                                {target.isPaid ? (
-                                                    <button
-                                                        onClick={() => handlePayment(target.id, true)}
-                                                        style={actionButtonStyle('alert')}
-                                                    >
-                                                        入金取消
-                                                    </button>
-                                                ) : (
-                                                    <button
-                                                        onClick={() => handlePayment(target.id, false)}
-                                                        style={actionButtonStyle('gold')}
-                                                    >
-                                                        入金完了
-                                                    </button>
-                                                )}
-                                                <span
-                                                    className="font-mincho"
-                                                    style={{
-                                                        padding: '8px 18px',
-                                                        fontSize: '14px',
-                                                        letterSpacing: '0.15em',
-                                                        fontWeight: 500,
-                                                        borderWidth: '1px',
-                                                        borderStyle: 'solid',
-                                                        borderColor: target.isPaid
-                                                            ? 'var(--brand-gold)'
-                                                            : 'var(--brand-red)',
-                                                        color: target.isPaid
-                                                            ? 'var(--brand-gold-soft)'
-                                                            : 'var(--brand-red)',
-                                                        backgroundColor: target.isPaid
-                                                            ? 'rgba(196, 174, 106, 0.1)'
-                                                            : 'rgba(154, 31, 40, 0.08)',
-                                                        display: 'inline-flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                    }}
-                                                >
-                                                    {target.isPaid ? '入金済' : '未入金'}
-                                                </span>
-                                            </>
+                                                add
+                                            </span>
+                                            この請求先で追加
+                                        </button>
+                                        {/* 入金は明細ごと。ここでは請求先全体の状況だけを表示する */}
+                                        {fullTarget.flowers.length > 0 && (
+                                            <span
+                                                className="font-mincho"
+                                                style={{ ...paymentBadgeStyle(targetStatus), padding: '8px 18px', fontSize: '14px' }}
+                                            >
+                                                {TARGET_STATUS_LABELS[targetStatus]}
+                                            </span>
                                         )}
                                     </div>
                                 </div>
@@ -419,46 +486,83 @@ export default function FlowersListPage() {
                             {/* 供花明細テーブル */}
                             <div style={{ padding: '8px 16px 16px' }}>
                                 <DataTable<Flower>
+                                    // 依頼主・名札・連名は幅を指定せず、金額・入金・操作を除いた残りを三等分する
+                                    fixedLayout
                                     columns={[
-                                        { key: 'requesterName', label: '依頼主', width: '150px' },
+                                        { key: 'requesterName', label: '依頼主' },
                                         {
                                             key: 'labelName',
                                             label: '名札',
-                                            width: '150px',
                                             render: (f) => f.labelName || '-',
                                         },
                                         {
                                             key: 'jointNames',
                                             label: '連名',
-                                            width: '150px',
                                             render: (f) => f.jointNames || '-',
                                         },
                                         {
                                             key: 'amount',
                                             label: '金額',
+                                            // ¥9,999,999（百万円の単位）まで1行に収まる幅
+                                            width: '140px',
                                             render: (f) => `¥${f.amount.toLocaleString()}`,
+                                        },
+                                        {
+                                            key: 'isPaid',
+                                            label: '入金',
+                                            width: '150px',
+                                            render: (f) => (
+                                                <div className="flex flex-col items-start gap-1">
+                                                    <span
+                                                        className="font-mincho"
+                                                        style={{
+                                                            ...paymentBadgeStyle(f.isPaid ? 'PAID' : 'UNPAID'),
+                                                            padding: '4px 12px',
+                                                            fontSize: '13px',
+                                                        }}
+                                                    >
+                                                        {f.isPaid ? '入金済' : '未入金'}
+                                                    </span>
+                                                    {f.isPaid && f.paidAt && (
+                                                        <span style={{ fontSize: '12px', color: 'var(--brand-text-muted)' }}>
+                                                            {formatDate(f.paidAt)}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            ),
                                         },
                                     ]}
                                     actionColumn={{
                                         key: 'actions',
                                         label: '操作',
-                                        width: '160px',
+                                        width: '300px',
                                         render: (flower) => (
-                                            <div className="flex justify-center gap-2">
+                                            <div className="flex justify-center gap-2 [&>button]:whitespace-nowrap [&>button]:!px-3">
+                                                <button
+                                                    onClick={() => handlePayment(flower)}
+                                                    disabled={payingFlowerId !== null}
+                                                    style={actionButtonStyle(
+                                                        flower.isPaid ? 'alert' : 'gold',
+                                                        payingFlowerId !== null
+                                                    )}
+                                                >
+                                                    {flower.isPaid ? '入金取消' : '入金完了'}
+                                                </button>
+                                                {/* 入金済みの供花は、金額や請求先が入金・領収書と食い違わないよう編集・削除不可 */}
                                                 <button
                                                     onClick={() =>
-                                                        !target.isPaid &&
+                                                        !flower.isPaid &&
                                                         setDialogState({ open: true, flower })
                                                     }
-                                                    disabled={target.isPaid}
-                                                    style={actionButtonStyle('done', target.isPaid)}
+                                                    disabled={flower.isPaid}
+                                                    style={actionButtonStyle('done', flower.isPaid)}
                                                 >
                                                     編集
                                                 </button>
                                                 <button
-                                                    onClick={() => !target.isPaid && handleDeleteFlower(flower.id)}
-                                                    disabled={target.isPaid}
-                                                    style={actionButtonStyle('alert', target.isPaid)}
+                                                    onClick={() => !flower.isPaid && handleDeleteFlower(flower.id)}
+                                                    disabled={flower.isPaid}
+                                                    style={actionButtonStyle('alert', flower.isPaid)}
                                                 >
                                                     削除
                                                 </button>

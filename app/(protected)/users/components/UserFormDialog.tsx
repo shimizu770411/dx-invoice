@@ -78,18 +78,6 @@ export function UserFormDialog({
                 }}
             >
                 <DialogHeader>
-                    <p
-                        className="font-garamond"
-                        style={{
-                            fontSize: '11px',
-                            color: 'var(--brand-gold-soft)',
-                            letterSpacing: '0.3em',
-                            fontWeight: 500,
-                            marginBottom: '4px',
-                        }}
-                    >
-                        {isEditing ? 'STAFF · EDIT' : 'STAFF · NEW'}
-                    </p>
                     <DialogTitle
                         className="font-mincho"
                         style={{

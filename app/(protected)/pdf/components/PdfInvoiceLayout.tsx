@@ -1640,9 +1640,6 @@ export function PdfInvoiceLayout({
                             <h2 className="text-center text-2xl font-black tracking-[0.3em]">
                                 選択オプション一覧
                             </h2>
-                            <p className="mt-1 text-center text-xs tracking-widest">
-                                Selected Items
-                            </p>
                         </div>
 
                         <div className="grid grid-cols-2 gap-3">

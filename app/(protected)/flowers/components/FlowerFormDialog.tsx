@@ -115,18 +115,6 @@ export function FlowerFormDialog({
                         borderBottom: '1px solid var(--brand-border)',
                     }}
                 >
-                    <p
-                        className="font-garamond"
-                        style={{
-                            fontSize: '11px',
-                            color: 'var(--brand-gold-soft)',
-                            letterSpacing: '0.3em',
-                            fontWeight: 500,
-                            marginBottom: '4px',
-                        }}
-                    >
-                        {isEdit ? 'EDIT FLOWER' : 'REGISTER FLOWER'}
-                    </p>
                     <h2
                         className="font-mincho"
                         style={{

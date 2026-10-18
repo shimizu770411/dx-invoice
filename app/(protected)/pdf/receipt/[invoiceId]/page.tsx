@@ -152,17 +152,6 @@ export default function ReceiptPdfPage() {
                 style={{ borderBottom: '1px solid var(--brand-border)' }}
             >
                 <div>
-                    <p
-                        className="font-garamond mb-2"
-                        style={{
-                            fontSize: '12px',
-                            color: 'var(--brand-gold-soft)',
-                            letterSpacing: '0.3em',
-                            fontWeight: 500,
-                        }}
-                    >
-                        RECEIPT
-                    </p>
                     <h1
                         className="font-mincho"
                         style={{
@@ -184,7 +173,7 @@ export default function ReceiptPdfPage() {
                                     marginLeft: '20px',
                                 }}
                             >
-                                — 請求書 No. {invoice.docNo}
+                                — 請求番号 {invoice.docNo}
                             </span>
                         )}
                     </h1>

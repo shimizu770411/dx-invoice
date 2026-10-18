@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { getBillingTargets, FlowerBillingTarget, getFamilyName } from '@/lib/flowers'
+import { calcFlowerTargetTotal, selectPaidFlowersForReceipt } from '@/lib/flowerTotals'
 import { getCompanyProfile, CompanyProfile } from '@/lib/company'
 import { getCustomer } from '@/lib/customers'
 import { CreateButton } from '@/components/button/CreateButton'
@@ -43,8 +44,8 @@ export default function FlowerPdfPage() {
                 getCompanyProfile(),
                 getCustomer(customerId),
             ])
-            // 依頼主が1件以上いる請求先のみ表示
-            setTargets(flowersData.filter((t) => t.flowers.length > 0))
+            // 領収書は入金済みの供花だけ。請求先ごとに入金済みの供花で明細と金額を作り、入金済みが無い請求先は出さない
+            setTargets(selectPaidFlowersForReceipt(flowersData))
             setCompany(companyData)
             setCustomer(customerData)
         } catch (error) {
@@ -95,7 +96,7 @@ export default function FlowerPdfPage() {
     if (targets.length === 0) {
         return (
             <div className="p-8">
-                <p className="mb-4 text-gray-500">依頼主が登録されている請求先がありません</p>
+                <p className="mb-4 text-gray-500">入金済みの供花がありません</p>
                 <ResetButton onClick={() => router.back()}>戻る</ResetButton>
             </div>
         )
@@ -150,9 +151,7 @@ export default function FlowerPdfPage() {
                 style={{ fontFamily: '"Noto Serif JP", serif' }}
             >
                 {targets.map((target, targetIndex) => {
-                    const total = target.flowers.reduce((sum: number, f) => sum + f.amount, 0)
-                    const tax = Math.round(total * 0.1)
-                    const totalWithTax = total + tax
+                    const { subtotal: total, tax, totalWithTax } = calcFlowerTargetTotal(target)
                     const docTitle = '領収証'
                     return (
                         <div

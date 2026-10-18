@@ -363,12 +363,6 @@ function InvoiceFormContent({
                     style={{ borderBottom: '1px solid var(--brand-border)' }}
                 >
                     <div>
-                        <p
-                            className="font-garamond mb-2"
-                            style={{ fontSize: '12px', color: 'var(--brand-gold-soft)', letterSpacing: '0.3em', fontWeight: 500 }}
-                        >
-                            INVOICE · EDIT
-                        </p>
                         <h1
                             className="font-mincho whitespace-normal lg:whitespace-nowrap"
                             style={{
@@ -382,7 +376,7 @@ function InvoiceFormContent({
                             請求書 編集
                             {invoice?.docNo && (
                                 <span style={{ fontSize: '16px', color: 'var(--brand-text-muted)', fontWeight: 400, letterSpacing: '0.15em', marginLeft: '20px' }}>
-                                    — No. {invoice.docNo}
+                                    — 請求番号 {invoice.docNo}
                                 </span>
                             )}
                         </h1>

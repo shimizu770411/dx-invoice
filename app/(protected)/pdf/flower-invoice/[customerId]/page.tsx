@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Image from 'next/image'
 import { getBillingTargets, FlowerBillingTarget, getFamilyName } from '@/lib/flowers'
+import { calcFlowerTargetTotal } from '@/lib/flowerTotals'
 import { getCompanyProfile, CompanyProfile } from '@/lib/company'
 import { getCustomer } from '@/lib/customers'
 import { CreateButton } from '@/components/button/CreateButton'
@@ -169,9 +170,7 @@ export default function FlowerInvoicePdfPage() {
                 style={{ fontFamily: '"Noto Serif JP", serif' }}
             >
                 {targets.map((target, targetIndex) => {
-                    const total = target.flowers.reduce((sum: number, f) => sum + f.amount, 0)
-                    const tax = Math.round(total * 0.1)
-                    const totalWithTax = total + tax
+                    const { subtotal: total, tax, totalWithTax } = calcFlowerTargetTotal(target)
                     const emptyRowCount = Math.max(0, ITEM_TABLE_MIN_ROWS - target.flowers.length)
                     const bankTypeAbbr = company?.bank2Type
                         ? (BANK_TYPE_ABBREVIATIONS[company.bank2Type] ?? company.bank2Type)

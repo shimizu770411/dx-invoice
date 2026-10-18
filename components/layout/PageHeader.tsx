@@ -1,8 +1,6 @@
 import React from 'react'
 
 type Props = {
-    /** 上に表示する英字キャプション（例: "CASE LIST"） */
-    eyebrow?: string
     /** 大日本語タイトル（例: "葬儀案件一覧"） */
     title: string
     /** 右側のアクション領域（ボタン等） */
@@ -11,27 +9,14 @@ type Props = {
 
 /**
  * 玉泉院ブランドのページヘッダー
- * - 上に英字キャプション（gold-soft 細字）
- * - 中央に大きな日本語タイトル（navy 明朝）
+ * - 大きな日本語タイトル（navy 明朝）。画面の表記は日本語のみ（英字の見出しは付けない）
  * - 下に brand-border の細い区切り線
  * - 右側に任意のアクション要素
  */
-export function PageHeader({ eyebrow, title, actions }: Props) {
+export function PageHeader({ title, actions }: Props) {
     return (
         <div className="mb-8 flex items-end justify-between border-b border-brand-border pb-5">
             <div>
-                {eyebrow && (
-                    <p
-                        className="mb-2 font-garamond text-brand-gold-soft"
-                        style={{
-                            fontSize: '12px',
-                            letterSpacing: '0.3em',
-                            fontWeight: 500,
-                        }}
-                    >
-                        {eyebrow}
-                    </p>
-                )}
                 <h1
                     className="font-mincho text-brand-navy"
                     style={{

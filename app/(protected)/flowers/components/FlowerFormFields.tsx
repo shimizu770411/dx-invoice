@@ -125,7 +125,7 @@ export function FlowerFormFields({
                         <FormInput
                             name="billToTel"
                             control={control}
-                            label="請求先TEL"
+                            label="請求先電話番号"
                             placeholder="例: 090-1234-5678"
                             disabled={readonlyTargetFields}
                         />

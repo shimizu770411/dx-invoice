@@ -20,6 +20,7 @@ export default function Navigation() {
         ...(currentUser?.isAdmin ? [{ href: '/company', label: '設定' }] : []),
         { href: '/reports/operations', label: 'ログ' },
         ...(currentUser?.isAdmin ? [{ href: '/reports/master-changes', label: '変更履歴' }] : []),
+        ...(currentUser?.isAdmin ? [{ href: '/reports/deleted-cases', label: '削除履歴' }] : []),
     ]
 
     const isActive = (href: string) => {
@@ -33,6 +34,8 @@ export default function Navigation() {
             return pathname === '/reports/operations' || pathname?.startsWith('/reports/operations/')
         if (href === '/reports/master-changes')
             return pathname === '/reports/master-changes' || pathname?.startsWith('/reports/master-changes/')
+        if (href === '/reports/deleted-cases')
+            return pathname === '/reports/deleted-cases' || pathname?.startsWith('/reports/deleted-cases/')
         return pathname === href
     }
 
@@ -65,21 +68,6 @@ export default function Navigation() {
                         }}
                     >
                         葬儀業務支援
-                    </span>
-                    <span
-                        className="font-garamond hidden lg:inline"
-                        style={{
-                            fontSize: '11px',
-                            color: 'var(--brand-gold)',
-                            letterSpacing: '0.25em',
-                            lineHeight: 1,
-                            borderLeft: '1px solid rgba(196, 174, 106, 0.4)',
-                            paddingLeft: '12px',
-                            marginLeft: '2px',
-                            whiteSpace: 'nowrap',
-                        }}
-                    >
-                        FUNERAL SYSTEM
                     </span>
                     {IS_LOCAL && (
                         <span

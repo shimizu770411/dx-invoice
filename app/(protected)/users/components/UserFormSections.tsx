@@ -19,7 +19,7 @@ export function UserFormSections({ isEditing, canEditRole }: UserFormSectionsPro
     return (
         <div className="flex flex-col gap-4">
             <FormInput name="name" control={control} label="名前" required error={errors.name} />
-            <FormInput name="tel" control={control} label="TEL" type="tel" required error={errors.tel} />
+            <FormInput name="tel" control={control} label="電話番号" type="tel" required error={errors.tel} />
             <FormInput
                 name="password"
                 control={control}
@@ -81,7 +81,7 @@ export function UserFormSections({ isEditing, canEditRole }: UserFormSectionsPro
                 )}
             />
 
-            <FormInput name="email" control={control} label="Email" type="email" error={errors.email} />
+            <FormInput name="email" control={control} label="メールアドレス" type="email" error={errors.email} />
             <FormInput name="birthDate" control={control} label="生年月日" type="date" error={errors.birthDate} />
 
             {/* ロール */}

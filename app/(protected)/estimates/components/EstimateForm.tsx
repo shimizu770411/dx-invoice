@@ -451,12 +451,6 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                     style={{ borderBottom: '1px solid var(--brand-border)' }}
                 >
                     <div>
-                        <p
-                            className="font-garamond mb-2"
-                            style={{ fontSize: '12px', color: 'var(--brand-gold-soft)', letterSpacing: '0.3em', fontWeight: 500 }}
-                        >
-                            {mode === 'create' ? 'ESTIMATE · NEW' : 'ESTIMATE · EDIT'}
-                        </p>
                         <h1
                             className="font-mincho"
                             style={{ fontSize: '26px', fontWeight: 600, color: 'var(--brand-navy)', letterSpacing: '0.2em', lineHeight: 1.2 }}
@@ -464,7 +458,7 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                             {pageTitle}
                             {mode === 'edit' && estimate?.docNo && (
                                 <span style={{ fontSize: '16px', color: 'var(--brand-text-muted)', fontWeight: 400, letterSpacing: '0.15em', marginLeft: '20px' }}>
-                                    — No. {estimate.docNo}
+                                    — 見積番号 {estimate.docNo}
                                 </span>
                             )}
                         </h1>
@@ -488,10 +482,10 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                 {/* プラン選択 */}
                 <div className="mb-6 flex items-center gap-3">
                     <span
-                        className="font-garamond"
-                        style={{ fontSize: '11px', color: 'var(--brand-gold-soft)', letterSpacing: '0.3em' }}
+                        className="font-mincho"
+                        style={{ fontSize: '12px', color: 'var(--brand-gold-soft)', letterSpacing: '0.15em' }}
                     >
-                        PLAN
+                        プラン
                     </span>
                     <select
                         value={planId}

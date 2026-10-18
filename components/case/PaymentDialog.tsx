@@ -56,17 +56,6 @@ export function PaymentDialog({ invoiceId, isPaid, onClose }: PaymentDialogProps
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="mb-6 pb-4" style={{ borderBottom: '1px solid var(--brand-border)' }}>
-                    <p
-                        className="font-garamond mb-2"
-                        style={{
-                            fontSize: '11px',
-                            color: 'var(--brand-gold-soft)',
-                            letterSpacing: '0.3em',
-                            fontWeight: 500,
-                        }}
-                    >
-                        {isPaid ? 'CANCEL PAYMENT' : 'REGISTER PAYMENT'}
-                    </p>
                     <h2
                         className="font-mincho"
                         style={{

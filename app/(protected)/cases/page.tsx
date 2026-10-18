@@ -3,10 +3,17 @@
 import { CreateButton } from '@/components/button/CreateButton'
 import { DataTable } from '@/components/table/DataTable'
 import { PageHeader } from '@/components/layout/PageHeader'
-import { CustomerListItem, SearchCustomersParams } from '@/lib/customers'
+import {
+    CustomerListItem,
+    SearchCustomersParams,
+    deleteCustomer,
+    getCaseDeletionPreview,
+} from '@/lib/customers'
+import { buildCaseDeletionConfirmMessage } from '@/lib/caseDeletionMessage'
+import { getMe } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCustomersQuery } from '@/hooks/useCustomer'
 import { buildCaseSteps, CaseStepKey } from '@/lib/caseProgress'
 import { caseStepButtonStyle } from '@/components/case/caseStepButtonStyle'
@@ -53,6 +60,20 @@ function ResponsiveActionLabel({ label }: { label: string }) {
 const CASE_ROW_BTN_SIZE_CLASSES =
     'px-2.5 py-3 text-[13px] min-w-[80px] lg:px-[18px] lg:py-2 lg:text-sm lg:min-w-[110px]'
 
+// 案件削除ボタン（管理者のみ表示）。進行中の操作ボタンと見分けられるよう、塗りつぶさない赤枠にする
+const caseDeleteButtonStyle = (disabled: boolean): React.CSSProperties => ({
+    letterSpacing: '0.12em',
+    fontWeight: 500,
+    border: '1px solid var(--brand-red)',
+    backgroundColor: '#ffffff',
+    color: 'var(--brand-red)',
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    opacity: disabled ? 0.5 : 1,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+})
+
 export default function CasesPage() {
     const router = useRouter()
     // フォーム入力値（検索後も保持）
@@ -68,10 +89,13 @@ export default function CasesPage() {
     }>({ open: false, invoiceId: null, customerId: null, isPaid: false })
 
     const [creatingInvoiceForId, setCreatingInvoiceForId] = useState<string | null>(null)
+    const [deletingCaseId, setDeletingCaseId] = useState<string | null>(null)
 
     // React Query フック
     const queryClient = useQueryClient()
     const { data: customers = [], isLoading: customersLoading } = useCustomersQuery(searchParams)
+    const { data: currentUser } = useQuery({ queryKey: ['me'], queryFn: getMe })
+    const isAdmin = currentUser?.isAdmin === true
     const formatDate = useDateFormat()
 
     const loading = customersLoading
@@ -114,6 +138,23 @@ export default function CasesPage() {
         })
     }
 
+    // 案件の削除（管理者のみ）。一緒に消える件数を確認で見せてから消す
+    const handleDeleteCase = async (customer: CustomerListItem) => {
+        if (deletingCaseId) return
+        setDeletingCaseId(customer.id)
+        try {
+            const preview = await getCaseDeletionPreview(customer.id)
+            if (!confirm(buildCaseDeletionConfirmMessage(preview, preview.summary))) return
+            await deleteCustomer(customer.id)
+            toast({ title: '案件を削除しました', variant: 'success', duration: 2000 })
+            queryClient.invalidateQueries({ queryKey: ['customers'] })
+        } catch (error) {
+            handleOperationError(error, extractValidationErrorMessage(error) ?? '案件の削除に失敗しました')
+        } finally {
+            setDeletingCaseId(null)
+        }
+    }
+
     const handlePaymentCancel = () => {
         setPaymentDialog({ open: false, invoiceId: null, customerId: null, isPaid: false })
     }
@@ -130,7 +171,6 @@ export default function CasesPage() {
         <div className="px-10 py-8" style={{ backgroundColor: '#fbfaf7', minHeight: 'calc(100vh - 68px)' }}>
             {/* ページヘッダー */}
             <PageHeader
-                eyebrow="CASE LIST"
                 title="葬儀案件一覧"
                 actions={<CreateButton onClick={() => router.push('/cases/new')}>新規登録</CreateButton>}
             />
@@ -147,15 +187,15 @@ export default function CasesPage() {
             {/* クイックフィルター */}
             <div className="mb-4 flex items-center justify-end gap-3">
                 <span
-                    className="font-garamond"
+                    className="font-mincho"
                     style={{
-                        fontSize: '11px',
+                        fontSize: '12px',
                         color: 'var(--brand-gold-soft)',
-                        letterSpacing: '0.3em',
+                        letterSpacing: '0.15em',
                         marginRight: '4px',
                     }}
                 >
-                    FILTER
+                    絞り込み
                 </span>
                 {activeQuickFilter && (
                     <button
@@ -232,7 +272,7 @@ export default function CasesPage() {
                     columns={[
                         {
                             key: 'receptionNo',
-                            label: 'No',
+                            label: '受付番号',
                             width: '50px',
                         },
                         {
@@ -421,6 +461,19 @@ export default function CasesPage() {
                                 >
                                     <ResponsiveActionLabel label="供花登録" />
                                 </button>
+
+                                {/* 案件削除（管理者のみ）。誤操作を避けるため右端に離して置く */}
+                                {isAdmin && (
+                                    <button
+                                        onClick={() => handleDeleteCase(item)}
+                                        disabled={deletingCaseId !== null}
+                                        style={caseDeleteButtonStyle(deletingCaseId !== null)}
+                                        className={`font-mincho ml-auto ${CASE_ROW_BTN_SIZE_CLASSES}`}
+                                        title="この案件と見積・請求書・入金・供花をまとめて削除"
+                                    >
+                                        {deletingCaseId === item.id ? '削除中…' : '削除'}
+                                    </button>
+                                )}
                             </div>
                         )
                     }}

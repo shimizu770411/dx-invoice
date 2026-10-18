@@ -56,7 +56,10 @@ enum EstimateType {
 
 enum PaymentTargetType {
   INVOICE
+  // 旧: 供花の請求先単位の入金（2026-10 に供花1件ごとの FLOWER へ移行済み。履歴として残すだけで参照しない）
   FLOWER_TARGET
+  // 供花1件ごとの入金（flowerId を持つ）
+  FLOWER
 }
 
 enum PaymentStatus {
@@ -116,6 +119,7 @@ model User {
   approverConfirmedInvoices Invoice[] @relation("InvoiceApproverConfirmedBy")
   operationLogs             OperationLog[]
   masterChangeLogs          MasterChangeLog[]
+  deletedCases              DeletedCase[]
 
   @@map("users")
 }
@@ -731,6 +735,7 @@ model Flower {
 
   customer      Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
   billingTargetItems FlowerBillingTargetItem[]
+  payments      Payment[]
 
   @@map("flowers")
 }
@@ -777,6 +782,7 @@ model Payment {
   createdById            BigInt?           @map("created_by_id")
   invoiceId              BigInt?           @map("invoice_id")
   flowerBillingTargetId BigInt?           @map("flower_billing_target_id")
+  flowerId              BigInt?           @map("flower_id")
   createdAt             DateTime          @default(now()) @db.Timestamptz(6) @map("created_at")
   updatedAt             DateTime          @updatedAt @db.Timestamptz(6) @map("updated_at")
 
@@ -784,10 +790,12 @@ model Payment {
   createdBy             User?             @relation("CreatedBy", fields: [createdById], references: [id])
   invoice               Invoice?          @relation(fields: [invoiceId], references: [id])
   flowerBillingTarget   FlowerBillingTarget? @relation(fields: [flowerBillingTargetId], references: [id])
+  flower                Flower?           @relation(fields: [flowerId], references: [id], onDelete: SetNull)
 
   @@index([customerId])
   @@index([targetType, invoiceId])
   @@index([targetType, flowerBillingTargetId])
+  @@index([targetType, flowerId])
   @@index([paidAt])
   @@index([createdAt])
   @@map("payments")
@@ -873,4 +881,26 @@ model MasterChangeLog {
   @@index([userId, occurredAt])
   @@index([targetType, targetId])
   @@map("master_change_logs")
+}
+
+// 管理者が案件一覧から削除した案件の控え。1案件＝1行。
+// 削除前に、案件と関連データ一式（見積・請求書・入金・供花・操作ログなど）を DB の行のまま snapshot に保存してから消す。
+// 復旧手順は lib/caseDeletion.ts の冒頭コメントを参照。
+model DeletedCase {
+  id                 BigInt   @id @default(autoincrement())
+  originalCustomerId BigInt   @map("original_customer_id")
+  receptionNo        String?  @db.VarChar(30) @map("reception_no")
+  deceasedName       String   @db.VarChar(100) @map("deceased_name")
+  chiefMournerName   String?  @db.VarChar(100) @map("chief_mourner_name")
+  // 一緒に削除した件数 { テーブル名: 件数 }
+  summary            Json
+  // 削除したデータ一式 { テーブル名: [行(列名はDBのまま)] }
+  snapshot           Json
+  deletedById        BigInt?  @map("deleted_by_id")
+  deletedAt          DateTime @default(now()) @db.Timestamptz(6) @map("deleted_at")
+
+  deletedBy User? @relation(fields: [deletedById], references: [id])
+
+  @@index([deletedAt])
+  @@map("deleted_cases")
 }
