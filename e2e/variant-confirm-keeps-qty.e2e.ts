@@ -48,12 +48,12 @@ describe.each([
         expect(await getQtys(page, MULTI_ROW_WITH_RETURN), '開き直した後の数量（加算・返品）').toEqual([200, 20])
     })
 
-    it(`${screen}: 重箱にチェックして数量を3にしてから種類を選んでも、数量3のまま`, async () => {
+    // 重箱はチェックと同時に種類選択が開くため、「数量を先に入れてから初めて種類を選ぶ」操作は無い
+    it(`${screen}: 重箱の種類を選んで数量を3にしてから種類を選び直しても、数量3のまま`, async () => {
         await openBlankDocument(session, page, kind, `種類確定重箱${screen}`)
         await setChecked(page, VARIANT_GROUP, true)
-        await setQty(page, VARIANT_GROUP, 3)
         await pickVariants(page, VARIANT_GROUP, ['Cセット'])
-        expect((await getQtys(page, VARIANT_GROUP))[0], '初めて種類を確定した後の数量').toBe(3)
+        await setQty(page, VARIANT_GROUP, 3)
         await pickVariants(page, VARIANT_GROUP, ['49日もち'])
         expect((await getQtys(page, VARIANT_GROUP))[0], '種類を選び直した後の数量').toBe(3)
     })

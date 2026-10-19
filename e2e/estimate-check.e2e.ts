@@ -12,6 +12,7 @@ import {
     fillLinkedFreeRow,
     getLinkedFreeRow,
     getQtys,
+    hasRow,
     isChecked,
     pickVariants,
     readScreenTotals,
@@ -68,7 +69,9 @@ describe('見積画面: チェックの付け外し', () => {
 
         await setChecked(page, PARENT_ALTAR, false)
         for (const child of [...SET_CHILDREN, MULTI_ROW_CHILD]) {
-            const qtys = await getQtys(page, child).catch(() => [0]) // 親を外すと子の行が隠れることもある
+            // 親祭壇が1つも選ばれていないと子の行は表示されない。表示される場合は数量が全行0
+            if (!(await hasRow(page, child))) continue
+            const qtys = await getQtys(page, child)
             expect(qtys.every((q) => q === 0), `${child} の数量が全行0に戻る（${qtys}）`).toBe(true)
         }
 
