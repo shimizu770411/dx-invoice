@@ -93,6 +93,7 @@ export const ROW_VARIANT_FIELDS: FieldDef[] = [
     { key: 'unitPrice', label: '単価', format: formatYen },
     { key: 'isDefault', label: '既定', format: formatOnOff },
     { key: 'isActive', label: '有効', format: formatOnOff },
+    { key: 'sortNo', label: '表示順', format: formatNumber },
 ]
 
 export const GROUP_FIELDS: FieldDef[] = [
@@ -213,8 +214,8 @@ export function buildPlanSettingChanges(
 
 // ---- 商品（基本項目＋明細行構成＋バリアントグループ） ----
 
-export type ProductRowVariantSnapshot = Snapshot & { label: string }
-export type ProductRowSnapshot = Snapshot & { label: string; variants: ProductRowVariantSnapshot[] }
+export type ProductRowVariantSnapshot = Snapshot & { id: string; label: string }
+export type ProductRowSnapshot = Snapshot & { id: string; label: string; variants: ProductRowVariantSnapshot[] }
 export type ProductGroupSnapshot = Snapshot & { id: string; label: string }
 export type ProductSnapshot = Snapshot & {
     name: string
@@ -226,36 +227,33 @@ export type ProductSnapshot = Snapshot & {
 
 /**
  * 商品の変更前後を比べる。
- * 明細行は保存のたびに削除→作り直しされIDが変わるため、並び順（何行目か）で対応付ける。
+ * 明細行・行の種類は保存してもIDが変わらないため、グループと同じくIDで対応付ける
+ * （「明細行N」の N はその時点の並び順）。
  */
 export function buildProductChanges(before: ProductSnapshot | null, after: ProductSnapshot | null): FieldChange[] {
     const withKind = (p: ProductSnapshot | null) => (p ? { ...p, kind: productKindLabel(p) } : null)
     const rowSubject = (row: Snapshot, idx: number) => `明細行${idx + 1}「${row.label}」`
-    const indexed = <T extends Snapshot>(items: T[]) => items.map((item, idx) => ({ ...item, _idx: idx }))
+    const indexed = (rows: ProductRowSnapshot[]) => rows.map((row, idx) => ({ ...row, _idx: idx }))
 
     const beforeRows = indexed(before?.rows ?? [])
     const afterRows = indexed(after?.rows ?? [])
     // 行ごと追加・削除された場合はその行の「追加」「削除」だけを残し、配下の種類までは並べない
-    const flattenRowVariants = (rows: typeof afterRows, otherRows: typeof afterRows) =>
-        rows
-            .filter((row) => row._idx < otherRows.length)
-            .flatMap((row) =>
-                indexed(row.variants).map((v) => ({
-                    ...v,
-                    _key: `${row._idx}-${v._idx}`,
-                    _rowSubject: rowSubject(row, row._idx),
-                }))
-            )
+    const flattenRowVariants = (rows: typeof afterRows, otherRows: typeof afterRows) => {
+        const otherIds = new Set(otherRows.map((r) => r.id))
+        return rows
+            .filter((row) => otherIds.has(row.id))
+            .flatMap((row) => row.variants.map((v) => ({ ...v, _rowSubject: rowSubject(row, row._idx) })))
+    }
 
     return [
         ...diffFields(withKind(before), withKind(after), PRODUCT_FIELDS),
         ...diffCollection(beforeRows, afterRows, {
-            key: (r) => String(r._idx),
+            key: (r) => r.id,
             subject: (r) => rowSubject(r, r._idx),
             defs: ROW_FIELDS,
         }),
         ...diffCollection(flattenRowVariants(beforeRows, afterRows), flattenRowVariants(afterRows, beforeRows), {
-            key: (v) => v._key,
+            key: (v) => v.id,
             subject: (v) => `${v._rowSubject}の種類「${v.label}」`,
             defs: ROW_VARIANT_FIELDS,
         }),

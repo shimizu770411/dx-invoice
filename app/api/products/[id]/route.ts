@@ -10,6 +10,69 @@ import {
     loadProductSnapshot,
     recordMasterChange,
 } from '@/lib/masterChangeLog'
+import { planProductRowSync, splitRemovals, type ExistingRow, type RowSyncPlan } from '@/lib/productRowSync'
+import type { Prisma } from '@phoenix-jpn/db'
+
+/**
+ * 明細行・行の種類を送られた内容に合わせる。既存のものはIDを保ったまま更新し、
+ * 外したものは見積・請求書から参照されていれば無効化、参照が無ければ削除する。
+ */
+async function applyProductRowSync(
+    tx: Prisma.TransactionClient,
+    productItemId: bigint,
+    plan: RowSyncPlan,
+    existing: ExistingRow[]
+): Promise<void> {
+    const removedRowVariantIds = existing
+        .filter((r) => plan.removedRowIds.includes(r.id))
+        .flatMap((r) => r.variants.map((v) => v.id))
+    const candidateRowIds = plan.removedRowIds.map(BigInt)
+    const candidateVariantIds = [...removedRowVariantIds, ...plan.removedVariantIds].map(BigInt)
+    const referenced = { rowIds: new Set<string>(), variantIds: new Set<string>() }
+    if (candidateRowIds.length > 0 || candidateVariantIds.length > 0) {
+        const where = {
+            OR: [{ productRowId: { in: candidateRowIds } }, { productRowVariantId: { in: candidateVariantIds } }],
+        }
+        const select = { productRowId: true, productRowVariantId: true } as const
+        const refs = [
+            ...(await tx.estimateItem.findMany({ where, select, distinct: ['productRowId', 'productRowVariantId'] })),
+            ...(await tx.invoiceItem.findMany({ where, select, distinct: ['productRowId', 'productRowVariantId'] })),
+        ]
+        for (const ref of refs) {
+            if (ref.productRowId !== null) referenced.rowIds.add(ref.productRowId.toString())
+            if (ref.productRowVariantId !== null) referenced.variantIds.add(ref.productRowVariantId.toString())
+        }
+    }
+    const removal = splitRemovals(plan, existing, referenced)
+    const toIds = (ids: string[]) => ({ in: ids.map(BigInt) })
+
+    if (removal.deleteRowIds.length > 0) {
+        await tx.productRow.deleteMany({ where: { id: toIds(removal.deleteRowIds), productItemId } })
+    }
+    if (removal.deactivateRowIds.length > 0) {
+        await tx.productRow.updateMany({ where: { id: toIds(removal.deactivateRowIds), productItemId }, data: { isActive: false } })
+    }
+    if (removal.deleteVariantIds.length > 0) {
+        await tx.productRowVariant.deleteMany({ where: { id: toIds(removal.deleteVariantIds) } })
+    }
+    if (removal.deactivateVariantIds.length > 0) {
+        await tx.productRowVariant.updateMany({ where: { id: toIds(removal.deactivateVariantIds) }, data: { isActive: false } })
+    }
+
+    for (const row of plan.rows) {
+        const rowId =
+            row.id !== null
+                ? (await tx.productRow.update({ where: { id: BigInt(row.id) }, data: { ...row.data, sortNo: row.sortNo } })).id
+                : (await tx.productRow.create({ data: { ...row.data, sortNo: row.sortNo, productItemId } })).id
+        for (const v of row.variants) {
+            if (v.id !== null) {
+                await tx.productRowVariant.update({ where: { id: BigInt(v.id) }, data: { ...v.data, sortNo: v.sortNo } })
+            } else {
+                await tx.productRowVariant.create({ data: { ...v.data, sortNo: v.sortNo, productRowId: rowId } })
+            }
+        }
+    }
+}
 
 export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
     const params = await props.params
@@ -130,6 +193,24 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
             }
         }
 
+        // 明細行の送り内容（他の商品の行のIDなど）も、書き込みを始める前に確かめる
+        let rowSync: { plan: RowSyncPlan; existing: ExistingRow[] } | null = null
+        if (Array.isArray(body.rows)) {
+            const existingRows = await prisma.productRow.findMany({
+                where: { productItemId },
+                select: { id: true, variants: { select: { id: true } } },
+            })
+            const existing: ExistingRow[] = existingRows.map((r) => ({
+                id: r.id.toString(),
+                variants: r.variants.map((v) => ({ id: v.id.toString() })),
+            }))
+            const result = planProductRowSync(existing, body.rows)
+            if (!result.ok) {
+                return NextResponse.json({ error: 'BadRequest', message: result.message }, { status: 400 })
+            }
+            rowSync = { plan: result.plan, existing }
+        }
+
         // 本体・明細行・グループ・変更履歴を1トランザクションで保存し、途中で失敗したら何も残さない
         await prisma.$transaction(async (tx) => {
             const before = await loadProductSnapshot(tx, productItemId)
@@ -150,53 +231,9 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
                 })
             }
 
-            // 明細行構成（複数行構成商品時のみ）: body.rows があれば全置換
-            if (Array.isArray(body.rows)) {
-                await tx.productRow.deleteMany({
-                    where: { productItemId: BigInt(params.id) },
-                })
-                for (const [rowIdx, row] of body.rows.entries()) {
-                    await tx.productRow.create({
-                        data: {
-                            productItemId: BigInt(params.id),
-                            label: typeof row.label === 'string' ? row.label : '',
-                            calcType: row.calcType === 'FIXED' ? 'FIXED' : 'UNIT_PRICE_X_QTY',
-                            defaultQty: Number.isFinite(Number(row.defaultQty))
-                                ? Number(row.defaultQty)
-                                : 1,
-                            hasReturn: Boolean(row.hasReturn),
-                            useForVariantLabel: Boolean(row.useForVariantLabel),
-                            useForDescriptionLabel: Boolean(row.useForDescriptionLabel),
-                            sortNo: rowIdx,
-                            isActive: row.isActive !== false,
-                            variants: {
-                                create: (Array.isArray(row.variants) ? row.variants : []).map(
-                                    (v: any, vIdx: number) => ({
-                                        label: typeof v.label === 'string' ? v.label : '',
-                                        abbreviatedName:
-                                            typeof v.abbreviatedName === 'string' && v.abbreviatedName
-                                                ? v.abbreviatedName
-                                                : null,
-                                        unitLabel:
-                                            typeof v.unitLabel === 'string' && v.unitLabel
-                                                ? v.unitLabel
-                                                : null,
-                                        imageUrl:
-                                            typeof v.imageUrl === 'string' && v.imageUrl
-                                                ? v.imageUrl
-                                                : null,
-                                        unitPrice: Number.isFinite(Number(v.unitPrice))
-                                            ? Number(v.unitPrice)
-                                            : 0,
-                                        isDefault: Boolean(v.isDefault),
-                                        sortNo: vIdx,
-                                        isActive: v.isActive !== false,
-                                    })
-                                ),
-                            },
-                        },
-                    })
-                }
+            // 明細行構成（複数行構成商品時のみ）: body.rows があれば、既存の行・種類はIDを保ったまま合わせる
+            if (rowSync) {
+                await applyProductRowSync(tx, productItemId, rowSync.plan, rowSync.existing)
             }
 
             // バリアントグループ（重箱等の「基本セット＋追加オプション」構成）: body.groups があれば同期

@@ -62,6 +62,61 @@ type VariantGroup = {
     dirty?: boolean
 }
 
+type MultiRowVariant = {
+    localId: string
+    label: string
+    /** 見積/請求書/PDFの括弧書き表示用の略称（8文字まで） */
+    abbreviatedName: string
+    /** 摘要欄の個数表示用の単位（8文字まで） */
+    unitLabel: string
+    imageUrl: string
+    unitPrice: number
+    isDefault: boolean
+}
+
+type MultiRow = {
+    localId: string
+    label: string
+    calcType: 'FIXED' | 'UNIT_PRICE_X_QTY'
+    defaultQty: number
+    hasReturn: boolean
+    /** showProductVariantName有効時、この行の選択種類名を括弧書き表示に使うか（1商品につき1行のみtrue） */
+    useForVariantLabel: boolean
+    /** showQtyInDescription有効時、この行の選択種類名を摘要欄に使うか（1商品につき1行のみtrue） */
+    useForDescriptionLabel: boolean
+    variants: MultiRowVariant[]
+}
+
+// 保存済みの行・種類はDBのIDを localId にしている。保存時はIDを送り、サーバー側でIDを保ったまま更新させる
+// （見積・請求書の明細が行・種類をIDで参照しているため。作り直すとつながりが切れる）
+const persistedId = (localId: string) => (localId.startsWith('tmp_') ? undefined : localId)
+
+// 無効化済みの行・種類（見積・請求書で使われたまま外したもの）は編集対象に出さない。
+// 出すと次の保存で有効として送られ、外したはずの行・種類が復活する
+const toMultiRows = (rows: any[] | undefined): MultiRow[] =>
+    (rows || [])
+        .filter((r: any) => r.isActive !== false)
+        .map((r: any) => ({
+            localId: String(r.id),
+            label: r.label ?? '',
+            calcType: r.calcType === 'FIXED' ? 'FIXED' : 'UNIT_PRICE_X_QTY',
+            defaultQty: typeof r.defaultQty === 'number' ? r.defaultQty : 1,
+            hasReturn: Boolean(r.hasReturn),
+            useForVariantLabel: Boolean(r.useForVariantLabel),
+            useForDescriptionLabel: Boolean(r.useForDescriptionLabel),
+            variants: (r.variants || [])
+                .filter((v: any) => v.isActive !== false)
+                .map((v: any) => ({
+                    localId: String(v.id),
+                    label: v.label ?? '',
+                    abbreviatedName: v.abbreviatedName ?? '',
+                    unitLabel: v.unitLabel ?? '',
+                    imageUrl: v.imageUrl ?? '',
+                    unitPrice: Number(v.unitPrice) || 0,
+                    isDefault: Boolean(v.isDefault),
+                })),
+        }))
+
 export default function ProductEditPage() {
     const router = useRouter()
     const params = useParams()
@@ -111,29 +166,6 @@ export default function ProductEditPage() {
     // グループ商品（重箱など、基本セット＋追加オプションのグループ構成）
     const [hasVariantGroups, setHasVariantGroups] = useState(false)
     const [variantGroups, setVariantGroups] = useState<VariantGroup[]>([])
-    type MultiRowVariant = {
-        localId: string
-        label: string
-        /** 見積/請求書/PDFの括弧書き表示用の略称（8文字まで） */
-        abbreviatedName: string
-        /** 摘要欄の個数表示用の単位（8文字まで） */
-        unitLabel: string
-        imageUrl: string
-        unitPrice: number
-        isDefault: boolean
-    }
-    type MultiRow = {
-        localId: string
-        label: string
-        calcType: 'FIXED' | 'UNIT_PRICE_X_QTY'
-        defaultQty: number
-        hasReturn: boolean
-        /** showProductVariantName有効時、この行の選択種類名を括弧書き表示に使うか（1商品につき1行のみtrue） */
-        useForVariantLabel: boolean
-        /** showQtyInDescription有効時、この行の選択種類名を摘要欄に使うか（1商品につき1行のみtrue） */
-        useForDescriptionLabel: boolean
-        variants: MultiRowVariant[]
-    }
     const [multiRows, setMultiRows] = useState<MultiRow[]>([])
     const genLocalId = () => `tmp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
     const [savingItem, setSavingItem] = useState(false)
@@ -289,26 +321,7 @@ export default function ProductEditPage() {
                 mergeDisplay: g.mergeDisplay ?? true,
             }))
         )
-        setMultiRows(
-            ((product as any).rows || []).map((r: any) => ({
-                localId: String(r.id),
-                label: r.label ?? '',
-                calcType: r.calcType === 'FIXED' ? 'FIXED' : 'UNIT_PRICE_X_QTY',
-                defaultQty: typeof r.defaultQty === 'number' ? r.defaultQty : 1,
-                hasReturn: Boolean(r.hasReturn),
-                useForVariantLabel: Boolean(r.useForVariantLabel),
-                useForDescriptionLabel: Boolean(r.useForDescriptionLabel),
-                variants: (r.variants || []).map((v: any) => ({
-                    localId: String(v.id),
-                    label: v.label ?? '',
-                    abbreviatedName: v.abbreviatedName ?? '',
-                    unitLabel: v.unitLabel ?? '',
-                    imageUrl: v.imageUrl ?? '',
-                    unitPrice: Number(v.unitPrice) || 0,
-                    isDefault: Boolean(v.isDefault),
-                })),
-            }))
-        )
+        setMultiRows(toMultiRows((product as any).rows))
         const groupedVariantRows: VariantRow[] = productVariantGroups.flatMap((g: any) =>
             (g.variants || []).map((v: ProductVariant) => ({
                 id: v.id,
@@ -402,6 +415,7 @@ export default function ProductEditPage() {
                     : [],
                 rows: isMultiRow
                     ? multiRows.map((r) => ({
+                          id: persistedId(r.localId),
                           label: r.label,
                           calcType: r.calcType,
                           defaultQty: r.defaultQty,
@@ -409,6 +423,7 @@ export default function ProductEditPage() {
                           useForVariantLabel: r.useForVariantLabel,
                           useForDescriptionLabel: r.useForDescriptionLabel,
                           variants: r.variants.map((v) => ({
+                              id: persistedId(v.localId),
                               label: v.label,
                               abbreviatedName: v.abbreviatedName || null,
                               unitLabel: v.unitLabel || null,
@@ -419,6 +434,9 @@ export default function ProductEditPage() {
                       }))
                     : [],
             } as any)
+            // 新しく追加した行・種類に振られたIDを、再取得を待たずに反映する
+            // （仮IDのまま続けて保存すると、同じ行・種類が二重に作られるため）
+            if (isMultiRow) setMultiRows(toMultiRows((savedProduct as any).rows))
             // 2) 親祭壇なら子商品の紐付け
             if (kind === 'PARENT') {
                 await setProductChildren(productId, childIds)
