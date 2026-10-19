@@ -341,10 +341,23 @@ export function DocumentItemTable({
         )
     }
 
-    const qtySignature = items.map((i) => i.qty ?? 0).join(',')
+    // 明細の読み込み・プラン切替・重箱の種類選択などで items が変わったとき、チェック状態を数量から作り直す。
+    // 作り直すのは「その位置の明細が別物になった行」と「items 上の数量が変わった行」だけにする。
+    // items の数量は読み込み時点の値のままで、画面で入れたチェック・数量はフォーム側にしか無いため、
+    // 全行を items の数量で作り直すと、重箱の種類を選んだだけで画面で入れたほかの商品のチェックが外れてしまう
+    const itemKeys = items.map(
+        (i) =>
+            `${i.productItemId ?? ''}|${i.productRowId ?? ''}|${i.sign ?? 1}|${i.productVariantGroupId ?? ''}|${i.qty ?? 0}`
+    )
+    const qtySignature = itemKeys.join(',')
     if (qtySignature !== prevQtySignature) {
+        const prevKeys = prevQtySignature === '' ? [] : prevQtySignature.split(',')
         setPrevQtySignature(qtySignature)
-        setCheckedItems(items.map((item) => (item.qty ?? 0) > 0))
+        setCheckedItems((prev) =>
+            items.map((item, i) =>
+                prevKeys[i] === itemKeys[i] && prev[i] !== undefined ? prev[i] : (item.qty ?? 0) > 0
+            )
+        )
     }
 
     const freeSignature = freeItems
