@@ -149,6 +149,13 @@ export function buildEstimateItemsForProduct(
         (item) => item.productItemId === product.id && !(item as any).productRowId
     )
     if (product.hasVariantGroups) {
+        // プラン切替では画面上の明細をそのまま受け取る。画面の重箱は、読み込み時に組み立てた
+        // 代表行（選んだ種類を groupSelections に持つ1行）なので、それを引き継ぐ。
+        // 保存行の形（productVariantGroupId 付きの種類ごとの行）しか見ないと、選んだ種類・数量が消える
+        const representative = allExisting.find((item) => (item as any).groupSelections)
+        if (representative) {
+            return [{ ...representative, sortNo: startSortNo, productItem: { ...product } } as EstimateItem]
+        }
         const groupExisting = allExisting.filter((item) => (item as any).productVariantGroupId)
         if (groupExisting.length > 0) {
             const groupSelectionsMap: Record<string, string[]> = {}

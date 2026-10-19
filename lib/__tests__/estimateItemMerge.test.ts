@@ -146,3 +146,43 @@ describe('種類のグループで選ぶ商品の代表行', () => {
         })
     })
 })
+
+/**
+ * プラン切替では、画面に出ている明細（読み込み後に組み立て直した代表行を含む）をそのまま渡して作り直す。
+ * 重箱の代表行は選んだ種類を groupSelections に持ち、保存行のような productVariantGroupId を持たない。
+ * 以前は保存行の形しか見ていなかったため、重箱を選んでからプランを切り替えると、
+ * 選んだ種類・数量・単価が警告なしに消えていた。
+ */
+describe('プラン切替時の、種類のグループで選ぶ商品', () => {
+    const jubako = product({ id: 29, name: '重箱', hasVariantGroups: true, variants: [] })
+    const onScreen = {
+        productItemId: 29,
+        description: '',
+        unitPriceGeneral: 19370,
+        unitPriceMember: 18000,
+        qty: 3,
+        amount: 0,
+        sortNo: 0,
+        groupSelections: JSON.stringify({ '7': ['101'], '8': ['205'] }),
+        productItem: { id: 29, name: '重箱', hasVariantGroups: true },
+    }
+
+    it('画面で選んだ種類・数量・単価をそのまま引き継ぐ', () => {
+        const [row] = merge(jubako, true, false, [onScreen])
+        expect(row.groupSelections).toBe(onScreen.groupSelections)
+        expect(row.qty).toBe(3)
+        expect(row.unitPriceGeneral).toBe(19370)
+        expect(row.unitPriceMember).toBe(18000)
+    })
+
+    it('商品の情報は切替後のプランのものに差し替える', () => {
+        const [row] = merge(jubako, true, false, [onScreen])
+        expect(row.productItem).toEqual(jubako)
+    })
+
+    it('種類を選んでいなければ、未選択の行のまま', () => {
+        const [row] = merge(jubako, true, false, [])
+        expect(row.qty).toBe(0)
+        expect(row.groupSelections).toBeUndefined()
+    })
+})
