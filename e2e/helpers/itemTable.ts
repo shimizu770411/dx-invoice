@@ -78,6 +78,31 @@ export async function setQty(page: Page, name: string, qty: number): Promise<voi
     await settle(page)
 }
 
+// 複数行で1商品の場合に、上から順に各行の数量を入れる（御供養の加算行・返品行など）
+export async function setQtys(page: Page, name: string, qtys: number[]): Promise<void> {
+    const row = await findRow(page, name)
+    const inputs = await row.evaluateHandle((first) => {
+        const span = Number((first.querySelector('td') as HTMLTableCellElement)?.rowSpan || 1)
+        const found: HTMLInputElement[] = []
+        let tr: HTMLTableRowElement | null = first
+        for (let i = 0; i < span && tr; i++) {
+            const input = tr.querySelector<HTMLInputElement>('input[type=number]')
+            if (input) found.push(input)
+            tr = tr.nextElementSibling as HTMLTableRowElement | null
+        }
+        return found
+    })
+    const handles = await inputs.getProperties()
+    const list = Array.from(handles.values()).map((h) => h.asElement()).filter((h): h is ElementHandle<Element> => !!h)
+    if (list.length < qtys.length) throw new Error(`E2E: 「${name}」の数量欄が ${qtys.length} 行ありません`)
+    for (let i = 0; i < qtys.length; i++) {
+        await list[i].click({ clickCount: 3 })
+        await list[i].type(String(qtys[i]))
+    }
+    await page.keyboard.press('Tab')
+    await settle(page)
+}
+
 // 種類選択の画面を開き、指定した種類を押して「確定」する（重箱のようなグループ商品は複数指定できる）
 export async function pickVariants(page: Page, name: string, variantNames: string[]): Promise<void> {
     const row = await findRow(page, name)

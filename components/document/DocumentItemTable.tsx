@@ -272,6 +272,10 @@ export function DocumentItemTable({
             }
         }
     }
+    const watchedItems = useWatch({ control, name: 'items' })
+    const watchedFreeItems = useWatch({ control, name: 'freeItems' })
+    // 入力中の数量。数量欄は文字列で入ることがあるため数値に揃える
+    const liveQtyOf = (idx: number): number => Number(watchedItems?.[idx]?.qty ?? items[idx]?.qty ?? 0) || 0
     const [prevQtySignature, setPrevQtySignature] = useState('')
     const [freeCheckedItems, setFreeCheckedItems] = useState<boolean[]>([])
     const [prevFreeSignature, setPrevFreeSignature] = useState('')
@@ -457,6 +461,20 @@ export function DocumentItemTable({
         if (variantDialogIndex !== null) {
             const item = items[variantDialogIndex]
             const isMulti = !!item?.productRowId
+            // 種類を確定した結果、数量が入っている行。チェック表示もこれに合わせる
+            // （親祭壇の子は未チェックでも種類を選べるため、選んだ時点でチェックを付ける）
+            const nowCheckedIndexes: number[] = []
+            // 数量は入力中の値で判定する。items の qty は画面を開いた時点の値のままなので、
+            // それを見ると利用者が入れた数量を既定値で上書きしてしまう
+            const raiseQtyIfEmpty = (idx: number, initQty: number) => {
+                if (liveQtyOf(idx) > 0) {
+                    nowCheckedIndexes.push(idx)
+                    return
+                }
+                if (initQty <= 0) return
+                setValue?.(`items.${idx}.qty` as `items.${number}.qty`, initQty, { shouldDirty: true })
+                nowCheckedIndexes.push(idx)
+            }
             if (isMulti && item?.productItemId) {
                 // 商品単位モード: 同じ productItem の全行に対して、選択された rowVariant を反映
                 const productItemId = String(item.productItemId)
@@ -474,17 +492,12 @@ export function DocumentItemTable({
                         })
                         // 加算行のみ qty=0 を defaultQty に上げる（返品行は0のまま）
                         const isReturnRow = Number(it.sign ?? 1) === -1
-                        if (!isReturnRow && !(it.qty && it.qty > 0)) {
-                            const row = it.productItem?.rows?.find(
-                                (r) => String(r.id) === String(it.productRowId)
-                            )
-                            const initQty = row?.defaultQty ?? 1
-                            setValue?.(
-                                `items.${idx}.qty` as `items.${number}.qty`,
-                                initQty,
-                                { shouldDirty: true }
-                            )
+                        if (isReturnRow) {
+                            if (liveQtyOf(idx) > 0) nowCheckedIndexes.push(idx)
+                            return
                         }
+                        const row = it.productItem?.rows?.find((r) => String(r.id) === String(it.productRowId))
+                        raiseQtyIfEmpty(idx, row?.defaultQty ?? 1)
                     }
                 })
             } else if (item?.productItem?.hasVariantGroups) {
@@ -496,13 +509,7 @@ export function DocumentItemTable({
                     )
                 }
                 const hasAnySelection = Object.values(pendingGroupSelections).some((ids) => ids.length > 0)
-                if (hasAnySelection && !(item.qty && item.qty > 0)) {
-                    setValue?.(
-                        `items.${variantDialogIndex}.qty` as `items.${number}.qty`,
-                        1,
-                        { shouldDirty: true }
-                    )
-                }
+                if (hasAnySelection) raiseQtyIfEmpty(variantDialogIndex, 1)
             } else if (item?.productItem?.isMultiSelect) {
                 onMultiSelectChange?.(variantDialogIndex, pendingMultiVariantIds, {
                     adhocSetScope: pendingAdhocSetScope,
@@ -522,11 +529,14 @@ export function DocumentItemTable({
                         ? { id: String(surchargeMaster.id), amount: surchargeMaster.amount }
                         : null,
                 } as any)
-                setValue?.(
-                    `items.${variantDialogIndex}.qty` as `items.${number}.qty`,
-                    item?.qty || 1,
-                    { shouldDirty: true }
-                )
+                raiseQtyIfEmpty(variantDialogIndex, 1)
+            }
+            if (nowCheckedIndexes.length > 0) {
+                setCheckedItems((prev) => {
+                    const next = [...prev]
+                    for (const i of nowCheckedIndexes) next[i] = true
+                    return next
+                })
             }
             setValue?.('_changeMarker' as any, String(Date.now()), { shouldDirty: true })
         }
@@ -541,8 +551,6 @@ export function DocumentItemTable({
         setPendingSurchargeId('')
     }
 
-    const watchedItems = useWatch({ control, name: 'items' })
-    const watchedFreeItems = useWatch({ control, name: 'freeItems' })
     const hasRows = fields.length > 0 || freeFields.length > 0
 
     // 親排他ロジック: どの親祭壇が選ばれているかを判定
