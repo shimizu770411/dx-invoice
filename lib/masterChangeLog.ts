@@ -5,7 +5,7 @@ export { MasterChangeAction, MasterChangeTargetType }
 
 const DEFAULT_SET_FIELDS = VARIANT_FIELDS.filter((f) => f.key === 'isDefaultSet')
 
-// 商品の更新は「本体・明細行の作り直し・グループ同期・履歴記録」を1トランザクションで行うため、
+// 商品の更新は「本体・明細行の同期・グループ同期・履歴記録」を1トランザクションで行うため、
 // 既定の5秒では明細行の多い商品で足りなくなる
 export const MASTER_SAVE_TX_TIMEOUT_MS = 30_000
 
@@ -57,7 +57,11 @@ export async function loadProductSnapshot(
     if (!product) return null
     return {
         ...product,
-        rows: product.rows.map((row) => ({ ...row, variants: row.variants.map((v) => ({ ...v })) })),
+        rows: product.rows.map((row) => ({
+            ...row,
+            id: row.id.toString(),
+            variants: row.variants.map((v) => ({ ...v, id: v.id.toString() })),
+        })),
         variantGroups: product.variantGroups.map((g) => ({ ...g, id: g.id.toString() })),
     }
 }

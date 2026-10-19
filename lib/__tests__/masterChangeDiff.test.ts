@@ -132,28 +132,69 @@ describe('buildProductChanges', () => {
         expect(changes).toEqual([{ label: '商品種別', before: '一般商品', after: '親祭壇（セット親）' }])
     })
 
-    it('明細行は作り直しでIDが変わっても、何行目かで対応付けて変わった項目だけを出す', () => {
-        const row = (unitPrice: number) => ({
-            label: '印刷',
-            calcType: 'UNIT_PRICE_X_QTY',
-            defaultQty: 1,
-            hasReturn: false,
-            useForVariantLabel: false,
-            useForDescriptionLabel: false,
-            isActive: true,
-            variants: [{ label: '標準', unitPrice, isDefault: true, isActive: true }],
-        })
+    const multiRow = (id: string, label: string, variants: { id: string; label: string; unitPrice: number }[]) => ({
+        id,
+        label,
+        calcType: 'UNIT_PRICE_X_QTY',
+        defaultQty: 1,
+        hasReturn: false,
+        useForVariantLabel: false,
+        useForDescriptionLabel: false,
+        isActive: true,
+        variants: variants.map((v) => ({ ...v, isDefault: false, isActive: true })),
+    })
+
+    it('明細行・行の種類はIDで対応付けて、変わった項目だけを出す', () => {
         const changes = buildProductChanges(
-            baseProduct({ isMultiRow: true, rows: [{ id: 'old', ...row(100) }] }),
-            baseProduct({ isMultiRow: true, rows: [{ id: 'new', ...row(120) }] })
+            baseProduct({ isMultiRow: true, rows: [multiRow('10', '印刷', [{ id: '20', label: '標準', unitPrice: 100 }])] }),
+            baseProduct({ isMultiRow: true, rows: [multiRow('10', '印刷', [{ id: '20', label: '標準', unitPrice: 120 }])] })
         )
         expect(changes).toEqual([
             { subject: '明細行1「印刷」の種類「標準」', label: '単価', before: '100円', after: '120円' },
         ])
     })
 
+    it('途中の行を外しても、後ろの行が「全項目の変更」にならず、外した行の「削除」だけが出る', () => {
+        const first = multiRow('1', '車種', [{ id: '11', label: 'クラウン', unitPrice: 36000 }])
+        const middle = multiRow('2', '深夜割増', [{ id: '21', label: '標準', unitPrice: 5000 }])
+        const last = multiRow('3', '10㎞毎に', [{ id: '31', label: '10㎞毎に', unitPrice: 6000 }])
+        const changes = buildProductChanges(
+            baseProduct({ isMultiRow: true, rows: [first, middle, last] }),
+            baseProduct({ isMultiRow: true, rows: [first, last] })
+        )
+        expect(changes).toEqual([{ subject: '明細行2「深夜割増」', label: CHANGE_REMOVED, before: '', after: '' }])
+    })
+
+    it('行の種類を外すと、その種類の「削除」だけが出る', () => {
+        const changes = buildProductChanges(
+            baseProduct({
+                isMultiRow: true,
+                rows: [
+                    multiRow('1', '御供養', [
+                        { id: '11', label: 'フェイスタオル', unitPrice: 800 },
+                        { id: '12', label: 'ミニタオル', unitPrice: 800 },
+                        { id: '13', label: '八女茶', unitPrice: 800 },
+                    ]),
+                ],
+            }),
+            baseProduct({
+                isMultiRow: true,
+                rows: [
+                    multiRow('1', '御供養', [
+                        { id: '11', label: 'フェイスタオル', unitPrice: 800 },
+                        { id: '13', label: '八女茶', unitPrice: 800 },
+                    ]),
+                ],
+            })
+        )
+        expect(changes).toEqual([
+            { subject: '明細行1「御供養」の種類「ミニタオル」', label: CHANGE_REMOVED, before: '', after: '' },
+        ])
+    })
+
     it('行ごと追加した場合は行の「追加」だけを出し、配下の種類は並べない', () => {
         const newRow = {
+            id: '7',
             label: '返品',
             calcType: 'FIXED',
             defaultQty: 1,
@@ -161,7 +202,7 @@ describe('buildProductChanges', () => {
             useForVariantLabel: false,
             useForDescriptionLabel: false,
             isActive: true,
-            variants: [{ label: '標準', unitPrice: 0, isDefault: true, isActive: true }],
+            variants: [{ id: '70', label: '標準', unitPrice: 0, isDefault: true, isActive: true }],
         }
         const changes = buildProductChanges(baseProduct(), baseProduct({ rows: [newRow] }))
         expect(changes).toEqual([{ subject: '明細行1「返品」', label: CHANGE_ADDED, before: '', after: '' }])
