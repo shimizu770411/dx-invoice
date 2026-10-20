@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Control, FieldArrayWithId, UseFormSetValue, useWatch } from 'react-hook-form'
 import { FormInput } from '@/components/form/FormInput'
@@ -13,11 +13,12 @@ import { ProductVariant } from '@/lib/products'
 import { resolveProductImageUrl } from '@/lib/utils'
 import { scopeApplies } from '@/lib/productScope'
 import { allowedServiceFlags } from '@/lib/itemPricing'
-import { calcDocumentItemAmount, freeItemUnitPrice, noChargeReasonFor, NO_CHARGE_LABELS } from '@/lib/documentTotals'
+import { calcDocumentItemAmount, freeItemUnitPrice, isMemberBenefitFreeRow, noChargeReasonFor, NO_CHARGE_LABELS } from '@/lib/documentTotals'
 import { EXECUTION_SURCHARGE_NAME, defaultQtyOnCheck } from '@/lib/documentUtils'
 import { PlanSurcharge, canApplySurcharge } from '@/lib/planSurcharges'
 import { MISSING_FROM_MASTER_LABEL } from '@/lib/documentMissingProducts'
 import { displayProductItemName } from '@/lib/documentDisplayNames'
+import { documentRowVisibility } from '@/lib/documentRowVisibility'
 
 // props 未指定時のフォールバック。毎レンダー新しい配列を渡すと、
 // これに依存する処理が無駄に再計算されるため安定した参照を使う
@@ -186,7 +187,6 @@ type Props = {
     isMember: boolean
     freeItems?: DocumentFreeItem[]
     freeFields?: FieldArrayWithId<DocumentFormData, 'freeItems', 'id'>[]
-    handleRemoveFreeItem?: (index: number) => void
     onVariantChange?: (
         index: number,
         variant: ProductVariant,
@@ -218,7 +218,6 @@ export function DocumentItemTable({
     isMember,
     freeItems = [],
     freeFields = [],
-    handleRemoveFreeItem,
     onVariantChange,
     setValue,
     readOnly = false,
@@ -259,7 +258,6 @@ export function DocumentItemTable({
     // グループ商品（重箱など）: groupId -> 選択中の variantId 配列
     const [pendingGroupSelections, setPendingGroupSelections] = useState<Record<string, string[]>>({})
     const [enlargedImage, setEnlargedImage] = useState<string | null>(null)
-    const [checkedItems, setCheckedItems] = useState<boolean[]>([])
     // 数量入力欄で Enter を押した際、次の商品のチェックボックスへ明示的にフォーカスを移すための参照
     // (端末・ブラウザによって Enter キーのフォーカス移動挙動が異なるため、挙動を統一する)
     const checkboxRefs = useRef<Record<number, HTMLInputElement | null>>({})
@@ -272,9 +270,65 @@ export function DocumentItemTable({
             }
         }
     }
-    const [prevQtySignature, setPrevQtySignature] = useState('')
+    const watchedItems = useWatch({ control, name: 'items' })
+    const watchedFreeItems = useWatch({ control, name: 'freeItems' })
+    // 入力中の数量。数量欄は文字列で入ることがあるため数値に揃える。
+    // 「有無」チェックの表示はこの数量から決める（チェックあり ⇔ 数量あり）。
+    // 以前はチェック状態を数量とは別に持っており、items の数量（画面を開いた時点の値）から作り直すたびに
+    // 画面で入れたチェックが外れたり、数量0なのにチェックが残ったりしていた
+    const liveQtyOf = (idx: number): number => Number(watchedItems?.[idx]?.qty ?? items[idx]?.qty ?? 0) || 0
+    // 種類選択で「種類が選択されていません」の注意を出しているか
+    const [showUnselectedWarning, setShowUnselectedWarning] = useState(false)
+    // 重箱のように種類のグループで選ぶ商品で、まだ種類が1つも確定していないか
+    const needsGroupSelection = (item: DocumentItem | undefined): boolean => {
+        if (!item?.productItem?.hasVariantGroups) return false
+        try {
+            const selections: Record<string, string[]> = item.groupSelections ? JSON.parse(item.groupSelections) : {}
+            return !Object.values(selections).some((ids) => ids.length > 0)
+        } catch {
+            return true
+        }
+    }
     const [freeCheckedItems, setFreeCheckedItems] = useState<boolean[]>([])
     const [prevFreeSignature, setPrevFreeSignature] = useState('')
+    // 自由行のチェックを外したときの数量の控え（自由行は削除できず並びが変わらないので、位置で持つ）
+    const freeQtyBeforeUncheckRef = useRef<Map<number, number>>(new Map())
+
+    // 会員特典の固定行（満期サービス・施行割増券）は、一般に切り替えたら外し（保存もしない）、
+    // 会員に戻したら入れていた金額で元に戻す。以前は一般に切り替えても金額が行に出たまま、
+    // 合計には入らない表示になっていた（2026-10-20 ユーザー指示）
+    const memberBenefitQtyRef = useRef<Map<number, number>>(new Map())
+    const prevIsMemberRef = useRef(isMember)
+    useEffect(() => {
+        if (prevIsMemberRef.current === isMember) return
+        prevIsMemberRef.current = isMember
+        const remembered = memberBenefitQtyRef.current
+        const changed: [number, boolean][] = []
+        ;(watchedFreeItems ?? []).forEach((fi, i) => {
+            if (!isMemberBenefitFreeRow(fi?.productItemName)) return
+            if (!isMember) {
+                const qty = Number(fi?.qty) || 0
+                if (qty <= 0) return
+                remembered.set(i, qty)
+                setValue?.(`freeItems.${i}.qty` as `freeItems.${number}.qty`, 0, { shouldDirty: true })
+                changed.push([i, false])
+                return
+            }
+            const qty = remembered.get(i)
+            if (!qty) return
+            remembered.delete(i)
+            setValue?.(`freeItems.${i}.qty` as `freeItems.${number}.qty`, qty, { shouldDirty: true })
+            changed.push([i, true])
+        })
+        if (changed.length === 0) return
+        setFreeCheckedItems((prev) => {
+            const next = [...prev]
+            for (const [i, checked] of changed) next[i] = checked
+            return next
+        })
+        // 会員区分が切り替わったときだけ動かす（自由行の入力のたびに動かすと、控えが上書きされる）
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isMember])
 
     // 種類列: 選択されたバリアント名を連結した文字列がこの文字数を超えたら集約表示にする
     const [expandedTypeRows, setExpandedTypeRows] = useState<Set<number>>(new Set())
@@ -339,12 +393,6 @@ export function DocumentItemTable({
                 )}
             </>
         )
-    }
-
-    const qtySignature = items.map((i) => i.qty ?? 0).join(',')
-    if (qtySignature !== prevQtySignature) {
-        setPrevQtySignature(qtySignature)
-        setCheckedItems(items.map((item) => (item.qty ?? 0) > 0))
     }
 
     const freeSignature = freeItems
@@ -437,6 +485,7 @@ export function DocumentItemTable({
         setPendingAdhocSetScope(
             !isThisChildItem && (adhoc === 'MEMBER_ONLY' || adhoc === 'BOTH') ? adhoc : 'NONE'
         )
+        setShowUnselectedWarning(false)
         setVariantDialogIndex(index)
     }
 
@@ -444,6 +493,13 @@ export function DocumentItemTable({
         if (variantDialogIndex !== null) {
             const item = items[variantDialogIndex]
             const isMulti = !!item?.productRowId
+            // 数量が0の行にだけ既定の数量を入れる（チェックも付く）。数量は入力中の値で判定する。
+            // items の qty は画面を開いた時点の値のままなので、それを見ると利用者が入れた数量を既定値で上書きしてしまう。
+            // 親祭壇の子は未チェックでも種類を選べるため、選んだ時点で数量が入りチェックが付く
+            const raiseQtyIfEmpty = (idx: number, initQty: number) => {
+                if (liveQtyOf(idx) > 0 || initQty <= 0) return
+                setValue?.(`items.${idx}.qty` as `items.${number}.qty`, initQty, { shouldDirty: true })
+            }
             if (isMulti && item?.productItemId) {
                 // 商品単位モード: 同じ productItem の全行に対して、選択された rowVariant を反映
                 const productItemId = String(item.productItemId)
@@ -460,18 +516,9 @@ export function DocumentItemTable({
                             rowVariant: rv,
                         })
                         // 加算行のみ qty=0 を defaultQty に上げる（返品行は0のまま）
-                        const isReturnRow = Number(it.sign ?? 1) === -1
-                        if (!isReturnRow && !(it.qty && it.qty > 0)) {
-                            const row = it.productItem?.rows?.find(
-                                (r) => String(r.id) === String(it.productRowId)
-                            )
-                            const initQty = row?.defaultQty ?? 1
-                            setValue?.(
-                                `items.${idx}.qty` as `items.${number}.qty`,
-                                initQty,
-                                { shouldDirty: true }
-                            )
-                        }
+                        if (Number(it.sign ?? 1) === -1) return
+                        const row = it.productItem?.rows?.find((r) => String(r.id) === String(it.productRowId))
+                        raiseQtyIfEmpty(idx, row?.defaultQty ?? 1)
                     }
                 })
             } else if (item?.productItem?.hasVariantGroups) {
@@ -483,13 +530,7 @@ export function DocumentItemTable({
                     )
                 }
                 const hasAnySelection = Object.values(pendingGroupSelections).some((ids) => ids.length > 0)
-                if (hasAnySelection && !(item.qty && item.qty > 0)) {
-                    setValue?.(
-                        `items.${variantDialogIndex}.qty` as `items.${number}.qty`,
-                        1,
-                        { shouldDirty: true }
-                    )
-                }
+                if (hasAnySelection) raiseQtyIfEmpty(variantDialogIndex, 1)
             } else if (item?.productItem?.isMultiSelect) {
                 onMultiSelectChange?.(variantDialogIndex, pendingMultiVariantIds, {
                     adhocSetScope: pendingAdhocSetScope,
@@ -509,15 +550,12 @@ export function DocumentItemTable({
                         ? { id: String(surchargeMaster.id), amount: surchargeMaster.amount }
                         : null,
                 } as any)
-                setValue?.(
-                    `items.${variantDialogIndex}.qty` as `items.${number}.qty`,
-                    item?.qty || 1,
-                    { shouldDirty: true }
-                )
+                raiseQtyIfEmpty(variantDialogIndex, 1)
             }
             setValue?.('_changeMarker' as any, String(Date.now()), { shouldDirty: true })
         }
         setVariantDialogIndex(null)
+        setShowUnselectedWarning(false)
         setPendingVariant(null)
         setPendingRowVariant(null)
         setPendingRowVariantsMap({})
@@ -528,8 +566,114 @@ export function DocumentItemTable({
         setPendingSurchargeId('')
     }
 
-    const watchedItems = useWatch({ control, name: 'items' })
-    const watchedFreeItems = useWatch({ control, name: 'freeItems' })
+    // 種類選択を閉じる（キャンセル・枠外クリック・Esc）。
+    // 重箱のような商品にチェックが付いたまま種類が1つも選ばれていなければ、閉じずに注意を出す。
+    // 種類なしのまま保存すると、0円・種類なしの明細が書類に残ってしまうため
+    const closeVariantDialog = () => {
+        const index = variantDialogIndex
+        if (index !== null && needsGroupSelection(items[index]) && liveQtyOf(index) > 0) {
+            setShowUnselectedWarning(true)
+            return
+        }
+        setShowUnselectedWarning(false)
+        setVariantDialogIndex(null)
+    }
+
+    // 注意を見たうえで種類を選ばなかった場合は、その商品のチェックを外して閉じる
+    const uncheckAndCloseVariantDialog = () => {
+        const index = variantDialogIndex
+        if (index !== null) {
+            setValue?.(`items.${index}.qty` as `items.${number}.qty`, 0, { shouldDirty: true })
+        }
+        setShowUnselectedWarning(false)
+        setVariantDialogIndex(null)
+    }
+
+    // チェックを外したときの数量の控え。入れ直したときは、既定の数量ではなくここに控えた数量に戻す。
+    // キーは明細の同一性（商品・行・加算/返品、追加行は親商品）。プラン切替で並びが変わっても同じ明細に戻せるよう、位置では持たない
+    const qtyBeforeUncheckRef = useRef<Map<string, number>>(new Map())
+    const itemKeyOf = (item: DocumentItem | undefined) =>
+        `item|${item?.productItemId ?? ''}|${item?.productRowId ?? ''}|${item?.sign ?? 1}`
+    const linkedFreeKeyOf = (productItemId: string) => `free|${productItemId}`
+    const linkedFreeIndexOf = (productItemId: string) =>
+        (watchedFreeItems ?? []).findIndex(
+            (fi: any) => fi?.parentProductItemId && String(fi.parentProductItemId) === productItemId
+        )
+
+    // 「有無」チェックの付け外し。チェック表示は数量から決まるので、ここでは数量だけを書き換える。
+    // 対象は、その商品の全行（複数行構成商品）と、親祭壇なら紐づく子商品、それらの追加行（控室管理費など）
+    const toggleItemCheck = (index: number, checked: boolean) => {
+        const currentItem = items[index]
+        const groupStart = groupStartIndexOf(index)
+        const groupIndexes = isGroupableRow(currentItem)
+            ? Array.from({ length: groupSizeOf(groupStart) }, (_, k) => groupStart + k)
+            : [index]
+        // 親祭壇なら、紐づく子商品（一般/会員共通）。プラン設定で疑似セット化された一般商品は親子関係を持たない
+        const childIndexes: number[] = []
+        if (currentItem?.productItem?.isSetParent) {
+            const childIds = new Set((currentItem.productItem.children || []).map((c) => String(c.id)))
+            items.forEach((it, i) => {
+                if (it?.productItem?.isSetChild && !it.productItem.isPlanForcedSet && childIds.has(String(it.productItemId))) {
+                    childIndexes.push(i)
+                }
+            })
+        }
+        const targets = [...groupIndexes, ...childIndexes]
+        const remembered = qtyBeforeUncheckRef.current
+        const setItemQty = (i: number, qty: number) =>
+            setValue?.(`items.${i}.qty` as `items.${number}.qty`, qty, { shouldDirty: true })
+        const linkedFreeTargets = targets
+            .filter((i) => items[i]?.productItem?.canAddFreeRow)
+            .map((i) => String(items[i]?.productItemId ?? ''))
+            .filter((pid, k, all) => all.indexOf(pid) === k)
+
+        if (!checked) {
+            for (const i of targets) {
+                remembered.set(itemKeyOf(items[i]), liveQtyOf(i))
+                setItemQty(i, 0)
+            }
+            // 追加行も数量を0にする（合計・保存に残らないように）
+            for (const pid of linkedFreeTargets) {
+                const fi = linkedFreeIndexOf(pid)
+                if (fi < 0) continue
+                remembered.set(linkedFreeKeyOf(pid), Number(watchedFreeItems?.[fi]?.qty ?? 0) || 0)
+                setValue?.(`freeItems.${fi}.qty` as `freeItems.${number}.qty`, 0, { shouldDirty: true })
+            }
+            return
+        }
+
+        // 入れ直し: 外したときの数量があればそれに戻し、無ければ既定の数量（返品行は0）にする
+        const takeRemembered = (key: string): number | undefined => {
+            if (!remembered.has(key)) return undefined
+            const qty = remembered.get(key)
+            remembered.delete(key)
+            return qty
+        }
+        const groupQtys = groupIndexes.map((i) => takeRemembered(itemKeyOf(items[i])) ?? defaultQtyOnCheck(items[i]))
+        // すべて0のままだと、チェックしたのに外れた表示になる。先頭行（加算行）に1を入れる
+        if (groupQtys.every((q) => q <= 0)) groupQtys[0] = 1
+        groupIndexes.forEach((i, k) => setItemQty(i, groupQtys[k]))
+        for (const ci of childIndexes) {
+            setItemQty(ci, takeRemembered(itemKeyOf(items[ci])) ?? defaultQtyOnCheck(items[ci]))
+            const childItem = items[ci]
+            const childVariantName = childItem?.productVariant?.name
+            if (childItem?.productItem?.overwriteDescriptionOnVariantChange && childVariantName) {
+                setValue?.(`items.${ci}.description` as `items.${number}.description`, childVariantName, {
+                    shouldDirty: true,
+                })
+            }
+        }
+        for (const pid of linkedFreeTargets) {
+            const qty = takeRemembered(linkedFreeKeyOf(pid))
+            const fi = linkedFreeIndexOf(pid)
+            if (qty === undefined || fi < 0) continue
+            setValue?.(`freeItems.${fi}.qty` as `freeItems.${number}.qty`, qty, { shouldDirty: true })
+        }
+
+        // 重箱のように種類を選んで初めて金額が決まる商品は、チェックと同時に種類選択を開く
+        if (needsGroupSelection(currentItem)) openVariantDialog(index)
+    }
+
     const hasRows = fields.length > 0 || freeFields.length > 0
 
     // 親排他ロジック: どの親祭壇が選ばれているかを判定
@@ -537,7 +681,6 @@ export function DocumentItemTable({
     const selectedParentIndex = items.findIndex(
         (it, i) => it?.productItem?.isSetParent && (watchedItems?.[i]?.qty ?? it?.qty ?? 0) > 0
     )
-    const selectedParentId = selectedParentIndex >= 0 ? String(items[selectedParentIndex]?.productItemId) : null
     const selectedParentChildIds = new Set<string>(
         selectedParentIndex >= 0
             ? (items[selectedParentIndex]?.productItem?.children || []).map((c) => String(c.id))
@@ -574,25 +717,9 @@ export function DocumentItemTable({
         return count
     }
 
-    // 行の表示判定（一般・会員共通）
+    // 行の表示判定（一般・会員共通）。画面の合計・保存と同じ判定を使う（lib/documentRowVisibility.ts）
     // 親祭壇は排他（1つだけ選択可）、子セット品は選択中親祭壇に紐づくものだけ表示
-    const isRowVisible = (item: DocumentItem | undefined): boolean => {
-        if (!item) return true
-        const pi = item.productItem
-        if (!pi) return true
-        // 親祭壇: 別の親が選択されているなら非表示
-        if (pi.isSetParent) {
-            if (selectedParentId && String(item.productItemId) !== selectedParentId) return false
-            return true
-        }
-        // 子セット品: 選択中親祭壇に紐づくもののみ表示
-        // (プラン設定で疑似セット子化された一般商品(isPlanForcedSet)は親子セット関係を持たないため対象外)
-        if (pi.isSetChild && !pi.isPlanForcedSet) {
-            return selectedParentChildIds.has(String(item.productItemId))
-        }
-        // 一般商品: 常に表示
-        return true
-    }
+    const rowVisible = documentRowVisibility(items, liveQtyOf)
     return (
         <div className="mb-8">
             <h3 className="mb-4">明細</h3>
@@ -619,20 +746,9 @@ export function DocumentItemTable({
                         <>
                             {fields.map((field, index) => {
                                 const item = items[index]
-                                if (!isRowVisible(item)) {
-                                    // 非表示行は qty を 0 にして登録対象から除外
-                                    // setValue はレンダリング中に呼べないため setTimeout で非同期化
-                                    if ((watchedItems?.[index]?.qty ?? 0) > 0) {
-                                        setTimeout(() => {
-                                            setValue?.(
-                                                `items.${index}.qty` as `items.${number}.qty`,
-                                                0,
-                                                { shouldDirty: true }
-                                            )
-                                        }, 0)
-                                    }
-                                    return null
-                                }
+                                // 表示されない行は数量を残したまま描画しない（合計・保存からは共通判定で外れる）。
+                                // 以前は描画中に数量を裏で0にしており、親の数量を戻すと子商品が数量0で出てきた
+                                if (!rowVisible[index]) return null
                                 const isParent = item?.productItem?.isSetParent
                                 const isChild = item?.productItem?.isSetChild
                                 // セット扱い・サービス扱い・満期サービス扱いの判定は共通処理に任せる。
@@ -645,8 +761,6 @@ export function DocumentItemTable({
                                 // 商品マスタから消えた商品を保存済み明細から復元した行。
                                 // 選べる種類がもう存在しないため、種類の選び直しはさせない
                                 const isMissingFromMaster = !!item?.productItem?.isMissingFromMaster
-                                const canSelectVariant =
-                                    !isMissingFromMaster && (checkedItems[index] || isLinkedChildOfSelectedParent)
                                 const liveQty = watchedItems?.[index]?.qty ?? item?.qty ?? 0
                                 // 複数行構成商品: calcType と sign を考慮
                                 const isMultiRowItem = !!(item?.productRowId && item?.calcType)
@@ -658,16 +772,20 @@ export function DocumentItemTable({
                                 const groupSize = isGroupStart ? groupSizeOf(index) : 0
                                 // グループ化して表示すべきか（複数行構成商品、または保存後に複数行展開されたグループ商品）
                                 const isGroupableItem = isMultiRowItem || !!item?.productVariantGroupId
-                                // グループ内で1つでもチェックされているか（商品単位の表示状態）
-                                const groupAnyChecked = (() => {
-                                    if (!isMultiRowItem && !item?.productVariantGroupId) return checkedItems[index] ?? false
-                                    const start = groupStart
-                                    const size = groupSizeOf(start)
-                                    for (let i = start; i < start + size; i++) {
-                                        if (checkedItems[i]) return true
-                                    }
-                                    return false
-                                })()
+                                // 商品単位のチェック表示。複数行構成商品はどれか1行でも数量があればチェックあり
+                                const groupRowIndexes = isGroupableItem
+                                    ? Array.from({ length: groupSizeOf(groupStart) }, (_, k) => groupStart + k)
+                                    : [index]
+                                const groupAnyChecked = groupRowIndexes.some((i) => liveQtyOf(i) > 0)
+                                const canSelectVariant = !isMissingFromMaster && (groupAnyChecked || isLinkedChildOfSelectedParent)
+                                // 数量欄は、数量を入れればチェックが付くよう原則として入力できるようにする
+                                // （チェック連動で入力不可にすると、数量を消して打ち直す途中で入力できなくなる）。
+                                // ただし、重箱のように種類を選んで初めて金額が決まる商品はチェック（種類選択）を先にさせ、
+                                // 返品行は加算行に数量があるときだけ入力できる
+                                const qtyInputDisabled = item?.productItem?.hasVariantGroups
+                                    ? !groupAnyChecked
+                                    : Number(item?.sign ?? 1) === -1 &&
+                                      !groupRowIndexes.some((i) => Number(items[i]?.sign ?? 1) === 1 && liveQtyOf(i) > 0)
                                 // 親付きフリー行の index を取得（商品マスタの canAddFreeRow=ON で見積/請求書に含まれる商品）
                                 const itemPid = String(item?.productItemId ?? '')
                                 const linkedFreeIndex =
@@ -696,94 +814,8 @@ export function DocumentItemTable({
                                                         ref={(el) => {
                                                             checkboxRefs.current[index] = el
                                                         }}
-                                                        checked={isGroupableItem ? groupAnyChecked : (checkedItems[index] ?? false)}
-                                                        onChange={(e) => {
-                                                            const checked = e.target.checked
-                                                            const currentItem = items[index]
-                                                            const isSetParent = !!currentItem?.productItem?.isSetParent
-
-                                                            // 親祭壇なら、紐づく子商品 index を計算（自動チェック・一般/会員共通）
-                                                            let childIndexes: number[] = []
-                                                            if (isSetParent) {
-                                                                const childIds = new Set<string>(
-                                                                    (currentItem!.productItem!.children || []).map((c) =>
-                                                                        String(c.id)
-                                                                    )
-                                                                )
-                                                                items.forEach((it, i) => {
-                                                                    if (
-                                                                        it?.productItem?.isSetChild &&
-                                                                        !it?.productItem?.isPlanForcedSet &&
-                                                                        childIds.has(String(it.productItemId))
-                                                                    ) {
-                                                                        childIndexes.push(i)
-                                                                    }
-                                                                })
-                                                            }
-
-                                                            // 複数行構成商品・グループ商品: 同グループの全行 index を取得
-                                                            const groupIndexes: number[] = isGroupableItem
-                                                                ? Array.from({ length: groupSize }, (_, k) => groupStart + k)
-                                                                : [index]
-
-                                                            // checkedItems を一括更新
-                                                            setCheckedItems((prev) => {
-                                                                const next = [...prev]
-                                                                for (const gi of groupIndexes) {
-                                                                    next[gi] = checked
-                                                                }
-                                                                for (const ci of childIndexes) {
-                                                                    next[ci] = checked
-                                                                }
-                                                                return next
-                                                            })
-
-                                                            // qty を一括更新（フォームを dirty 化）
-                                                            // 複数行構成商品は行ごとの規定数量、返品行（sign=-1）は常に 0 にする。
-                                                            // 親祭壇から子商品（霊柩車など）をまとめてチェックするときも同じ数量にする
-                                                            for (const gi of groupIndexes) {
-                                                                setValue?.(
-                                                                    `items.${gi}.qty` as `items.${number}.qty`,
-                                                                    checked ? defaultQtyOnCheck(items[gi]) : 0,
-                                                                    { shouldDirty: true }
-                                                                )
-                                                            }
-                                                            for (const ci of childIndexes) {
-                                                                setValue?.(
-                                                                    `items.${ci}.qty` as `items.${number}.qty`,
-                                                                    checked ? defaultQtyOnCheck(items[ci]) : 0,
-                                                                    { shouldDirty: true }
-                                                                )
-                                                                const childItem = items[ci]
-                                                                const childVariantName = childItem?.productVariant?.name
-                                                                if (checked && childItem?.productItem?.overwriteDescriptionOnVariantChange && childVariantName) {
-                                                                    setValue?.(
-                                                                        `items.${ci}.description` as `items.${number}.description`,
-                                                                        childVariantName,
-                                                                        { shouldDirty: true }
-                                                                    )
-                                                                }
-                                                            }
-
-                                                            // canAddFreeRow=ON の商品: チェックを外したら紐づくフリー行の数量を0にリセット（合計計算に残らないようにする）
-                                                            if (!checked) {
-                                                                for (const gi of [...groupIndexes, ...childIndexes]) {
-                                                                    const gItem = items[gi]
-                                                                    if (!gItem?.productItem?.canAddFreeRow) continue
-                                                                    const pid = String(gItem.productItemId ?? '')
-                                                                    const fiIndex = (watchedFreeItems ?? []).findIndex(
-                                                                        (fi: any) => fi?.parentProductItemId && String(fi.parentProductItemId) === pid
-                                                                    )
-                                                                    if (fiIndex >= 0) {
-                                                                        setValue?.(
-                                                                            `freeItems.${fiIndex}.qty` as `freeItems.${number}.qty`,
-                                                                            0,
-                                                                            { shouldDirty: true }
-                                                                        )
-                                                                    }
-                                                                }
-                                                            }
-                                                        }}
+                                                        checked={groupAnyChecked}
+                                                        onChange={(e) => toggleItemCheck(index, e.target.checked)}
                                                         className="h-5 w-5 cursor-pointer"
                                                     />
                                                 )}
@@ -899,7 +931,7 @@ export function DocumentItemTable({
                                                 type="number"
                                                 min={0}
                                                 max={3000}
-                                                disabled={isGroupableItem ? !groupAnyChecked : !checkedItems[index]}
+                                                disabled={qtyInputDisabled}
                                                 onKeyDown={(e) => {
                                                     if (e.key !== 'Enter') return
                                                     e.preventDefault()
@@ -1012,7 +1044,7 @@ export function DocumentItemTable({
                                                     rows={2}
                                                     noResize
                                                     maxRows={2}
-                                                    disabled={isGroupableItem ? !groupAnyChecked : !checkedItems[index]}
+                                                    disabled={!groupAnyChecked}
                                                 />
                                             </td>
                                         )}
@@ -1031,7 +1063,7 @@ export function DocumentItemTable({
                                                     control={control}
                                                     type="text"
                                                     placeholder="品目名（自由入力）"
-                                                    disabled={isGroupableItem ? !groupAnyChecked : !checkedItems[index]}
+                                                    disabled={!groupAnyChecked}
                                                 />
                                             </td>
                                             <td className="border border-gray-300 p-3 text-center text-sm text-gray-500">
@@ -1044,7 +1076,7 @@ export function DocumentItemTable({
                                                     type="number"
                                                     min={0}
                                                     max={3000}
-                                                    disabled={isGroupableItem ? !groupAnyChecked : !checkedItems[index]}
+                                                    disabled={!groupAnyChecked}
                                                     onKeyDown={(e) => {
                                                         if (e.key !== 'Enter') return
                                                         e.preventDefault()
@@ -1059,7 +1091,7 @@ export function DocumentItemTable({
                                                 <FreeRowPriceInputs
                                                     index={linkedFreeIndex}
                                                     control={control}
-                                                    disabled={isGroupableItem ? !groupAnyChecked : !checkedItems[index]}
+                                                    disabled={!groupAnyChecked}
                                                     isMember={isMember}
                                                 />
                                             </td>
@@ -1070,7 +1102,7 @@ export function DocumentItemTable({
                                                     rows={2}
                                                     noResize
                                                     maxRows={2}
-                                                    disabled={isGroupableItem ? !groupAnyChecked : !checkedItems[index]}
+                                                    disabled={!groupAnyChecked}
                                                 />
                                             </td>
                                         </tr>
@@ -1105,7 +1137,8 @@ export function DocumentItemTable({
                                 // 一般の書類では入力させない（入れても合計には反映されない）
                                 const memberBenefitBlocked = (isMaturity || isExecutionSurcharge) && !isMember
                                 const inputsDisabled = readOnly || !isChecked || memberBenefitBlocked
-                                const amount = isChecked
+                                // 一般の書類では合計に入らないので、金額も¥0と表示する
+                                const amount = isChecked && !memberBenefitBlocked
                                     ? isFixedRow
                                         ? liveUnitPrice
                                         : liveUnitPrice * liveQty
@@ -1131,9 +1164,14 @@ export function DocumentItemTable({
                                                             next[index] = checked
                                                             return next
                                                         })
+                                                        // 商品の行と同じく、入れ直したときは外す前の数量に戻す
+                                                        const remembered = freeQtyBeforeUncheckRef.current
+                                                        if (!checked) remembered.set(index, Number(liveQty) || 0)
+                                                        const restored = remembered.get(index)
+                                                        if (checked) remembered.delete(index)
                                                         setValue?.(
                                                             `freeItems.${index}.qty` as `freeItems.${number}.qty`,
-                                                            checked ? 1 : 0,
+                                                            checked ? (restored && restored > 0 ? restored : 1) : 0,
                                                             { shouldDirty: true }
                                                         )
                                                     }}
@@ -1262,7 +1300,7 @@ export function DocumentItemTable({
                     </div>,
                     document.body
                 )}
-            <Dialog open={variantDialogIndex !== null} onOpenChange={(open) => !open && setVariantDialogIndex(null)}>
+            <Dialog open={variantDialogIndex !== null} onOpenChange={(open) => !open && closeVariantDialog()}>
                 <DialogContent
                     className="flex max-w-xl flex-col"
                     style={{ maxHeight: '90vh' }}
@@ -1821,14 +1859,29 @@ export function DocumentItemTable({
                                 </div>
                             )
                         })()}
+                    {showUnselectedWarning && (
+                        <p className="shrink-0 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">
+                            種類が選択されていません。種類を選ばない場合は、この商品のチェックを外します。
+                        </p>
+                    )}
                     <DialogFooter className="shrink-0">
-                        <button
-                            type="button"
-                            onClick={() => setVariantDialogIndex(null)}
-                            className="cursor-pointer rounded border border-gray-300 bg-white px-4 py-2 text-gray-700"
-                        >
-                            キャンセル
-                        </button>
+                        {showUnselectedWarning ? (
+                            <button
+                                type="button"
+                                onClick={uncheckAndCloseVariantDialog}
+                                className="cursor-pointer rounded border border-red-300 bg-white px-4 py-2 text-red-700"
+                            >
+                                チェックを外す
+                            </button>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={closeVariantDialog}
+                                className="cursor-pointer rounded border border-gray-300 bg-white px-4 py-2 text-gray-700"
+                            >
+                                キャンセル
+                            </button>
+                        )}
                         <button
                             type="button"
                             onClick={confirmVariant}

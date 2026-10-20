@@ -4,9 +4,10 @@ import { scopeApplies } from '@/lib/productScope'
 import { resolveUnitPriceGeneral, resolveUnitPriceMember } from '@/lib/itemPricing'
 import { expandMultiRowToItems } from '@/lib/expandMultiRow'
 
-// 見積の明細行を組み立てる判定ロジック。
+// 見積・請求書の明細行を組み立てる判定ロジック（請求書の編集画面の読み込みも buildMergedEstimateItems を使う）。
 // 画面のフックから切り離してあるのは、プラン切替と読み込みで挙動が変わる分岐が多く、
 // 単体テストで固定しておきたいため。
+// 以前は請求書側に写しがあり、片方だけ直して食い違う不具合が起きていたので、写しは作らないこと。
 
 /**
  * 重箱のように種類のグループで選ぶ商品は、保存時に種類ごとの行へ分かれる（expandVariantGroupItems）。
@@ -149,6 +150,13 @@ export function buildEstimateItemsForProduct(
         (item) => item.productItemId === product.id && !(item as any).productRowId
     )
     if (product.hasVariantGroups) {
+        // プラン切替では画面上の明細をそのまま受け取る。画面の重箱は、読み込み時に組み立てた
+        // 代表行（選んだ種類を groupSelections に持つ1行）なので、それを引き継ぐ。
+        // 保存行の形（productVariantGroupId 付きの種類ごとの行）しか見ないと、選んだ種類・数量が消える
+        const representative = allExisting.find((item) => (item as any).groupSelections)
+        if (representative) {
+            return [{ ...representative, sortNo: startSortNo, productItem: { ...product } } as EstimateItem]
+        }
         const groupExisting = allExisting.filter((item) => (item as any).productVariantGroupId)
         if (groupExisting.length > 0) {
             const groupSelectionsMap: Record<string, string[]> = {}

@@ -13,8 +13,8 @@ description: 'Use after modifying estimates or invoices components/hooks/schemas
 
 | 見積(estimates) | 請求書(invoices) | 備考 |
 |---|---|---|
-| `app/(protected)/estimates/components/EstimateForm.tsx` | `app/(protected)/invoices/components/InvoiceForm.tsx` | `handleVariantChange` / `handleMultiSelectChange` / `handleGroupVariantChange` / isMember再計算useEffect / `onInvalid` / `onSubmitWithStoreCheck` / 合計表示部分がほぼ一字一句コピペ |
-| `app/(protected)/estimates/hooks/useEstimateForm.ts` | `app/(protected)/invoices/hooks/useInvoiceForm.ts` | estimate側は `useEstimateCreate` / `useEstimateEdit` の2フック＋`buildNewEstimateItems`等の分割関数。invoice側は `useInvoiceEdit` のみ（create相当は無い）で、同等のマージロジックが `loadData` 内にベタ書き |
+| `app/(protected)/estimates/components/EstimateForm.tsx` | `app/(protected)/invoices/components/InvoiceForm.tsx` | `onInvalid` / `onSubmitWithStoreCheck` / 合計表示部分がほぼ一字一句コピペ。種類選択・会員区分切替のハンドラは 2026-10-20 に `hooks/useDocumentItemHandlers.ts` へ共通化済み |
+| `app/(protected)/estimates/hooks/useEstimateForm.ts` | `app/(protected)/invoices/hooks/useInvoiceForm.ts` | estimate側は `useEstimateCreate` / `useEstimateEdit` の2フック。invoice側は `useInvoiceEdit` のみ（create相当は無い）。ロード時マージは 2026-10-20 から両方とも `lib/estimateItemMerge.ts` の `buildMergedEstimateItems` を使う。保存時の `onSubmit`（明細・自由行の組み立て）は今もコピペ |
 | `app/(protected)/estimates/schemas/EstimateFormSchema.ts` | `app/(protected)/invoices/schemas/InvoiceFormSchema.ts` | item/freeItemフィールドは `lib/documentSchema.ts` の `documentItemFieldSchema`/`documentFreeItemFieldSchema` に共通化済み。フォーム全体としての差分は estimate のみの `preConsultStaff` と `isMember` 初期値のみ |
 
 ## 既に共通化されている箇所（確認は軽微でよい）
@@ -23,9 +23,12 @@ description: 'Use after modifying estimates or invoices components/hooks/schemas
 
 - `lib/documentUtils.ts`（`padDocumentFreeItems` / `buildDocumentFreeItems` / `expandEachModeItems` / `expandVariantGroupItems` / docNo系）
 - `lib/documentTotals.ts`（`calculateDocumentFormTotals`）
+- `lib/documentRowVisibility.ts`（表示される行・書類に載る行の判定。画面の表示・合計・保存で共通）
+- `lib/estimateItemMerge.ts`（ロード時・プラン切替時の明細の組み立て。請求書の読み込みも使う）
+- `hooks/useDocumentItemHandlers.ts`（種類選択・会員区分切替の明細への反映）
+- `components/document/DocumentItemTable.tsx`（明細表。チェック表示はフォームの数量から決める）
 - `lib/expandMultiRow.ts`
 - `lib/documentSchema.ts`
-- `hooks/useDocumentItems.ts`
 - `hooks/useDocumentProductSearch.ts`
 
 ## 手順

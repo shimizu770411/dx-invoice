@@ -28,6 +28,44 @@ async function findRow(page: Page, name: string): Promise<ElementHandle<HTMLTabl
     return row
 }
 
+export type RowState = { name: string; checked: boolean; qtys: number[] }
+
+// 明細表に出ている商品の行（自由行を除く）の、チェック状態と数量の一覧。
+// 複数行で1商品の場合は1件にまとめ、数量は上から順に並べる
+export async function readAllRows(page: Page): Promise<RowState[]> {
+    return page.evaluate(() => {
+        const out: { name: string; checked: boolean; qtys: number[] }[] = []
+        const rows = Array.from(document.querySelectorAll<HTMLTableRowElement>('table tbody tr'))
+        for (const tr of rows) {
+            const checkbox = tr.querySelector<HTMLInputElement>('td:first-child input[type=checkbox]')
+            const nameCell = tr.querySelectorAll('td')[1]
+            if (!checkbox || !nameCell) continue
+            // 自由行（操作列に「自由」）と、満期サービスなどの固定行（「固定」「会員のみ」）は商品の行ではない
+            if (['自由', '固定', '会員のみ'].includes(tr.querySelectorAll('td')[2]?.textContent?.trim() ?? '')) continue
+            const name = Array.from(nameCell.querySelectorAll('span'))
+                .map((s) => s.textContent?.trim() ?? '')
+                .find((t) => t !== '' && t !== 'セット' && t !== '親祭壇')
+            if (!name) continue
+            const span = Number((tr.querySelector('td') as HTMLTableCellElement).rowSpan || 1)
+            const qtys: number[] = []
+            let cur: HTMLTableRowElement | null = tr
+            for (let i = 0; i < span && cur; i++) {
+                const input = cur.querySelector<HTMLInputElement>('input[type=number]')
+                if (input) qtys.push(Number(input.value || '0'))
+                cur = cur.nextElementSibling as HTMLTableRowElement | null
+            }
+            out.push({ name, checked: checkbox.checked, qtys })
+        }
+        return out
+    })
+}
+
+// 行の「種類」欄の表示（選ばれている種類名）
+export async function getTypeText(page: Page, name: string): Promise<string> {
+    const row = await findRow(page, name)
+    return row.evaluate((tr) => (tr.querySelectorAll('td')[4]?.textContent ?? '').trim())
+}
+
 export async function hasRow(page: Page, name: string): Promise<boolean> {
     try {
         await findRow(page, name)
@@ -78,16 +116,44 @@ export async function setQty(page: Page, name: string, qty: number): Promise<voi
     await settle(page)
 }
 
+// 複数行で1商品の場合に、上から順に各行の数量を入れる（御供養の加算行・返品行など）
+export async function setQtys(page: Page, name: string, qtys: number[]): Promise<void> {
+    const row = await findRow(page, name)
+    const inputs = await row.evaluateHandle((first) => {
+        const span = Number((first.querySelector('td') as HTMLTableCellElement)?.rowSpan || 1)
+        const found: HTMLInputElement[] = []
+        let tr: HTMLTableRowElement | null = first
+        for (let i = 0; i < span && tr; i++) {
+            const input = tr.querySelector<HTMLInputElement>('input[type=number]')
+            if (input) found.push(input)
+            tr = tr.nextElementSibling as HTMLTableRowElement | null
+        }
+        return found
+    })
+    const handles = await inputs.getProperties()
+    const list = Array.from(handles.values()).map((h) => h.asElement()).filter((h): h is ElementHandle<Element> => !!h)
+    if (list.length < qtys.length) throw new Error(`E2E: 「${name}」の数量欄が ${qtys.length} 行ありません`)
+    for (let i = 0; i < qtys.length; i++) {
+        await list[i].click({ clickCount: 3 })
+        await list[i].type(String(qtys[i]))
+    }
+    await page.keyboard.press('Tab')
+    await settle(page)
+}
+
 // 種類選択の画面を開き、指定した種類を押して「確定」する（重箱のようなグループ商品は複数指定できる）
 export async function pickVariants(page: Page, name: string, variantNames: string[]): Promise<void> {
-    const row = await findRow(page, name)
-    const opener = await row.evaluateHandle((tr) =>
-        Array.from(tr.querySelectorAll('button')).find((b) => b.textContent?.includes('feature_search')) ?? null
-    )
-    const openerEl = opener.asElement() as ElementHandle<HTMLButtonElement> | null
-    if (!openerEl) throw new Error(`E2E: 「${name}」の種類選択ボタンがありません`)
-    await openerEl.click()
-    await page.waitForSelector('[role=dialog]')
+    // 重箱のような商品は、チェックを付けた時点で種類選択が開いている
+    if (!(await isVariantDialogOpen(page))) {
+        const row = await findRow(page, name)
+        const opener = await row.evaluateHandle((tr) =>
+            Array.from(tr.querySelectorAll('button')).find((b) => b.textContent?.includes('feature_search')) ?? null
+        )
+        const openerEl = opener.asElement() as ElementHandle<HTMLButtonElement> | null
+        if (!openerEl) throw new Error(`E2E: 「${name}」の種類選択ボタンがありません`)
+        await openerEl.click()
+        await page.waitForSelector('[role=dialog]')
+    }
     for (const variant of variantNames) {
         const found = await page.evaluate((v: string) => {
             const button = Array.from(document.querySelectorAll('[role=dialog] button')).find((b) =>
@@ -104,6 +170,25 @@ export async function pickVariants(page: Page, name: string, variantNames: strin
         ;(ok as HTMLButtonElement | undefined)?.click()
     })
     await page.waitForSelector('[role=dialog]', { hidden: true })
+    await settle(page)
+}
+
+export async function isVariantDialogOpen(page: Page): Promise<boolean> {
+    return (await page.$('[role=dialog]')) !== null
+}
+
+export async function variantDialogText(page: Page): Promise<string> {
+    return page.evaluate(() => document.querySelector('[role=dialog]')?.textContent ?? '')
+}
+
+// 種類選択の画面の下部のボタン（キャンセル・チェックを外す など）を押す
+export async function clickVariantDialogButton(page: Page, label: string): Promise<void> {
+    const clicked = await page.evaluate((text: string) => {
+        const button = Array.from(document.querySelectorAll('[role=dialog] button')).find((b) => b.textContent?.trim() === text)
+        ;(button as HTMLButtonElement | undefined)?.click()
+        return !!button
+    }, label)
+    if (!clicked) throw new Error(`E2E: 種類選択の画面に「${label}」ボタンがありません`)
     await settle(page)
 }
 
@@ -179,6 +264,61 @@ export async function fillFreeRow(
     await settle(page)
 }
 
+// 明細表下部の自由行・固定行（満期サービスなど）を品名で探す。自由行は品名の入力欄、固定行は品名の表示で照合する
+async function findFreeRow(page: Page, name: string): Promise<ElementHandle<HTMLTableRowElement> | null> {
+    const handle = await page.evaluateHandle((target: string) => {
+        const rows = Array.from(document.querySelectorAll<HTMLTableRowElement>('table tbody tr'))
+        return (
+            rows.find((tr) => {
+                const kind = tr.querySelectorAll('td')[2]?.textContent?.trim() ?? ''
+                if (kind === '自由') return tr.querySelector<HTMLInputElement>('input[type=text]')?.value === target
+                if (kind === '固定' || kind === '会員のみ') return tr.querySelectorAll('td')[1]?.textContent?.trim() === target
+                return false
+            }) ?? null
+        )
+    }, name)
+    return handle.asElement() as ElementHandle<HTMLTableRowElement> | null
+}
+
+// 自由行・固定行の状態。チェック欄が出ていない行（一般の書類の満期サービスなど）は checkbox が null
+export async function getFreeRow(
+    page: Page,
+    name: string
+): Promise<{ checkbox: boolean | null; qty: number | null; amountText: string } | null> {
+    const row = await findFreeRow(page, name)
+    if (!row) return null
+    return row.evaluate((tr) => {
+        const cb = tr.querySelector<HTMLInputElement>('input[type=checkbox]')
+        const qty = tr.querySelector<HTMLInputElement>('input[type=number]')
+        // 金額は「¥」で始まる表示
+        const amount = Array.from(tr.querySelectorAll('div')).find((d) => d.children.length === 0 && (d.textContent ?? '').includes('¥'))
+        return {
+            checkbox: cb ? cb.checked : null,
+            qty: qty ? Number(qty.value || '0') : null,
+            amountText: (amount?.textContent ?? '').trim(),
+        }
+    })
+}
+
+export async function toggleFreeRow(page: Page, name: string): Promise<void> {
+    const row = await findFreeRow(page, name)
+    const checkbox = await row?.$('input[type=checkbox]')
+    if (!checkbox) throw new Error(`E2E: 「${name}」のチェック欄がありません`)
+    await checkbox.click()
+    await settle(page)
+}
+
+// 固定行（満期サービスなど）の金額を入れる
+export async function setFixedRowPrice(page: Page, name: string, price: number): Promise<void> {
+    const row = await findFreeRow(page, name)
+    const input = await row?.$('input:not([type=checkbox])')
+    if (!input) throw new Error(`E2E: 「${name}」の金額欄がありません`)
+    await input.click({ clickCount: 3 })
+    await input.type(String(price))
+    await page.keyboard.press('Tab')
+    await settle(page)
+}
+
 // 画面下部に固定表示される合計欄（小計・消費税・合計・会費入金・差引合計）。
 // 見積は「小　計」、請求書は「小計」と表記が違うため、空白を除いて見出しを照合する
 export async function readScreenTotals(page: Page): Promise<ScreenTotals> {
@@ -200,6 +340,28 @@ export async function readScreenTotals(page: Page): Promise<ScreenTotals> {
     if (missing >= 0) throw new Error(`E2E: 画面の合計欄（${['小計', '消費税', '合計', '会費入金', '差引合計'][missing]}）が見つかりません`)
     const [subtotal, tax, total, membershipPaidAmount, grandTotal] = (texts as string[]).map(toNumber)
     return { subtotal, tax, total, membershipPaidAmount: Math.abs(membershipPaidAmount), grandTotal }
+}
+
+// 見積画面のプランを切り替える。明細が消える場合の確認には「OK」で答える
+export async function setPlan(page: Page, planName: string): Promise<void> {
+    const handle = await page.evaluateHandle((name: string) => {
+        return (
+            Array.from(document.querySelectorAll('select')).find((s) =>
+                Array.from(s.options).some((o) => o.textContent?.trim() === name)
+            ) ?? null
+        )
+    }, planName)
+    const select = handle.asElement() as ElementHandle<HTMLSelectElement> | null
+    if (!select) throw new Error(`E2E: プラン「${planName}」の選択欄がありません`)
+    const value = await select.evaluate(
+        (s, name) => Array.from(s.options).find((o) => o.textContent?.trim() === name)!.value,
+        planName
+    )
+    const acceptConfirm = (dialog: { accept: () => Promise<void> }) => void dialog.accept()
+    page.once('dialog', acceptConfirm)
+    await select.select(value)
+    await settle(page, 1500)
+    page.off('dialog', acceptConfirm)
 }
 
 // 「一般・会員」の切り替え（独自の選択欄なので、表示をクリックして選ぶ）
