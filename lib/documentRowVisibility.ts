@@ -17,7 +17,7 @@ type VisibilityItem = {
     [key: string]: unknown
 }
 
-type LinkedFreeItem = { parentProductItemId?: string | number | null }
+type LinkedFreeItem = { parentProductItemId?: string | number | null; [key: string]: unknown }
 
 /**
  * 画面に表示される行か。

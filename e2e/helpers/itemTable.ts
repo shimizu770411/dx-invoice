@@ -264,6 +264,61 @@ export async function fillFreeRow(
     await settle(page)
 }
 
+// 明細表下部の自由行・固定行（満期サービスなど）を品名で探す。自由行は品名の入力欄、固定行は品名の表示で照合する
+async function findFreeRow(page: Page, name: string): Promise<ElementHandle<HTMLTableRowElement> | null> {
+    const handle = await page.evaluateHandle((target: string) => {
+        const rows = Array.from(document.querySelectorAll<HTMLTableRowElement>('table tbody tr'))
+        return (
+            rows.find((tr) => {
+                const kind = tr.querySelectorAll('td')[2]?.textContent?.trim() ?? ''
+                if (kind === '自由') return tr.querySelector<HTMLInputElement>('input[type=text]')?.value === target
+                if (kind === '固定' || kind === '会員のみ') return tr.querySelectorAll('td')[1]?.textContent?.trim() === target
+                return false
+            }) ?? null
+        )
+    }, name)
+    return handle.asElement() as ElementHandle<HTMLTableRowElement> | null
+}
+
+// 自由行・固定行の状態。チェック欄が出ていない行（一般の書類の満期サービスなど）は checkbox が null
+export async function getFreeRow(
+    page: Page,
+    name: string
+): Promise<{ checkbox: boolean | null; qty: number | null; amountText: string } | null> {
+    const row = await findFreeRow(page, name)
+    if (!row) return null
+    return row.evaluate((tr) => {
+        const cb = tr.querySelector<HTMLInputElement>('input[type=checkbox]')
+        const qty = tr.querySelector<HTMLInputElement>('input[type=number]')
+        // 金額は「¥」で始まる表示
+        const amount = Array.from(tr.querySelectorAll('div')).find((d) => d.children.length === 0 && (d.textContent ?? '').includes('¥'))
+        return {
+            checkbox: cb ? cb.checked : null,
+            qty: qty ? Number(qty.value || '0') : null,
+            amountText: (amount?.textContent ?? '').trim(),
+        }
+    })
+}
+
+export async function toggleFreeRow(page: Page, name: string): Promise<void> {
+    const row = await findFreeRow(page, name)
+    const checkbox = await row?.$('input[type=checkbox]')
+    if (!checkbox) throw new Error(`E2E: 「${name}」のチェック欄がありません`)
+    await checkbox.click()
+    await settle(page)
+}
+
+// 固定行（満期サービスなど）の金額を入れる
+export async function setFixedRowPrice(page: Page, name: string, price: number): Promise<void> {
+    const row = await findFreeRow(page, name)
+    const input = await row?.$('input:not([type=checkbox])')
+    if (!input) throw new Error(`E2E: 「${name}」の金額欄がありません`)
+    await input.click({ clickCount: 3 })
+    await input.type(String(price))
+    await page.keyboard.press('Tab')
+    await settle(page)
+}
+
 // 画面下部に固定表示される合計欄（小計・消費税・合計・会費入金・差引合計）。
 // 見積は「小　計」、請求書は「小計」と表記が違うため、空白を除いて見出しを照合する
 export async function readScreenTotals(page: Page): Promise<ScreenTotals> {

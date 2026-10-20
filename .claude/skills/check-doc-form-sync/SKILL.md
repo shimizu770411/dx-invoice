@@ -29,7 +29,6 @@ description: 'Use after modifying estimates or invoices components/hooks/schemas
 - `components/document/DocumentItemTable.tsx`（明細表。チェック表示はフォームの数量から決める）
 - `lib/expandMultiRow.ts`
 - `lib/documentSchema.ts`
-- `hooks/useDocumentItems.ts`
 - `hooks/useDocumentProductSearch.ts`
 
 ## 手順

@@ -15,7 +15,6 @@ type Props = {
     isMember: boolean
     freeItems?: InvoiceFreeItem[]
     freeFields?: FieldArrayWithId<InvoiceFormData, 'freeItems', 'id'>[]
-    handleRemoveFreeItem?: (index: number) => void
     onVariantChange?: (index: number, variant: ProductVariant) => void
     setValue?: UseFormSetValue<InvoiceFormData>
     readOnly?: boolean

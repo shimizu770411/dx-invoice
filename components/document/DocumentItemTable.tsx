@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Control, FieldArrayWithId, UseFormSetValue, useWatch } from 'react-hook-form'
 import { FormInput } from '@/components/form/FormInput'
@@ -13,7 +13,7 @@ import { ProductVariant } from '@/lib/products'
 import { resolveProductImageUrl } from '@/lib/utils'
 import { scopeApplies } from '@/lib/productScope'
 import { allowedServiceFlags } from '@/lib/itemPricing'
-import { calcDocumentItemAmount, freeItemUnitPrice, noChargeReasonFor, NO_CHARGE_LABELS } from '@/lib/documentTotals'
+import { calcDocumentItemAmount, freeItemUnitPrice, isMemberBenefitFreeRow, noChargeReasonFor, NO_CHARGE_LABELS } from '@/lib/documentTotals'
 import { EXECUTION_SURCHARGE_NAME, defaultQtyOnCheck } from '@/lib/documentUtils'
 import { PlanSurcharge, canApplySurcharge } from '@/lib/planSurcharges'
 import { MISSING_FROM_MASTER_LABEL } from '@/lib/documentMissingProducts'
@@ -187,7 +187,6 @@ type Props = {
     isMember: boolean
     freeItems?: DocumentFreeItem[]
     freeFields?: FieldArrayWithId<DocumentFormData, 'freeItems', 'id'>[]
-    handleRemoveFreeItem?: (index: number) => void
     onVariantChange?: (
         index: number,
         variant: ProductVariant,
@@ -219,7 +218,6 @@ export function DocumentItemTable({
     isMember,
     freeItems = [],
     freeFields = [],
-    handleRemoveFreeItem,
     onVariantChange,
     setValue,
     readOnly = false,
@@ -293,6 +291,44 @@ export function DocumentItemTable({
     }
     const [freeCheckedItems, setFreeCheckedItems] = useState<boolean[]>([])
     const [prevFreeSignature, setPrevFreeSignature] = useState('')
+    // 自由行のチェックを外したときの数量の控え（自由行は削除できず並びが変わらないので、位置で持つ）
+    const freeQtyBeforeUncheckRef = useRef<Map<number, number>>(new Map())
+
+    // 会員特典の固定行（満期サービス・施行割増券）は、一般に切り替えたら外し（保存もしない）、
+    // 会員に戻したら入れていた金額で元に戻す。以前は一般に切り替えても金額が行に出たまま、
+    // 合計には入らない表示になっていた（2026-10-20 ユーザー指示）
+    const memberBenefitQtyRef = useRef<Map<number, number>>(new Map())
+    const prevIsMemberRef = useRef(isMember)
+    useEffect(() => {
+        if (prevIsMemberRef.current === isMember) return
+        prevIsMemberRef.current = isMember
+        const remembered = memberBenefitQtyRef.current
+        const changed: [number, boolean][] = []
+        ;(watchedFreeItems ?? []).forEach((fi, i) => {
+            if (!isMemberBenefitFreeRow(fi?.productItemName)) return
+            if (!isMember) {
+                const qty = Number(fi?.qty) || 0
+                if (qty <= 0) return
+                remembered.set(i, qty)
+                setValue?.(`freeItems.${i}.qty` as `freeItems.${number}.qty`, 0, { shouldDirty: true })
+                changed.push([i, false])
+                return
+            }
+            const qty = remembered.get(i)
+            if (!qty) return
+            remembered.delete(i)
+            setValue?.(`freeItems.${i}.qty` as `freeItems.${number}.qty`, qty, { shouldDirty: true })
+            changed.push([i, true])
+        })
+        if (changed.length === 0) return
+        setFreeCheckedItems((prev) => {
+            const next = [...prev]
+            for (const [i, checked] of changed) next[i] = checked
+            return next
+        })
+        // 会員区分が切り替わったときだけ動かす（自由行の入力のたびに動かすと、控えが上書きされる）
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isMember])
 
     // 種類列: 選択されたバリアント名を連結した文字列がこの文字数を超えたら集約表示にする
     const [expandedTypeRows, setExpandedTypeRows] = useState<Set<number>>(new Set())
@@ -1101,7 +1137,8 @@ export function DocumentItemTable({
                                 // 一般の書類では入力させない（入れても合計には反映されない）
                                 const memberBenefitBlocked = (isMaturity || isExecutionSurcharge) && !isMember
                                 const inputsDisabled = readOnly || !isChecked || memberBenefitBlocked
-                                const amount = isChecked
+                                // 一般の書類では合計に入らないので、金額も¥0と表示する
+                                const amount = isChecked && !memberBenefitBlocked
                                     ? isFixedRow
                                         ? liveUnitPrice
                                         : liveUnitPrice * liveQty
@@ -1127,9 +1164,14 @@ export function DocumentItemTable({
                                                             next[index] = checked
                                                             return next
                                                         })
+                                                        // 商品の行と同じく、入れ直したときは外す前の数量に戻す
+                                                        const remembered = freeQtyBeforeUncheckRef.current
+                                                        if (!checked) remembered.set(index, Number(liveQty) || 0)
+                                                        const restored = remembered.get(index)
+                                                        if (checked) remembered.delete(index)
                                                         setValue?.(
                                                             `freeItems.${index}.qty` as `freeItems.${number}.qty`,
-                                                            checked ? 1 : 0,
+                                                            checked ? (restored && restored > 0 ? restored : 1) : 0,
                                                             { shouldDirty: true }
                                                         )
                                                     }}

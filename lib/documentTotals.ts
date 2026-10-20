@@ -28,7 +28,7 @@ type DocumentFormItemField = {
 type DocumentFormFreeItem = {
     /** 控室管理費などの追加行の親商品。親商品が書類に載らないときは、この行も合計に入れない */
     parentProductItemId?: string | number | null
-    productItemName?: string
+    productItemName?: string | null
     unitPriceGeneral: number
     unitPriceMember?: number
     qty: number

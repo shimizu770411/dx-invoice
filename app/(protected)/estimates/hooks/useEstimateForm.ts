@@ -13,16 +13,11 @@ import { toast } from '@/hooks/use-toast'
 import { handleLoadError, handleSaveError } from '@/lib/errorHandler'
 import {
     calculateDocumentFormTotals,
-    calcDocumentItemAmount,
-    freeItemUnitPrice,
     clearNoChargeSnapshot,
-    resolveNoChargeScope,
-    resolveNoChargeReason,
 } from '@/lib/documentTotals'
-import { useDocumentItems } from '@/hooks/useDocumentItems'
-import { expandEachModeItems, expandVariantGroupItems, buildDocumentFreeItems, isFreeItemToSave, MATURITY_SERVICE_NAME, EXECUTION_SURCHARGE_NAME, EXECUTION_SURCHARGE_AMOUNT } from '@/lib/documentUtils'
+import { buildDocumentFreeItems, MATURITY_SERVICE_NAME, EXECUTION_SURCHARGE_NAME } from '@/lib/documentUtils'
 import { useDocumentProductSearch } from '@/hooks/useDocumentProductSearch'
-import { documentActiveRows, isFreeRowParentActive } from '@/lib/documentRowVisibility'
+import { buildDocumentSubmitPayload } from '@/lib/documentSubmit'
 import { EstimateFormData, DEFAULT_FORM_VALUES } from '../schemas/EstimateFormSchema'
 
 
@@ -159,23 +154,15 @@ export function useEstimateCreate(customerId: string, reset: UseFormReset<Estima
     const onSubmit = async (formValues: EstimateFormData) => {
         try {
             const isMember = formValues.isMember === 'true'
-            const allMergedItems = items.map((item, i) => {
-                const qty = formValues.items[i]?.qty ?? item.qty
-                const description = formValues.items[i]?.description ?? item.description ?? ''
-                // セット扱い・サービス扱いの行は 0 円になる。ここで単価×数量をそのまま入れると、
-                // 0円扱いのはずの行まで積み上がった合計がサーバー側で算出され保存されてしまう。
-                // 金額と 0 円扱いの控えは、必ず同じ明細から同時に作る（片方だけ古いと食い違う）
-                const amount = calcDocumentItemAmount(item, qty, isMember)
-                const noChargeScope = resolveNoChargeScope(item)
-                const noChargeReason = resolveNoChargeReason(item, isMember)
-                return { ...item, qty, description, amount, noChargeScope, noChargeReason }
+            const payload = buildDocumentSubmitPayload({
+                items,
+                freeItems,
+                formItems: formValues.items,
+                formFreeItems: formValues.freeItems,
+                isMember,
+                customer,
             })
-            // 画面に表示されない行（選ばれていない親祭壇の子商品など）は、数量が残っていても保存しない
-            const isActiveRow = documentActiveRows(allMergedItems, (i) => Number(allMergedItems[i].qty) || 0)
-            const activeItems = allMergedItems
-                .filter((_, i) => isActiveRow[i])
-                .map((item, i) => ({ ...item, sortNo: i }))
-            if (activeItems.length === 0) {
+            if (payload.hasNoItems) {
                 toast({
                     title: '数量が1以上の品目を少なくとも1つ入力してください',
                     variant: 'destructive',
@@ -183,31 +170,7 @@ export function useEstimateCreate(customerId: string, reset: UseFormReset<Estima
                 })
                 return
             }
-            const groupExpandedItems = expandVariantGroupItems(activeItems, isMember)
-            const finalItems = expandEachModeItems(groupExpandedItems, isMember)
-            const mergedFreeItems = freeItems
-                .map((item, i) => {
-                    const productItemName = formValues.freeItems[i]?.productItemName ?? item.productItemName ?? ''
-                    const isMaturity = productItemName === MATURITY_SERVICE_NAME
-                    const isExecutionSurcharge = productItemName === EXECUTION_SURCHARGE_NAME
-                    const description = isMaturity || isExecutionSurcharge
-                        ? ''
-                        : formValues.freeItems[i]?.description ?? item.description ?? ''
-                    // 施行割増券は金額固定・編集不可のため、フォーム送信値に関わらず規定額を強制する
-                    const unitPriceGeneral = isExecutionSurcharge
-                        ? EXECUTION_SURCHARGE_AMOUNT
-                        : formValues.freeItems[i]?.unitPriceGeneral ?? item.unitPriceGeneral
-                    const unitPriceMember = formValues.freeItems[i]?.unitPriceMember ?? item.unitPriceMember ?? 0
-                    const qty = formValues.freeItems[i]?.qty ?? item.qty
-                    const amount =
-                        freeItemUnitPrice({ productItemName, unitPriceGeneral, unitPriceMember }, isMember) * qty
-                    return { ...item, productItemName, description, unitPriceGeneral, unitPriceMember, qty, amount }
-                })
-                // 控室管理費などの追加行は、親商品が保存されるときだけ保存する
-                .filter((fi) => isFreeItemToSave(fi) && isFreeRowParentActive(fi, allMergedItems, isActiveRow))
-                .map((it, i) => ({ ...it, sortNo: i }))
-            const totals = calculateDocumentFormTotals(items, formValues.items, isMember, customer, freeItems, formValues.freeItems)
-            const data = { ...formValues, ...totals, items: finalItems, freeItems: mergedFreeItems }
+            const data = { ...formValues, ...payload.totals, items: payload.items, freeItems: payload.freeItems }
             const created = await createEstimate(customerId, data)
             toast({ title: '登録しました', variant: 'success', duration: 2000 })
             queryClient.invalidateQueries({ queryKey: ['customers'] })
@@ -350,23 +313,15 @@ export function useEstimateEdit(estimateId: string, reset: UseFormReset<Estimate
     const onSubmit = async (formValues: EstimateFormData) => {
         try {
             const isMember = formValues.isMember === 'true'
-            const allMergedItems = items.map((item, i) => {
-                const qty = formValues.items[i]?.qty ?? item.qty
-                const description = formValues.items[i]?.description ?? item.description ?? ''
-                // セット扱い・サービス扱いの行は 0 円になる。ここで単価×数量をそのまま入れると、
-                // 0円扱いのはずの行まで積み上がった合計がサーバー側で算出され保存されてしまう。
-                // 金額と 0 円扱いの控えは、必ず同じ明細から同時に作る（片方だけ古いと食い違う）
-                const amount = calcDocumentItemAmount(item, qty, isMember)
-                const noChargeScope = resolveNoChargeScope(item)
-                const noChargeReason = resolveNoChargeReason(item, isMember)
-                return { ...item, qty, description, amount, noChargeScope, noChargeReason }
+            const payload = buildDocumentSubmitPayload({
+                items,
+                freeItems,
+                formItems: formValues.items,
+                formFreeItems: formValues.freeItems,
+                isMember,
+                customer,
             })
-            // 画面に表示されない行（選ばれていない親祭壇の子商品など）は、数量が残っていても保存しない
-            const isActiveRow = documentActiveRows(allMergedItems, (i) => Number(allMergedItems[i].qty) || 0)
-            const activeItems = allMergedItems
-                .filter((_, i) => isActiveRow[i])
-                .map((item, i) => ({ ...item, sortNo: i }))
-            if (activeItems.length === 0) {
+            if (payload.hasNoItems) {
                 toast({
                     title: '数量が1以上の品目を少なくとも1つ入力してください',
                     variant: 'destructive',
@@ -374,31 +329,7 @@ export function useEstimateEdit(estimateId: string, reset: UseFormReset<Estimate
                 })
                 return
             }
-            const groupExpandedItems = expandVariantGroupItems(activeItems, isMember)
-            const finalItems = expandEachModeItems(groupExpandedItems, isMember)
-            const mergedFreeItems = freeItems
-                .map((item, i) => {
-                    const productItemName = formValues.freeItems[i]?.productItemName ?? item.productItemName ?? ''
-                    const isMaturity = productItemName === MATURITY_SERVICE_NAME
-                    const isExecutionSurcharge = productItemName === EXECUTION_SURCHARGE_NAME
-                    const description = isMaturity || isExecutionSurcharge
-                        ? ''
-                        : formValues.freeItems[i]?.description ?? item.description ?? ''
-                    // 施行割増券は金額固定・編集不可のため、フォーム送信値に関わらず規定額を強制する
-                    const unitPriceGeneral = isExecutionSurcharge
-                        ? EXECUTION_SURCHARGE_AMOUNT
-                        : formValues.freeItems[i]?.unitPriceGeneral ?? item.unitPriceGeneral
-                    const unitPriceMember = formValues.freeItems[i]?.unitPriceMember ?? item.unitPriceMember ?? 0
-                    const qty = formValues.freeItems[i]?.qty ?? item.qty
-                    const amount =
-                        freeItemUnitPrice({ productItemName, unitPriceGeneral, unitPriceMember }, isMember) * qty
-                    return { ...item, productItemName, description, unitPriceGeneral, unitPriceMember, qty, amount }
-                })
-                // 控室管理費などの追加行は、親商品が保存されるときだけ保存する
-                .filter((fi) => isFreeItemToSave(fi) && isFreeRowParentActive(fi, allMergedItems, isActiveRow))
-                .map((it, i) => ({ ...it, sortNo: i }))
-            const totals = calculateDocumentFormTotals(items, formValues.items, isMember, customer, freeItems, formValues.freeItems)
-            const data = { ...formValues, ...totals, items: finalItems, freeItems: mergedFreeItems }
+            const data = { ...formValues, ...payload.totals, items: payload.items, freeItems: payload.freeItems }
             await updateEstimate(estimateId, data)
             toast({ title: '更新しました', variant: 'success', duration: 2000 })
             await loadData()
@@ -414,11 +345,6 @@ export function useEstimateEdit(estimateId: string, reset: UseFormReset<Estimate
 // 品目検索フック
 // -------------------------------------------------------
 export const useProductSearch = useDocumentProductSearch<EstimateItem>
-
-// -------------------------------------------------------
-// 明細操作フック
-// -------------------------------------------------------
-export const useEstimateItems = useDocumentItems<EstimateItem>
 
 // -------------------------------------------------------
 // 合計計算ユーティリティ
