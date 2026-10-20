@@ -213,12 +213,14 @@ export async function fillLinkedFreeRow(
     const freeRow = (await row.evaluateHandle((tr) => tr.nextElementSibling)).asElement() as ElementHandle<HTMLTableRowElement> | null
     if (!freeRow) throw new Error(`E2E: 「${parentName}」の追加行がありません`)
     const [nameInput, qtyInput, generalInput, memberInput] = await freeRow.$$('input')
-    for (const [input, value] of [
+    const entries: [ElementHandle, string][] = [
         [nameInput, values.name],
         [qtyInput, String(values.qty)],
         [generalInput, String(values.general)],
-        [memberInput, String(values.member)],
-    ] as const) {
+    ]
+    // 会員価格の欄は会員の書類でだけ表示されるため、一般の書類では member を無視する
+    if (memberInput) entries.push([memberInput, String(values.member)])
+    for (const [input, value] of entries) {
         await input.click({ clickCount: 3 })
         await input.type(value)
     }
