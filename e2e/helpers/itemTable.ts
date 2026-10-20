@@ -213,12 +213,14 @@ export async function fillLinkedFreeRow(
     const freeRow = (await row.evaluateHandle((tr) => tr.nextElementSibling)).asElement() as ElementHandle<HTMLTableRowElement> | null
     if (!freeRow) throw new Error(`E2E: 「${parentName}」の追加行がありません`)
     const [nameInput, qtyInput, generalInput, memberInput] = await freeRow.$$('input')
-    for (const [input, value] of [
+    const entries: [ElementHandle, string][] = [
         [nameInput, values.name],
         [qtyInput, String(values.qty)],
         [generalInput, String(values.general)],
-        [memberInput, String(values.member)],
-    ] as const) {
+    ]
+    // 会員価格の欄は会員の書類でだけ表示されるため、一般の書類では member を無視する
+    if (memberInput) entries.push([memberInput, String(values.member)])
+    for (const [input, value] of entries) {
         await input.click({ clickCount: 3 })
         await input.type(value)
     }
@@ -342,7 +344,7 @@ export async function readScreenTotals(page: Page): Promise<ScreenTotals> {
     return { subtotal, tax, total, membershipPaidAmount: Math.abs(membershipPaidAmount), grandTotal }
 }
 
-// 見積画面のプランを切り替える。明細が消える場合の確認には「OK」で答える
+// 見積画面のプランを切り替える
 export async function setPlan(page: Page, planName: string): Promise<void> {
     const handle = await page.evaluateHandle((name: string) => {
         return (
@@ -357,11 +359,10 @@ export async function setPlan(page: Page, planName: string): Promise<void> {
         (s, name) => Array.from(s.options).find((o) => o.textContent?.trim() === name)!.value,
         planName
     )
-    const acceptConfirm = (dialog: { accept: () => Promise<void> }) => void dialog.accept()
-    page.once('dialog', acceptConfirm)
+    // 明細が消える場合の確認は、セッション共通の設定（openSession）で「OK」になる。
+    // ここでも OK を押すと二重に応答して「既に応答済み」のエラーになる
     await select.select(value)
     await settle(page, 1500)
-    page.off('dialog', acceptConfirm)
 }
 
 // 「一般・会員」の切り替え（独自の選択欄なので、表示をクリックして選ぶ）

@@ -14,6 +14,7 @@ import { EstimateOtherFields } from './EstimateOtherFields'
 import { EstimateCustomerSummary } from './EstimateCustomerSummary'
 import { EstimateBasicInfo } from './EstimateBasicInfo'
 import { useDocumentItemHandlers } from '@/hooks/useDocumentItemHandlers'
+import { trimStaleFormRows, validationErrorTitle } from '@/lib/documentFormGuards'
 import type { DocumentFormData } from '@/components/document/DocumentItemTable'
 import { getPlanSurcharges, PlanSurcharge } from '@/lib/planSurcharges'
 import { assignEstimateDocNo, confirmEstimate } from '@/lib/estimates'
@@ -150,16 +151,9 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
 
     const totals = calculateTotals(items, watchedItems, watchedIsMember === 'true', customer, freeItems, watchedFreeItems)
 
+    // 入力チェックで止まったときは必ず通知する（明細行の中の項目のエラーでも無言にしない）
     const onInvalid = (errs: any) => {
-        const itemsError = errs?.items?.root?.message ?? errs?.items?.message
-        if (itemsError) {
-            toast({ title: itemsError, variant: 'destructive', duration: 3000 })
-            return
-        }
-        const first = Object.values(errs as Record<string, any>).find((e) => e?.message)
-        if (first?.message) {
-            toast({ title: first.message, variant: 'destructive', duration: 3000 })
-        }
+        toast({ title: validationErrorTitle(errs), variant: 'destructive', duration: 3000 })
     }
 
     const onSubmitWithStoreCheck = async (formValues: EstimateFormData) => {
@@ -249,7 +243,11 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
     return (
         <FormProvider {...methods}>
             <form
-                onSubmit={handleSubmit(onSubmitWithStoreCheck, onInvalid)}
+                onSubmit={(e) => {
+                    // 画面の明細より後ろに残った行があると入力チェックで弾かれるので、先に取り除く
+                    trimStaleFormRows(getValues as any, setValue as any, { items: items.length, freeItems: freeItems.length })
+                    return handleSubmit(onSubmitWithStoreCheck, onInvalid)(e)
+                }}
                 className="flex flex-col px-10 py-8"
                 style={{
                     backgroundColor: '#fbfaf7',
