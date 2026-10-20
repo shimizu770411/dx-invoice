@@ -40,8 +40,8 @@ export async function readAllRows(page: Page): Promise<RowState[]> {
             const checkbox = tr.querySelector<HTMLInputElement>('td:first-child input[type=checkbox]')
             const nameCell = tr.querySelectorAll('td')[1]
             if (!checkbox || !nameCell) continue
-            // 自由行は品名が入力欄で、操作列に「自由」と出る
-            if (tr.querySelectorAll('td')[2]?.textContent?.trim() === '自由') continue
+            // 自由行（操作列に「自由」）と、満期サービスなどの固定行（「固定」「会員のみ」）は商品の行ではない
+            if (['自由', '固定', '会員のみ'].includes(tr.querySelectorAll('td')[2]?.textContent?.trim() ?? '')) continue
             const name = Array.from(nameCell.querySelectorAll('span'))
                 .map((s) => s.textContent?.trim() ?? '')
                 .find((t) => t !== '' && t !== 'セット' && t !== '親祭壇')
