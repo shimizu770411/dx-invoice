@@ -1,4 +1,5 @@
 import type { AppliesTo } from '@/lib/products'
+import { documentActiveFreeRows, documentActiveRows } from '@/lib/documentRowVisibility'
 import { scopeApplies } from '@/lib/productScope'
 import { computeMultiRowAmount } from '@/lib/expandMultiRow'
 import {
@@ -25,6 +26,8 @@ type DocumentFormItemField = {
 }
 
 type DocumentFormFreeItem = {
+    /** 控室管理費などの追加行の親商品。親商品が書類に載らないときは、この行も合計に入れない */
+    parentProductItemId?: string | number | null
     productItemName?: string
     unitPriceGeneral: number
     unitPriceMember?: number
@@ -32,6 +35,7 @@ type DocumentFormFreeItem = {
 }
 
 type DocumentFormFreeItemField = {
+    parentProductItemId?: string | number | null
     productItemName?: string
     qty?: number
     unitPriceGeneral?: number
@@ -292,18 +296,27 @@ export function calculateDocumentFormTotals(
     freeItems?: DocumentFormFreeItem[],
     freeItemFields?: DocumentFormFreeItemField[]
 ) {
-    const regularSubtotal = items.reduce((sum, item, i) => {
-        const qty = itemFields?.[i]?.qty ?? item.qty
-        return sum + calcDocumentItemAmount(item, qty, isMember)
-    }, 0)
+    const qtyOf = (i: number) => Number(itemFields?.[i]?.qty ?? items[i]?.qty ?? 0) || 0
+    // 画面に表示されない行（選ばれていない親祭壇の子商品など）は、数量が残っていても合計に入れない
+    const activeItems = documentActiveRows(items, qtyOf)
+    const regularSubtotal = items.reduce(
+        (sum, item, i) => (activeItems[i] ? sum + calcDocumentItemAmount(item, qtyOf(i), isMember) : sum),
+        0
+    )
     // 入力中の値（フォーム側）を優先してから小計を出す
     const mergedFreeItems = (freeItems || []).map((item, i) => ({
+        parentProductItemId: freeItemFields?.[i]?.parentProductItemId ?? item.parentProductItemId,
         productItemName: freeItemFields?.[i]?.productItemName ?? item.productItemName,
         unitPriceGeneral: freeItemFields?.[i]?.unitPriceGeneral ?? item.unitPriceGeneral,
         unitPriceMember: freeItemFields?.[i]?.unitPriceMember ?? item.unitPriceMember,
         qty: freeItemFields?.[i]?.qty ?? item.qty,
     }))
-    const freeSubtotal = calcFreeItemsSubtotal(mergedFreeItems, isMember)
+    // 追加行は親商品が載るときだけ合計に入れる（親の数量を0にすると追加行は画面から消えるため）
+    const activeFree = documentActiveFreeRows(mergedFreeItems, items, activeItems)
+    const freeSubtotal = calcFreeItemsSubtotal(
+        mergedFreeItems.filter((_, i) => activeFree[i]),
+        isMember
+    )
     const subtotal = regularSubtotal + freeSubtotal
     const tax = Math.round(subtotal * TAX_RATE)
     const total = subtotal + tax

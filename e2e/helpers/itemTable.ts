@@ -60,6 +60,12 @@ export async function readAllRows(page: Page): Promise<RowState[]> {
     })
 }
 
+// 行の「種類」欄の表示（選ばれている種類名）
+export async function getTypeText(page: Page, name: string): Promise<string> {
+    const row = await findRow(page, name)
+    return row.evaluate((tr) => (tr.querySelectorAll('td')[4]?.textContent ?? '').trim())
+}
+
 export async function hasRow(page: Page, name: string): Promise<boolean> {
     try {
         await findRow(page, name)

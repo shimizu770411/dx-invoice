@@ -22,6 +22,7 @@ import {
 import { useDocumentItems } from '@/hooks/useDocumentItems'
 import { expandEachModeItems, expandVariantGroupItems, buildDocumentFreeItems, isFreeItemToSave, MATURITY_SERVICE_NAME, EXECUTION_SURCHARGE_NAME, EXECUTION_SURCHARGE_AMOUNT } from '@/lib/documentUtils'
 import { useDocumentProductSearch } from '@/hooks/useDocumentProductSearch'
+import { documentActiveRows, isFreeRowParentActive } from '@/lib/documentRowVisibility'
 import { EstimateFormData, DEFAULT_FORM_VALUES } from '../schemas/EstimateFormSchema'
 
 
@@ -169,7 +170,11 @@ export function useEstimateCreate(customerId: string, reset: UseFormReset<Estima
                 const noChargeReason = resolveNoChargeReason(item, isMember)
                 return { ...item, qty, description, amount, noChargeScope, noChargeReason }
             })
-            const activeItems = allMergedItems.filter((item) => item.qty > 0).map((item, i) => ({ ...item, sortNo: i }))
+            // 画面に表示されない行（選ばれていない親祭壇の子商品など）は、数量が残っていても保存しない
+            const isActiveRow = documentActiveRows(allMergedItems, (i) => Number(allMergedItems[i].qty) || 0)
+            const activeItems = allMergedItems
+                .filter((_, i) => isActiveRow[i])
+                .map((item, i) => ({ ...item, sortNo: i }))
             if (activeItems.length === 0) {
                 toast({
                     title: '数量が1以上の品目を少なくとも1つ入力してください',
@@ -198,7 +203,8 @@ export function useEstimateCreate(customerId: string, reset: UseFormReset<Estima
                         freeItemUnitPrice({ productItemName, unitPriceGeneral, unitPriceMember }, isMember) * qty
                     return { ...item, productItemName, description, unitPriceGeneral, unitPriceMember, qty, amount }
                 })
-                .filter(isFreeItemToSave)
+                // 控室管理費などの追加行は、親商品が保存されるときだけ保存する
+                .filter((fi) => isFreeItemToSave(fi) && isFreeRowParentActive(fi, allMergedItems, isActiveRow))
                 .map((it, i) => ({ ...it, sortNo: i }))
             const totals = calculateDocumentFormTotals(items, formValues.items, isMember, customer, freeItems, formValues.freeItems)
             const data = { ...formValues, ...totals, items: finalItems, freeItems: mergedFreeItems }
@@ -355,7 +361,11 @@ export function useEstimateEdit(estimateId: string, reset: UseFormReset<Estimate
                 const noChargeReason = resolveNoChargeReason(item, isMember)
                 return { ...item, qty, description, amount, noChargeScope, noChargeReason }
             })
-            const activeItems = allMergedItems.filter((item) => item.qty > 0).map((item, i) => ({ ...item, sortNo: i }))
+            // 画面に表示されない行（選ばれていない親祭壇の子商品など）は、数量が残っていても保存しない
+            const isActiveRow = documentActiveRows(allMergedItems, (i) => Number(allMergedItems[i].qty) || 0)
+            const activeItems = allMergedItems
+                .filter((_, i) => isActiveRow[i])
+                .map((item, i) => ({ ...item, sortNo: i }))
             if (activeItems.length === 0) {
                 toast({
                     title: '数量が1以上の品目を少なくとも1つ入力してください',
@@ -384,7 +394,8 @@ export function useEstimateEdit(estimateId: string, reset: UseFormReset<Estimate
                         freeItemUnitPrice({ productItemName, unitPriceGeneral, unitPriceMember }, isMember) * qty
                     return { ...item, productItemName, description, unitPriceGeneral, unitPriceMember, qty, amount }
                 })
-                .filter(isFreeItemToSave)
+                // 控室管理費などの追加行は、親商品が保存されるときだけ保存する
+                .filter((fi) => isFreeItemToSave(fi) && isFreeRowParentActive(fi, allMergedItems, isActiveRow))
                 .map((it, i) => ({ ...it, sortNo: i }))
             const totals = calculateDocumentFormTotals(items, formValues.items, isMember, customer, freeItems, formValues.freeItems)
             const data = { ...formValues, ...totals, items: finalItems, freeItems: mergedFreeItems }

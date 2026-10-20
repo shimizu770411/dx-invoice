@@ -18,6 +18,7 @@ import { EXECUTION_SURCHARGE_NAME, defaultQtyOnCheck } from '@/lib/documentUtils
 import { PlanSurcharge, canApplySurcharge } from '@/lib/planSurcharges'
 import { MISSING_FROM_MASTER_LABEL } from '@/lib/documentMissingProducts'
 import { displayProductItemName } from '@/lib/documentDisplayNames'
+import { documentRowVisibility } from '@/lib/documentRowVisibility'
 
 // props 未指定時のフォールバック。毎レンダー新しい配列を渡すと、
 // これに依存する処理が無駄に再計算されるため安定した参照を使う
@@ -644,7 +645,6 @@ export function DocumentItemTable({
     const selectedParentIndex = items.findIndex(
         (it, i) => it?.productItem?.isSetParent && (watchedItems?.[i]?.qty ?? it?.qty ?? 0) > 0
     )
-    const selectedParentId = selectedParentIndex >= 0 ? String(items[selectedParentIndex]?.productItemId) : null
     const selectedParentChildIds = new Set<string>(
         selectedParentIndex >= 0
             ? (items[selectedParentIndex]?.productItem?.children || []).map((c) => String(c.id))
@@ -681,25 +681,9 @@ export function DocumentItemTable({
         return count
     }
 
-    // 行の表示判定（一般・会員共通）
+    // 行の表示判定（一般・会員共通）。画面の合計・保存と同じ判定を使う（lib/documentRowVisibility.ts）
     // 親祭壇は排他（1つだけ選択可）、子セット品は選択中親祭壇に紐づくものだけ表示
-    const isRowVisible = (item: DocumentItem | undefined): boolean => {
-        if (!item) return true
-        const pi = item.productItem
-        if (!pi) return true
-        // 親祭壇: 別の親が選択されているなら非表示
-        if (pi.isSetParent) {
-            if (selectedParentId && String(item.productItemId) !== selectedParentId) return false
-            return true
-        }
-        // 子セット品: 選択中親祭壇に紐づくもののみ表示
-        // (プラン設定で疑似セット子化された一般商品(isPlanForcedSet)は親子セット関係を持たないため対象外)
-        if (pi.isSetChild && !pi.isPlanForcedSet) {
-            return selectedParentChildIds.has(String(item.productItemId))
-        }
-        // 一般商品: 常に表示
-        return true
-    }
+    const rowVisible = documentRowVisibility(items, liveQtyOf)
     return (
         <div className="mb-8">
             <h3 className="mb-4">明細</h3>
@@ -726,20 +710,9 @@ export function DocumentItemTable({
                         <>
                             {fields.map((field, index) => {
                                 const item = items[index]
-                                if (!isRowVisible(item)) {
-                                    // 非表示行は qty を 0 にして登録対象から除外
-                                    // setValue はレンダリング中に呼べないため setTimeout で非同期化
-                                    if ((watchedItems?.[index]?.qty ?? 0) > 0) {
-                                        setTimeout(() => {
-                                            setValue?.(
-                                                `items.${index}.qty` as `items.${number}.qty`,
-                                                0,
-                                                { shouldDirty: true }
-                                            )
-                                        }, 0)
-                                    }
-                                    return null
-                                }
+                                // 表示されない行は数量を残したまま描画しない（合計・保存からは共通判定で外れる）。
+                                // 以前は描画中に数量を裏で0にしており、親の数量を戻すと子商品が数量0で出てきた
+                                if (!rowVisible[index]) return null
                                 const isParent = item?.productItem?.isSetParent
                                 const isChild = item?.productItem?.isSetChild
                                 // セット扱い・サービス扱い・満期サービス扱いの判定は共通処理に任せる。

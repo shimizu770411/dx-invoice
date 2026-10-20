@@ -4,9 +4,10 @@ import { scopeApplies } from '@/lib/productScope'
 import { resolveUnitPriceGeneral, resolveUnitPriceMember } from '@/lib/itemPricing'
 import { expandMultiRowToItems } from '@/lib/expandMultiRow'
 
-// 見積の明細行を組み立てる判定ロジック。
+// 見積・請求書の明細行を組み立てる判定ロジック（請求書の編集画面の読み込みも buildMergedEstimateItems を使う）。
 // 画面のフックから切り離してあるのは、プラン切替と読み込みで挙動が変わる分岐が多く、
 // 単体テストで固定しておきたいため。
+// 以前は請求書側に写しがあり、片方だけ直して食い違う不具合が起きていたので、写しは作らないこと。
 
 /**
  * 重箱のように種類のグループで選ぶ商品は、保存時に種類ごとの行へ分かれる（expandVariantGroupItems）。

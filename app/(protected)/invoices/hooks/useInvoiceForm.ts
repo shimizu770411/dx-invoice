@@ -19,7 +19,8 @@ import {
 import { useDocumentItems } from '@/hooks/useDocumentItems'
 import { expandEachModeItems, expandVariantGroupItems, buildDocumentFreeItems, isFreeItemToSave, MATURITY_SERVICE_NAME, CANCELLATION_FEE_NAME, EXECUTION_SURCHARGE_NAME, EXECUTION_SURCHARGE_AMOUNT } from '@/lib/documentUtils'
 import { useDocumentProductSearch } from '@/hooks/useDocumentProductSearch'
-import { buildVariantGroupRepresentative } from '@/lib/estimateItemMerge'
+import { documentActiveRows, isFreeRowParentActive } from '@/lib/documentRowVisibility'
+import { buildMergedEstimateItems } from '@/lib/estimateItemMerge'
 import { InvoiceFormData } from '../schemas/InvoiceFormSchema'
 
 
@@ -66,164 +67,16 @@ export function useInvoiceEdit(invoiceId: string, reset: UseFormReset<InvoiceFor
             // プラン適用より後に補うことで、補った商品がプランの非表示設定で消えるのを防ぐ
             const filteredProducts = withProductsMissingFromMaster(planAppliedProducts, existingItems)
 
-            // 全アクティブ品目と既存請求明細をマージ
-            const mergedItems: InvoiceItem[] = []
-            for (const product of filteredProducts as any[]) {
-                // 複数行構成商品: ProductRow ごとに既存明細とマージ
-                // hasReturn=true の行は加算/減算の2行に展開
-                if (product.isMultiRow && product.rows && product.rows.length > 0) {
-                    for (const row of product.rows as any[]) {
-                        const def =
-                            row.variants?.find((v: any) => v.isDefault) ?? row.variants?.[0]
-                        const signs: (1 | -1)[] = row.hasReturn ? [1, -1] : [1]
-                        // 加算行(sign=1)が既に保存されていれば、その種類・単価を新規生成する行のデフォルトにする。
-                        // 返品数量が未入力(qty=0)の間は返品行が保存されず、再読込のたびに商品マスタの
-                        // デフォルト種類(先頭行)で作り直されてしまい、加算行で選んだ種類と単価がズレるため。
-                        const existingPrimary = existingItems.find(
-                            (item) =>
-                                String((item as any).productRowId ?? '') === String(row.id) &&
-                                Number((item as any).sign ?? 1) === 1
-                        )
-                        const primaryVariant = existingPrimary
-                            ? row.variants?.find(
-                                  (v: any) => String(v.id) === String((existingPrimary as any).productRowVariantId)
-                              ) ?? def
-                            : def
-                        const primaryUnitPrice = existingPrimary?.unitPriceGeneral ?? primaryVariant?.unitPrice ?? 0
-                        for (const sign of signs) {
-                            const existing = existingItems.find(
-                                (item) =>
-                                    String((item as any).productRowId ?? '') === String(row.id) &&
-                                    Number((item as any).sign ?? 1) === sign
-                            )
-                            if (existing) {
-                                mergedItems.push({
-                                    ...existing,
-                                    productItem: { ...product },
-                                    productRow: row,
-                                } as InvoiceItem)
-                                continue
-                            }
-                            mergedItems.push({
-                                productItemId: product.id,
-                                productRowId: String(row.id),
-                                productRowVariantId: primaryVariant ? String(primaryVariant.id) : null,
-                                calcType: row.calcType,
-                                sign,
-                                description: product.defaultDescription ?? '',
-                                unitPriceGeneral: primaryUnitPrice,
-                                unitPriceMember: primaryUnitPrice,
-                                qty: 0,
-                                amount: 0,
-                                sortNo: mergedItems.length,
-                                productItem: { ...product },
-                                productRow: row,
-                                productRowVariant: primaryVariant,
-                            } as InvoiceItem)
-                        }
-                    }
-                    continue
-                }
-                const allExisting = existingItems.filter(
-                    (item) =>
-                        item.productItemId === product.id && !(item as any).productRowId
-                )
-                if (product.hasVariantGroups) {
-                    const groupExisting = allExisting.filter((item) => (item as any).productVariantGroupId)
-                    if (groupExisting.length > 0) {
-                        const groupSelectionsMap: Record<string, string[]> = {}
-                        for (const gi of groupExisting) {
-                            const gid = String((gi as any).productVariantGroupId)
-                            if (!groupSelectionsMap[gid]) groupSelectionsMap[gid] = []
-                            if ((gi as any).multiSelectVariantIds) {
-                                try {
-                                    const ids: string[] = JSON.parse((gi as any).multiSelectVariantIds)
-                                    groupSelectionsMap[gid].push(...ids)
-                                } catch { /* ignore */ }
-                            } else if (gi.productVariantId) {
-                                groupSelectionsMap[gid].push(String(gi.productVariantId))
-                            }
-                        }
-                        mergedItems.push({
-                            productItemId: product.id,
-                            description: product.defaultDescription ?? '',
-                            // 見積と同じ組み立て方にする（数量2で保存したものは数量2のまま戻す）
-                            ...buildVariantGroupRepresentative(groupExisting),
-                            amount: 0,
-                            sortNo: mergedItems.length,
-                            productItem: { ...product },
-                            groupSelections: JSON.stringify(groupSelectionsMap),
-                        } as InvoiceItem)
-                    } else {
-                        mergedItems.push({
-                            productItemId: product.id,
-                            description: product.defaultDescription ?? '',
-                            unitPriceGeneral: 0,
-                            unitPriceMember: 0,
-                            qty: 0,
-                            amount: 0,
-                            sortNo: mergedItems.length,
-                            productItem: { ...product },
-                        } as InvoiceItem)
-                    }
-                    continue
-                }
-                if (allExisting.length > 0) {
-                    // EACH モード (isMultiSelect=true, multiSelectMerge=false): 複数EACH行を1スロットに集約
-                    if ((product as any).isMultiSelect && (product as any).multiSelectMerge === false && allExisting.length > 1) {
-                        const variantIds = allExisting
-                            .map((it: any) => String(it.productVariantId))
-                            .filter(Boolean)
-                        // 単価は保存済み明細の合計を使う。商品マスタの現在価格で集計し直すと、
-                        // 価格改定後に旧書類を開いただけで金額が変わり、保存で確定してしまう。
-                        const totalGeneral = allExisting.reduce(
-                            (s: number, it: any) => s + (it.unitPriceGeneral || 0),
-                            0
-                        )
-                        const totalMember = allExisting.reduce(
-                            (s: number, it: any) => s + (it.unitPriceMember || 0),
-                            0
-                        )
-                        mergedItems.push({
-                            ...allExisting[0],
-                            productItem: { ...product },
-                            multiSelectVariantIds: JSON.stringify(variantIds),
-                            unitPriceGeneral: totalGeneral,
-                            unitPriceMember: totalMember,
-                        } as any)
-                    } else {
-                        const existing = allExisting[0]
-                        // セット扱いの判定は種類側の初期セット品フラグを見るため、選択中の種類も
-                        // プラン適用後のものに引き直す。保存値のままだと、プランでセット化した
-                        // 商品がこの画面でだけ満額で計上される
-                        const planAppliedVariant = existing.productVariantId
-                            ? (product.variants ?? []).find(
-                                  (v: any) => String(v.id) === String(existing.productVariantId)
-                              )
-                            : undefined
-                        mergedItems.push({
-                            ...existing,
-                            productItem: { ...product },
-                            productVariant: planAppliedVariant ?? existing.productVariant,
-                        })
-                    }
-                    continue
-                }
-                // 商品マスタから消えた商品を補った場合、種類一覧が無いこともある
-                const firstVariant = (product.variants ?? [])[0] ?? null
-                mergedItems.push({
-                    productItemId: product.id,
-                    productVariantId: firstVariant?.id ?? undefined,
-                    description: product.defaultDescription ?? '',
-                    unitPriceGeneral: firstVariant?.priceGeneral || 0,
-                    unitPriceMember: firstVariant?.priceMember || 0,
-                    qty: 0,
-                    amount: 0,
-                    sortNo: mergedItems.length,
-                    productItem: { ...product },
-                    productVariant: firstVariant,
-                })
-            }
+            // 全アクティブ品目と既存請求明細をマージする。組み立ては見積と共通の処理を使う。
+            // 以前は見積の処理を写した別物で、保存済み明細の無い商品の初期種類だけ「種類の先頭」になっており、
+            // プラン別設定の初期セット品（先頭以外の種類）が請求書でだけ効かず、見積と金額が食い違っていた
+            const isMember = !!(invoiceData as any).isMember
+            const mergedItems = buildMergedEstimateItems(
+                filteredProducts as any,
+                existingItems as any,
+                isMember,
+                false
+            ) as unknown as InvoiceItem[]
 
             const loadedFreeItems: InvoiceFreeItem[] = (invoiceData as any).freeItems || []
 
@@ -296,7 +149,11 @@ export function useInvoiceEdit(invoiceId: string, reset: UseFormReset<InvoiceFor
                 const noChargeReason = resolveNoChargeReason(item, isMember)
                 return { ...item, qty, description, amount, noChargeScope, noChargeReason }
             })
-            const activeItems = allMergedItems.filter((item) => item.qty > 0).map((item, i) => ({ ...item, sortNo: i }))
+            // 画面に表示されない行（選ばれていない親祭壇の子商品など）は、数量が残っていても保存しない
+            const isActiveRow = documentActiveRows(allMergedItems, (i) => Number(allMergedItems[i].qty) || 0)
+            const activeItems = allMergedItems
+                .filter((_, i) => isActiveRow[i])
+                .map((item, i) => ({ ...item, sortNo: i }))
             if (activeItems.length === 0) {
                 toast({
                     title: '数量が1以上の品目を少なくとも1つ入力してください',
@@ -325,7 +182,8 @@ export function useInvoiceEdit(invoiceId: string, reset: UseFormReset<InvoiceFor
                         freeItemUnitPrice({ productItemName, unitPriceGeneral, unitPriceMember }, isMember) * qty
                     return { ...item, productItemName, description, unitPriceGeneral, unitPriceMember, qty, amount }
                 })
-                .filter(isFreeItemToSave)
+                // 控室管理費などの追加行は、親商品が保存されるときだけ保存する
+                .filter((fi) => isFreeItemToSave(fi) && isFreeRowParentActive(fi, allMergedItems, isActiveRow))
                 .map((it, i) => ({ ...it, sortNo: i }))
             const totals = calculateDocumentFormTotals(
                 items,
