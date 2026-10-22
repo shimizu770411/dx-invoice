@@ -108,22 +108,21 @@ describe('verifyToken', () => {
 // requireAuth
 // -------------------------------------------------------
 describe('requireAuth', () => {
-    it('x-user-payload ヘッダがある場合、トークン検証なしで payload を返す', async () => {
-        const encoded = encodeURIComponent(JSON.stringify(PAYLOAD))
-        const req = makeRequest({ xUserPayload: encoded })
+    // proxy.ts がすり抜けられた場合に備え、外部から付けられる x-user-payload ヘッダは信用しない
+    it('x-user-payload ヘッダだけ（トークンなし）では 401 レスポンスを返す', async () => {
+        const forged = encodeURIComponent(JSON.stringify({ sub: '1', tel: '000' }))
+        const req = makeRequest({ xUserPayload: forged })
         const result = await requireAuth(req)
-        expect(result).toHaveProperty('payload')
-        expect((result as { payload: JWTPayload }).payload.sub).toBe(PAYLOAD.sub)
+        expect(result instanceof NextResponse).toBe(true)
+        expect((result as NextResponse).status).toBe(401)
     })
 
-    it('x-user-payload が壊れている場合は Bearer トークンにフォールバックする', async () => {
+    it('x-user-payload ヘッダとトークンが食い違う場合はトークンの内容を採用する', async () => {
         const token = signToken(PAYLOAD)
-        const req = makeRequest({
-            xUserPayload: '%%%invalid%%%',
-            authorization: `Bearer ${token}`,
-        })
+        const forged = encodeURIComponent(JSON.stringify({ sub: '1', tel: '000' }))
+        const req = makeRequest({ xUserPayload: forged, authorization: `Bearer ${token}` })
         const result = await requireAuth(req)
-        expect(result).toHaveProperty('payload')
+        expect((result as { payload: JWTPayload }).payload.sub).toBe(PAYLOAD.sub)
     })
 
     it('認証情報がない場合は 401 レスポンスを返す', async () => {

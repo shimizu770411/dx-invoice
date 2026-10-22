@@ -344,7 +344,7 @@ export async function readScreenTotals(page: Page): Promise<ScreenTotals> {
     return { subtotal, tax, total, membershipPaidAmount: Math.abs(membershipPaidAmount), grandTotal }
 }
 
-// 見積画面のプランを切り替える。明細が消える場合の確認には「OK」で答える
+// 見積画面のプランを切り替える
 export async function setPlan(page: Page, planName: string): Promise<void> {
     const handle = await page.evaluateHandle((name: string) => {
         return (
@@ -359,11 +359,10 @@ export async function setPlan(page: Page, planName: string): Promise<void> {
         (s, name) => Array.from(s.options).find((o) => o.textContent?.trim() === name)!.value,
         planName
     )
-    const acceptConfirm = (dialog: { accept: () => Promise<void> }) => void dialog.accept()
-    page.once('dialog', acceptConfirm)
+    // 明細が消える場合の確認は、セッション共通の設定（openSession）で「OK」になる。
+    // ここでも OK を押すと二重に応答して「既に応答済み」のエラーになる
     await select.select(value)
     await settle(page, 1500)
-    page.off('dialog', acceptConfirm)
 }
 
 // 「一般・会員」の切り替え（独自の選択欄なので、表示をクリックして選ぶ）
