@@ -191,8 +191,11 @@ type Props = {
     showSeparateFees?: boolean
     /** 備考欄の冒頭に葬儀代金〜【備考】の固定ブロックを出力する（請求書のみ） */
     showInvoiceFees?: boolean
-    /** 備考欄の最下部に出す振込先の行（請求書のみ。1行目に口座、2行目に口座名義）。未登録なら渡さない */
-    bankTransferLines?: string[]
+    /**
+     * 備考欄の最下部に固定で出す行。請求書は振込先（1行目に口座、2行目に口座名義。未登録なら渡さない）、
+     * 本見積は振込みでの支払いのお願い。入力できる備考の行数は、この行数ぶん減らしてある（DocumentOtherFields.tsx）
+     */
+    remarksFooterLines?: string[]
     /** 下部の自由入力行の単価・数量を出すか（自社情報管理の設定）。未指定なら両方出す */
     freeItemDisplay?: FreeItemDisplay
 }
@@ -618,7 +621,7 @@ export function PdfInvoiceLayout({
     hideSelectedOptions,
     showSeparateFees,
     showInvoiceFees,
-    bankTransferLines = [],
+    remarksFooterLines = [],
     freeItemDisplay = DEFAULT_FREE_ITEM_DISPLAY,
 }: Props) {
     const { docNo, membershipPaidAmount, items } = doc
@@ -1486,12 +1489,12 @@ export function PdfInvoiceLayout({
                                     <div className="whitespace-pre-wrap break-words">{doc.remarks}</div>
                                 ) : null}
                             </div>
-                            {/* 振込先は備考本文の量にかかわらず、備考欄の最下部に固定で出す。
-                                口座名義は2行目に分けて文字が小さくなりすぎないようにし、
+                            {/* 振込先（請求書）・振込みのお願い（本見積）は備考本文の量にかかわらず、備考欄の最下部に固定で出す。
+                                振込先の口座名義は2行目に分けて文字が小さくなりすぎないようにし、
                                 それでも幅に収まらない行だけ1行に収まるよう自動縮小する */}
-                            {bankTransferLines.length > 0 ? (
+                            {remarksFooterLines.length > 0 ? (
                                 <div className="mx-2 shrink-0">
-                                    {bankTransferLines.map((line, i) => (
+                                    {remarksFooterLines.map((line, i) => (
                                         <AutoFitOneLineText key={i} text={line} basePx={REMARKS_FONT_PX} />
                                     ))}
                                 </div>

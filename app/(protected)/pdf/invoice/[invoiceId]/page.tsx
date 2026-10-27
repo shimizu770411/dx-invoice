@@ -151,7 +151,7 @@ export default function InvoicePdfPage() {
                 products={products}
                 hideSelectedOptions={hideSelectedOptions}
                 showInvoiceFees
-                bankTransferLines={bankTransferLines}
+                remarksFooterLines={bankTransferLines}
                 freeItemDisplay={freeItemDisplay}
             />
         </div>

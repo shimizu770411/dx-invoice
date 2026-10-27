@@ -20,6 +20,12 @@ export const MAX_REMARKS_LENGTH = REMARKS_LINE_LENGTH * REMARKS_ROWS
 const INVOICE_BANK_TRANSFER_RESERVED_ROWS = 3
 export const INVOICE_REMARKS_ROWS = REMARKS_ROWS - INVOICE_BANK_TRANSFER_RESERVED_ROWS
 export const INVOICE_MAX_REMARKS_LENGTH = REMARKS_LINE_LENGTH * INVOICE_REMARKS_ROWS
+// 本見積は備考欄の最下部に「お支払いは振込みにてお願いします」を1行出すため、その分だけ入力できる行を減らす。
+// 実測では11行入力すると最終行が重なり、10行なら1行ぶんの余白を残して収まる。
+// 事前相談見積の備考は本見積にそのまま引き継がれるため、事前相談見積も同じ行数にそろえる
+const ESTIMATE_PAYMENT_NOTE_RESERVED_ROWS = 1
+export const ESTIMATE_REMARKS_ROWS = REMARKS_ROWS - ESTIMATE_PAYMENT_NOTE_RESERVED_ROWS
+export const ESTIMATE_MAX_REMARKS_LENGTH = REMARKS_LINE_LENGTH * ESTIMATE_REMARKS_ROWS
 // 備考欄の入力幅。実測した24文字ぶんの表示幅(約471px)にpadding/borderと安全マージンを加えた値
 export const REMARKS_TEXTAREA_MAX_WIDTH = '510px'
 

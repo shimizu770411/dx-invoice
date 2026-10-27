@@ -161,6 +161,9 @@ export function calcInvoicePaymentTotal(grandTotal: number, flowerFee?: number |
 // 請求書の備考欄の最下部に出す振込先の見出し
 export const BANK_TRANSFER_PREFIX = 'お振込先：'
 
+// 本見積の備考欄の最下部に出す、支払い方法のお願い（事前相談見積には出さない）
+export const FORMAL_ESTIMATE_PAYMENT_NOTE = 'お支払いは振込みにてお願いします'
+
 // 振込先の2行目（口座名義）を「お振込先：」の幅だけ字下げして、1行目の銀行名とそろえる
 const BANK_TRANSFER_INDENT = '　'.repeat(BANK_TRANSFER_PREFIX.length)
 
