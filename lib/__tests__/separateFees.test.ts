@@ -160,6 +160,11 @@ describe('buildInvoiceFeeLines', () => {
         expect(lines.map((l) => l.underline)).toEqual([false, true, false])
     })
 
+    it('太字・大きめの文字で目立たせるのは支払合計の行だけ', () => {
+        const lines = buildInvoiceFeeLines(834900, 12000)
+        expect(lines.map((l) => l.emphasis)).toEqual([false, false, true])
+    })
+
     it('生花代が未入力ならラベルのみで、支払合計は葬儀代金と同額', () => {
         const lines = buildInvoiceFeeLines(834900, null)
         expect(lines[1].amountText).toBe('')

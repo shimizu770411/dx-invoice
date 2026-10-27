@@ -192,6 +192,8 @@ export type InvoiceFeeLine = {
     amountText: string
     /** 次の行との間に罫線を引くか（生花代と支払合計の間に入れる） */
     underline: boolean
+    /** 太字・大きめの文字で目立たせるか（支払合計の行だけ） */
+    emphasis: boolean
 }
 
 /**
@@ -200,12 +202,13 @@ export type InvoiceFeeLine = {
  */
 export function buildInvoiceFeeLines(grandTotal: number, flowerFee?: number | null): InvoiceFeeLine[] {
     return [
-        { label: INVOICE_FEE_LABELS.funeralFee, amountText: formatFeeAmount(grandTotal), underline: false },
-        { label: INVOICE_FEE_LABELS.flowerFee, amountText: formatFeeAmount(flowerFee), underline: true },
+        { label: INVOICE_FEE_LABELS.funeralFee, amountText: formatFeeAmount(grandTotal), underline: false, emphasis: false },
+        { label: INVOICE_FEE_LABELS.flowerFee, amountText: formatFeeAmount(flowerFee), underline: true, emphasis: false },
         {
             label: INVOICE_FEE_LABELS.paymentTotal,
             amountText: formatFeeAmount(calcInvoicePaymentTotal(grandTotal, flowerFee)),
             underline: false,
+            emphasis: true,
         },
     ]
 }

@@ -1469,8 +1469,12 @@ export function PdfInvoiceLayout({
                                             <div
                                                 key={line.label}
                                                 // 生花代と支払合計の間だけ罫線を挟む。行を増やさず下線として引く
-                                                className={line.underline ? 'border-b border-black' : ''}
-                                                style={{ width: INVOICE_FEE_BLOCK_WIDTH }}
+                                                className={`${line.underline ? 'border-b border-black' : ''} ${line.emphasis ? 'font-bold' : ''}`}
+                                                style={{
+                                                    width: INVOICE_FEE_BLOCK_WIDTH,
+                                                    // 支払合計だけ備考欄の文字より2pt大きくする（明細表の差引合計額と同じ考え方）
+                                                    ...(line.emphasis ? { fontSize: 'calc(0.75rem + 2pt)' } : {}),
+                                                }}
                                             >
                                                 {line.label}：{line.amountText}
                                             </div>
