@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyToken } from './jwt'
 import { prisma } from './prisma'
+import { canManagePayment, PAYMENT_ROLE_DENIED_MESSAGE } from './paymentPermission'
 
 /**
  * JWT認証ミドルウェア
@@ -35,6 +36,28 @@ export async function requireAdmin(request: NextRequest): Promise<{ payload: any
 
     if (!user?.isAdmin) {
         return NextResponse.json({ error: '管理者権限が必要です' }, { status: 403 })
+    }
+
+    return authResult
+}
+
+/**
+ * 入金の登録・取消の権限チェック
+ * requireAuth に加えて users.role が事務員・経理・決裁者のいずれかかを確認する
+ */
+export async function requirePaymentRole(request: NextRequest): Promise<{ payload: any } | NextResponse> {
+    const authResult = await requireAuth(request)
+    if (authResult instanceof NextResponse) {
+        return authResult
+    }
+
+    const user = await prisma.user.findUnique({
+        where: { id: BigInt(authResult.payload.sub) },
+        select: { role: true },
+    })
+
+    if (!canManagePayment(user?.role)) {
+        return NextResponse.json({ error: PAYMENT_ROLE_DENIED_MESSAGE }, { status: 403 })
     }
 
     return authResult

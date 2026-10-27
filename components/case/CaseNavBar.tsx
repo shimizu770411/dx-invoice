@@ -2,8 +2,10 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { buildCaseSteps, resolveCurrentStepKey, CaseScreen, CaseStep } from '@/lib/caseProgress'
+import { canManagePayment } from '@/lib/paymentPermission'
+import { getMe } from '@/lib/auth'
 import { useCaseProgressQuery } from '@/hooks/useCaseProgress'
 import { caseStepButtonStyle } from './caseStepButtonStyle'
 import { PaymentDialog } from './PaymentDialog'
@@ -42,6 +44,8 @@ export function CaseNavBar({ customerId, current, currentEstimateId, isDirty = f
     const router = useRouter()
     const queryClient = useQueryClient()
     const { data: progress } = useCaseProgressQuery(customerId)
+    // 入金の登録・取消は事務員・経理・決裁者だけ（案件一覧と同じ判定）。ログイン情報の取得前は押せない側に倒す
+    const { data: currentUser } = useQuery({ queryKey: ['me'], queryFn: getMe })
     const [paymentOpen, setPaymentOpen] = useState(false)
     const [creatingInvoice, setCreatingInvoice] = useState(false)
 
@@ -49,7 +53,7 @@ export function CaseNavBar({ customerId, current, currentEstimateId, isDirty = f
     // 何も描かないと、届いた瞬間にバーの高さぶん画面が下にずれて入力中の位置が動く
     if (!progress) return <div style={{ height: NAV_BAR_HEIGHT }} className="mb-5" aria-hidden />
 
-    const steps = buildCaseSteps(progress)
+    const steps = buildCaseSteps(progress, canManagePayment(currentUser?.role))
 
     const currentKey = resolveCurrentStepKey(steps, current, currentEstimateId, progress.preConsultEstimateId)
 

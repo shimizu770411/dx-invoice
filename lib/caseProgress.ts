@@ -9,6 +9,8 @@
  * 一覧とバーで「請求書が押せる条件」が食い違うのを防ぐため。
  */
 
+import { PAYMENT_ROLE_DENIED_MESSAGE } from '@/lib/paymentPermission'
+
 /** 書類の有無だけで決まる状態。案件一覧の行データもそのまま渡せる形にしてある */
 export interface CaseProgressLike {
     hasEstimate: boolean
@@ -66,7 +68,11 @@ export interface CaseStep {
  * 事前相談見積のボタンは、本見積を作ったあとだけ別枠で出す。
  * 本見積を作る前は見積ボタン自体が事前相談見積を指しているため、2つ並べる意味がない。
  */
-export function buildCaseSteps(progress: CaseProgressLike): CaseStep[] {
+export function buildCaseSteps(
+    progress: CaseProgressLike,
+    /** ログイン中のユーザーが入金の登録・取消をできるか（事務員・経理・決裁者のみ。lib/paymentPermission.ts） */
+    canManagePayment: boolean
+): CaseStep[] {
     const hasFormalEstimate = progress.estimateType === 'FORMAL'
     const steps: CaseStep[] = [
         { key: 'case', group: 'edit', label: '葬儀案件', variant: 'accent', disabled: false },
@@ -104,8 +110,12 @@ export function buildCaseSteps(progress: CaseProgressLike): CaseStep[] {
         group: 'flow',
         label: progress.isPaid ? '入金取消' : '入金登録',
         variant: progress.isPaid ? 'done' : 'alert',
-        disabled: !progress.hasInvoice,
-        lockedReason: !progress.hasInvoice ? '請求書作成後に使用できます' : undefined,
+        disabled: !progress.hasInvoice || !canManagePayment,
+        lockedReason: !progress.hasInvoice
+            ? '請求書作成後に使用できます'
+            : !canManagePayment
+              ? PAYMENT_ROLE_DENIED_MESSAGE
+              : undefined,
     })
 
     steps.push({

@@ -16,6 +16,7 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCustomersQuery } from '@/hooks/useCustomer'
 import { buildCaseSteps, CaseStepKey } from '@/lib/caseProgress'
+import { canManagePayment } from '@/lib/paymentPermission'
 import { caseStepButtonStyle } from '@/components/case/caseStepButtonStyle'
 import { PaymentDialog } from '@/components/case/PaymentDialog'
 import { createInvoiceFromEstimate } from '@/lib/invoices'
@@ -96,6 +97,8 @@ export default function CasesPage() {
     const { data: customers = [], isLoading: customersLoading } = useCustomersQuery(searchParams)
     const { data: currentUser } = useQuery({ queryKey: ['me'], queryFn: getMe })
     const isAdmin = currentUser?.isAdmin === true
+    // 入金の登録・取消は事務員・経理・決裁者だけ。ログイン情報の取得前は押せない側に倒す
+    const canPay = canManagePayment(currentUser?.role)
     const formatDate = useDateFormat()
 
     const loading = customersLoading
@@ -310,7 +313,7 @@ export default function CasesPage() {
 
                         // ステップの状態（ラベル・配色・使えるかどうか）は、この一覧と各画面上部の切替バーで共通にしている。
                         // 片方だけ条件を変えると、同じ案件なのに画面によって押せるボタンが違う、という食い違いが起きる
-                        const steps = buildCaseSteps(item)
+                        const steps = buildCaseSteps(item, canPay)
                         const stepOf = (key: CaseStepKey) => steps.find((s) => s.key === key)!
                         const estStep = stepOf('estimate')
                         const invStep = stepOf('invoice')

@@ -14,12 +14,12 @@ const noDocuments = { hasEstimate: false, hasInvoice: false, isPaid: false }
 
 /** ステップを key で引く。並び順の検証とは分けて書くためのヘルパー */
 function step(progress: Parameters<typeof buildCaseSteps>[0], key: CaseStepKey) {
-    return buildCaseSteps(progress).find((s) => s.key === key)
+    return buildCaseSteps(progress, true).find((s) => s.key === key)
 }
 
 describe('操作ボタンの並び', () => {
     it('情報編集 → 見積 → 請求 → 入金 → 領収書 → 供花 の順に並ぶ', () => {
-        expect(buildCaseSteps(noDocuments).map((s) => s.key)).toEqual([
+        expect(buildCaseSteps(noDocuments, true).map((s) => s.key)).toEqual([
             'case',
             'estimate',
             'invoice',
@@ -30,7 +30,7 @@ describe('操作ボタンの並び', () => {
     })
 
     it('情報編集と供花は書類の流れとは別のまとまりにする', () => {
-        const steps = buildCaseSteps(noDocuments)
+        const steps = buildCaseSteps(noDocuments, true)
         expect(steps.find((s) => s.key === 'case')?.group).toBe('edit')
         expect(steps.find((s) => s.key === 'flowers')?.group).toBe('parallel')
         expect(steps.filter((s) => s.group === 'flow').map((s) => s.key)).toEqual([
@@ -49,7 +49,7 @@ describe('操作ボタンの並び', () => {
             hasInvoice: false,
             isPaid: false,
         }
-        expect(buildCaseSteps(withFormal).map((s) => s.key)).toEqual([
+        expect(buildCaseSteps(withFormal, true).map((s) => s.key)).toEqual([
             'case',
             'preConsultEstimate',
             'estimate',
@@ -157,6 +157,24 @@ describe('次に進めるかどうか', () => {
         expect(step(paid, 'payment')).toMatchObject({ disabled: false, label: '入金取消', variant: 'done' })
     })
 
+    it('入金を扱えないロールの人は、請求書があっても入金を押せず、理由が出る', () => {
+        const invoiced = { hasEstimate: true, estimateType: 'FORMAL' as const, hasInvoice: true, isPaid: false }
+        expect(buildCaseSteps(invoiced, false).find((s) => s.key === 'payment')).toMatchObject({
+            disabled: true,
+            label: '入金登録',
+            lockedReason: '入金の登録・取消は事務員・経理・決裁者のみ行えます',
+        })
+    })
+
+    it('入金を扱えないロールの人は、入金済みの取消も押せない', () => {
+        const paid = { hasEstimate: true, estimateType: 'FORMAL' as const, hasInvoice: true, isPaid: true }
+        expect(buildCaseSteps(paid, false).find((s) => s.key === 'payment')).toMatchObject({ disabled: true, label: '入金取消' })
+    })
+
+    it('請求書がまだ無いときは、ロールにかかわらず「請求書作成後」の理由を出す', () => {
+        expect(buildCaseSteps(noDocuments, false).find((s) => s.key === 'payment')?.lockedReason).toBe('請求書作成後に使用できます')
+    })
+
     it('情報編集と供花はいつでも押せる', () => {
         expect(step(noDocuments, 'case')?.disabled).toBe(false)
         expect(step(noDocuments, 'flowers')?.disabled).toBe(false)
@@ -182,27 +200,27 @@ describe('今いる画面がどのボタンに当たるか', () => {
     it('事前相談見積しかない案件でその見積を開いていたら、見積ボタンが現在地になる', () => {
         // 事前相談見積の別枠ボタンは本見積を作るまで並ばない。
         // 並んでいないボタンを現在地にすると、今開いている見積ボタンが押せたままになる
-        const steps = buildCaseSteps(preConsultOnly)
+        const steps = buildCaseSteps(preConsultOnly, true)
         expect(resolveCurrentStepKey(steps, 'estimate', '1', '1')).toBe('estimate')
     })
 
     it('本見積を作ったあとに事前相談見積を開いていたら、その別枠ボタンが現在地になる', () => {
-        const steps = buildCaseSteps(withFormal)
+        const steps = buildCaseSteps(withFormal, true)
         expect(resolveCurrentStepKey(steps, 'estimate', '1', '1')).toBe('preConsultEstimate')
     })
 
     it('本見積を開いていたら、見積ボタンが現在地になる', () => {
-        const steps = buildCaseSteps(withFormal)
+        const steps = buildCaseSteps(withFormal, true)
         expect(resolveCurrentStepKey(steps, 'estimate', '9', '1')).toBe('estimate')
     })
 
     it('新規作成でまだ見積IDが無くても、見積ボタンが現在地になる', () => {
-        const steps = buildCaseSteps({ hasEstimate: false, hasInvoice: false, isPaid: false })
+        const steps = buildCaseSteps({ hasEstimate: false, hasInvoice: false, isPaid: false }, true)
         expect(resolveCurrentStepKey(steps, 'estimate', undefined, null)).toBe('estimate')
     })
 
     it('見積以外の画面は、そのままその画面のボタンが現在地になる', () => {
-        const steps = buildCaseSteps(withFormal)
+        const steps = buildCaseSteps(withFormal, true)
         expect(resolveCurrentStepKey(steps, 'case')).toBe('case')
         expect(resolveCurrentStepKey(steps, 'invoice')).toBe('invoice')
         expect(resolveCurrentStepKey(steps, 'flowers')).toBe('flowers')
@@ -210,7 +228,7 @@ describe('今いる画面がどのボタンに当たるか', () => {
 
     it('現在地として返すキーは、必ず実際に並んでいるボタンのもの', () => {
         for (const progress of [preConsultOnly, withFormal]) {
-            const steps = buildCaseSteps(progress)
+            const steps = buildCaseSteps(progress, true)
             const key = resolveCurrentStepKey(steps, 'estimate', '1', '1')
             expect(steps.map((s) => s.key)).toContain(key)
         }
