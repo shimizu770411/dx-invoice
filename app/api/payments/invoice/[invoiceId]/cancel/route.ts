@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireAuth } from '@/lib/auth-middleware'
+import { requirePaymentRole } from '@/lib/auth-middleware'
 import { serializeBigInt } from '@/lib/prisma-utils'
 
 export async function POST(request: NextRequest, props: { params: Promise<{ invoiceId: string }> }) {
     const params = await props.params
     try {
-        // JWT認証
-        const authResult = await requireAuth(request)
+        // JWT認証と、入金を扱えるロール（事務員・経理・決裁者）かの確認
+        const authResult = await requirePaymentRole(request)
         if (authResult instanceof NextResponse) {
             return authResult
         }

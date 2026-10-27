@@ -12,6 +12,7 @@ import { CreateButton } from '@/components/button/CreateButton'
 import { ResetButton } from '@/components/button/ResetButton'
 import { toast } from '@/hooks/use-toast'
 import { PdfInvoiceLayout, PDF_VIEWPORT_WIDTH_PX } from '@/app/(protected)/pdf/components/PdfInvoiceLayout'
+import { estimateRemarksFooterLines } from '@/lib/separateFees'
 
 export default function EstimatePdfPage() {
     const router = useRouter()
@@ -138,6 +139,7 @@ export default function EstimatePdfPage() {
                 hideSelectedOptions={hideSelectedOptions}
                 showSeparateFees
                 freeItemDisplay={freeItemDisplay}
+                remarksFooterLines={estimateRemarksFooterLines(estimate?.estimateType)}
             />
         </div>
     )

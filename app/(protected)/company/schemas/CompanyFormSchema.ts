@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { INVOICE_MAX_REMARKS_LENGTH, MAX_REMARKS_LENGTH } from '@/components/document/DocumentOtherFields'
+import { ESTIMATE_MAX_REMARKS_LENGTH, INVOICE_MAX_REMARKS_LENGTH } from '@/components/document/DocumentOtherFields'
 
 export const companyFormSchema = z.object({
     companyNo: z.string().optional(),
@@ -34,7 +34,10 @@ export const companyFormSchema = z.object({
     pdfPromptOnExport: z.boolean(),
     pdfShowFreeItemUnitPrice: z.boolean(),
     pdfShowFreeItemQty: z.boolean(),
-    estimateRemarksDefault: z.string().max(MAX_REMARKS_LENGTH, `${MAX_REMARKS_LENGTH}文字以内で入力してください`).optional(),
+    estimateRemarksDefault: z
+        .string()
+        .max(ESTIMATE_MAX_REMARKS_LENGTH, `${ESTIMATE_MAX_REMARKS_LENGTH}文字以内で入力してください`)
+        .optional(),
     invoiceRemarksDefault: z
         .string()
         .max(INVOICE_MAX_REMARKS_LENGTH, `${INVOICE_MAX_REMARKS_LENGTH}文字以内で入力してください`)

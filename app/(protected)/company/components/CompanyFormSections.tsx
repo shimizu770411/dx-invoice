@@ -6,11 +6,11 @@ import { FormInput } from '@/components/form/FormInput'
 import { FormSelect } from '@/components/form/FormSelect'
 import { FormTextarea } from '@/components/form/FormTextarea'
 import {
+    ESTIMATE_MAX_REMARKS_LENGTH,
+    ESTIMATE_REMARKS_ROWS,
     INVOICE_MAX_REMARKS_LENGTH,
     INVOICE_REMARKS_ROWS,
-    MAX_REMARKS_LENGTH,
     REMARKS_LINE_LENGTH,
-    REMARKS_ROWS,
     REMARKS_TEXTAREA_MAX_WIDTH,
 } from '@/components/document/DocumentOtherFields'
 import { CompanyFormData } from '../schemas/CompanyFormSchema'
@@ -267,10 +267,11 @@ export function RemarksDefaultSection() {
                         name="estimateRemarksDefault"
                         control={control}
                         label="見積書"
-                        rows={REMARKS_ROWS}
-                        maxRows={REMARKS_ROWS}
+                        // 見積の備考はこの初期値から作られるため、見積の備考欄と同じ行数にそろえる
+                        rows={ESTIMATE_REMARKS_ROWS}
+                        maxRows={ESTIMATE_REMARKS_ROWS}
                         maxLineLength={REMARKS_LINE_LENGTH}
-                        maxLength={MAX_REMARKS_LENGTH}
+                        maxLength={ESTIMATE_MAX_REMARKS_LENGTH}
                         noResize
                         error={errors.estimateRemarksDefault}
                     />

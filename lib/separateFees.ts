@@ -161,6 +161,17 @@ export function calcInvoicePaymentTotal(grandTotal: number, flowerFee?: number |
 // 請求書の備考欄の最下部に出す振込先の見出し
 export const BANK_TRANSFER_PREFIX = 'お振込先：'
 
+// 見積の備考欄の最下部に出す1行。本見積は支払い方法のお願い、事前相談見積は見積の有効期限
+export const FORMAL_ESTIMATE_PAYMENT_NOTE = 'お支払いは振込みにてお願いします'
+export const PRE_CONSULTATION_VALIDITY_NOTE = '有効期限3ヶ月'
+
+/** 見積PDFの備考欄の最下部に出す行（見積の種類で決まる） */
+export function estimateRemarksFooterLines(estimateType: 'PRE_CONSULTATION' | 'FORMAL' | undefined): string[] {
+    if (estimateType === 'FORMAL') return [FORMAL_ESTIMATE_PAYMENT_NOTE]
+    if (estimateType === 'PRE_CONSULTATION') return [PRE_CONSULTATION_VALIDITY_NOTE]
+    return []
+}
+
 // 振込先の2行目（口座名義）を「お振込先：」の幅だけ字下げして、1行目の銀行名とそろえる
 const BANK_TRANSFER_INDENT = '　'.repeat(BANK_TRANSFER_PREFIX.length)
 
@@ -192,6 +203,8 @@ export type InvoiceFeeLine = {
     amountText: string
     /** 次の行との間に罫線を引くか（生花代と支払合計の間に入れる） */
     underline: boolean
+    /** 太字・大きめの文字で目立たせるか（支払合計の行だけ） */
+    emphasis: boolean
 }
 
 /**
@@ -200,12 +213,13 @@ export type InvoiceFeeLine = {
  */
 export function buildInvoiceFeeLines(grandTotal: number, flowerFee?: number | null): InvoiceFeeLine[] {
     return [
-        { label: INVOICE_FEE_LABELS.funeralFee, amountText: formatFeeAmount(grandTotal), underline: false },
-        { label: INVOICE_FEE_LABELS.flowerFee, amountText: formatFeeAmount(flowerFee), underline: true },
+        { label: INVOICE_FEE_LABELS.funeralFee, amountText: formatFeeAmount(grandTotal), underline: false, emphasis: false },
+        { label: INVOICE_FEE_LABELS.flowerFee, amountText: formatFeeAmount(flowerFee), underline: true, emphasis: false },
         {
             label: INVOICE_FEE_LABELS.paymentTotal,
             amountText: formatFeeAmount(calcInvoicePaymentTotal(grandTotal, flowerFee)),
             underline: false,
+            emphasis: true,
         },
     ]
 }

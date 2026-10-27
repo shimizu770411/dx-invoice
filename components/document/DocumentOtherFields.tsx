@@ -7,19 +7,26 @@ import { FormSelect } from '@/components/form/FormSelect'
 import { FormTextarea } from '@/components/form/FormTextarea'
 import type { DocumentFormData } from './DocumentItemTable'
 
-// PDF出力時の備考欄1行の折り返し文字数（例:「【別料金】　・火葬料金：１２３４５６７８９０１２」）
+// PDF出力時の備考欄1行の折り返し文字数（例:「【別料金】　・火葬料金：１２３４５６７８９０１２」）。
+// 入力欄は全角・半角を問わず1文字と数えるため、PDF側は全角24文字が1行に収まる幅を確保している（PdfInvoiceLayout.tsx）
 export const REMARKS_LINE_LENGTH = 24
 // PDF側が備考欄の冒頭に固定出力する行数。
 // 見積書は【別料金】〜【備考】、請求書は葬儀代金〜【備考】で、どちらも4行
 export const REMARKS_FIXED_BLOCK_ROWS = 4
-// 備考欄の表示行数と文字数上限。固定出力するぶん、入力欄はその行数を差し引いた高さにする
+// 備考欄の表示行数。固定出力するぶん、入力欄はその行数を差し引いた高さにする。
+// 見積・請求書とも、ここからさらに最下部の固定行のぶんを減らした行数を使う（下記）
 export const REMARKS_ROWS = 15 - REMARKS_FIXED_BLOCK_ROWS
-export const MAX_REMARKS_LENGTH = REMARKS_LINE_LENGTH * REMARKS_ROWS
 // 請求書は備考欄の最下部に振込先（口座1行＋口座名義1行）を出すため、その分だけ入力できる行を減らす。
 // 振込先2行とその上の余白で、実測では備考本文3行ぶんの高さを使う（11行入力すると9行目以降が振込先と重なる）
 const INVOICE_BANK_TRANSFER_RESERVED_ROWS = 3
 export const INVOICE_REMARKS_ROWS = REMARKS_ROWS - INVOICE_BANK_TRANSFER_RESERVED_ROWS
 export const INVOICE_MAX_REMARKS_LENGTH = REMARKS_LINE_LENGTH * INVOICE_REMARKS_ROWS
+// 見積は備考欄の最下部に1行出す（本見積は「お支払いは振込みにてお願いします」、事前相談見積は「有効期限3ヶ月」）ため、
+// その分だけ入力できる行を減らす。実測では11行入力すると最終行が重なり、10行なら1行ぶんの余白を残して収まる。
+// 事前相談見積の備考は本見積にそのまま引き継がれるため、どちらも同じ行数にしておく必要がある
+const ESTIMATE_FOOTER_RESERVED_ROWS = 1
+export const ESTIMATE_REMARKS_ROWS = REMARKS_ROWS - ESTIMATE_FOOTER_RESERVED_ROWS
+export const ESTIMATE_MAX_REMARKS_LENGTH = REMARKS_LINE_LENGTH * ESTIMATE_REMARKS_ROWS
 // 備考欄の入力幅。実測した24文字ぶんの表示幅(約471px)にpadding/borderと安全マージンを加えた値
 export const REMARKS_TEXTAREA_MAX_WIDTH = '510px'
 
