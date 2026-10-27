@@ -193,7 +193,7 @@ type Props = {
     showInvoiceFees?: boolean
     /**
      * 備考欄の最下部に固定で出す行。請求書は振込先（1行目に口座、2行目に口座名義。未登録なら渡さない）、
-     * 本見積は振込みでの支払いのお願い。入力できる備考の行数は、この行数ぶん減らしてある（DocumentOtherFields.tsx）
+     * 本見積は振込みでの支払いのお願い、事前相談見積は有効期限。入力できる備考の行数は、この行数ぶん減らしてある（DocumentOtherFields.tsx）
      */
     remarksFooterLines?: string[]
     /** 下部の自由入力行の単価・数量を出すか（自社情報管理の設定）。未指定なら両方出す */
@@ -1454,9 +1454,12 @@ export function PdfInvoiceLayout({
                             </table>
                         </div>
                         {/* 調整 */}
-                        <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-b border-black px-1 text-[0.75rem]">
+                        {/* 備考は入力画面で1行 REMARKS_LINE_LENGTH（24）文字まで入るため、全角24文字（12px×24＝288px）が
+                            1行に収まる幅が要る。左右とも余白を取ると約279pxで最後の1文字が折り返すので、
+                            見た目に影響しない右側の余白だけ外す（左の字下げはそのまま） */}
+                        <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-b border-black pl-1 text-[0.75rem]">
                             <div>(備考)</div>
-                            <div className="mx-2 min-h-0 flex-1 overflow-hidden">
+                            <div className="ml-2 min-h-0 flex-1 overflow-hidden">
                                 {showSeparateFees && (
                                     <div className="whitespace-pre-wrap break-words">
                                         {buildSeparateFeesText(doc)}
@@ -1489,7 +1492,7 @@ export function PdfInvoiceLayout({
                                     <div className="whitespace-pre-wrap break-words">{doc.remarks}</div>
                                 ) : null}
                             </div>
-                            {/* 振込先（請求書）・振込みのお願い（本見積）は備考本文の量にかかわらず、備考欄の最下部に固定で出す。
+                            {/* 振込先（請求書）・振込みのお願い（本見積）・有効期限（事前相談見積）は備考本文の量にかかわらず、備考欄の最下部に固定で出す。
                                 振込先の口座名義は2行目に分けて文字が小さくなりすぎないようにし、
                                 それでも幅に収まらない行だけ1行に収まるよう自動縮小する */}
                             {remarksFooterLines.length > 0 ? (

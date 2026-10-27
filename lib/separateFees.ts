@@ -161,8 +161,16 @@ export function calcInvoicePaymentTotal(grandTotal: number, flowerFee?: number |
 // 請求書の備考欄の最下部に出す振込先の見出し
 export const BANK_TRANSFER_PREFIX = 'お振込先：'
 
-// 本見積の備考欄の最下部に出す、支払い方法のお願い（事前相談見積には出さない）
+// 見積の備考欄の最下部に出す1行。本見積は支払い方法のお願い、事前相談見積は見積の有効期限
 export const FORMAL_ESTIMATE_PAYMENT_NOTE = 'お支払いは振込みにてお願いします'
+export const PRE_CONSULTATION_VALIDITY_NOTE = '有効期限3ヶ月'
+
+/** 見積PDFの備考欄の最下部に出す行（見積の種類で決まる） */
+export function estimateRemarksFooterLines(estimateType: 'PRE_CONSULTATION' | 'FORMAL' | undefined): string[] {
+    if (estimateType === 'FORMAL') return [FORMAL_ESTIMATE_PAYMENT_NOTE]
+    if (estimateType === 'PRE_CONSULTATION') return [PRE_CONSULTATION_VALIDITY_NOTE]
+    return []
+}
 
 // 振込先の2行目（口座名義）を「お振込先：」の幅だけ字下げして、1行目の銀行名とそろえる
 const BANK_TRANSFER_INDENT = '　'.repeat(BANK_TRANSFER_PREFIX.length)

@@ -18,7 +18,7 @@ export function EstimateOtherFields({ control, disabled }: Props) {
             control={control as unknown as Control<DocumentFormData>}
             disabled={disabled}
             estimateStaffLabel="本見積担当"
-            // 本見積PDFは備考欄の最下部に支払い方法のお願いを出すため、入力できる行を少なくする
+            // 見積PDFは備考欄の最下部に1行（本見積は支払い方法のお願い、事前相談見積は有効期限）を出すため、入力できる行を少なくする
             remarksRows={ESTIMATE_REMARKS_ROWS}
             preConsultStaffSlot={
                 <FormInput

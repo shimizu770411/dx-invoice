@@ -5,7 +5,22 @@ import {
     buildInvoiceFeeLines,
     calcInvoicePaymentTotal,
     buildBankTransferLines,
+    estimateRemarksFooterLines,
 } from '../separateFees'
+
+describe('estimateRemarksFooterLines', () => {
+    it('本見積は振込みでのお支払いのお願いを1行出す', () => {
+        expect(estimateRemarksFooterLines('FORMAL')).toEqual(['お支払いは振込みにてお願いします'])
+    })
+
+    it('事前相談見積は有効期限を1行出す', () => {
+        expect(estimateRemarksFooterLines('PRE_CONSULTATION')).toEqual(['有効期限3ヶ月'])
+    })
+
+    it('見積の種類が分からない（読み込み前）ときは何も出さない', () => {
+        expect(estimateRemarksFooterLines(undefined)).toEqual([])
+    })
+})
 
 // 従来、備考欄に自動入力されていた文言そのもの
 const LEGACY_BLOCK = '【別料金】 ・火葬料金：\n　　　　　 ・お布施：\n　　　　　 ・新聞広告：\n【備考】'
