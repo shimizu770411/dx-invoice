@@ -209,6 +209,9 @@ type Props = {
 const INVOICE_FEE_BLOCK_WIDTH = '83%'
 // 備考欄の文字サイズ（text-[0.75rem] と一致させる）。振込先の自動縮小の基準に使う
 const REMARKS_FONT_PX = 12
+// 受付Noのうち大きく出す末尾の桁数と、その文字サイズ（他の部分の0.8remから4段階上げた大きさ）
+const DOC_NO_EMPHASIS_DIGITS = 3
+const DOC_NO_EMPHASIS_FONT_SIZE = '1.25rem'
 
 // ──────────────────────────────────────────────────────────
 // テーブル行ビルダー
@@ -986,7 +989,14 @@ export function PdfInvoiceLayout({
                     </h1>
                     <div className="flex justify-end">
                         <div className="whitespace-nowrap border-b border-black pb-[2px] align-bottom text-[0.8rem] leading-none tracking-tight">
-                            受付No.{docNo ? ` ${docNo}` : ''}
+                            受付No.
+                            {docNo ? (
+                                <>
+                                    {` ${docNo.slice(0, -DOC_NO_EMPHASIS_DIGITS)}`}
+                                    {/* 下3桁は案件の見分けに使うため、他より大きく出す */}
+                                    <span style={{ fontSize: DOC_NO_EMPHASIS_FONT_SIZE }}>{docNo.slice(-DOC_NO_EMPHASIS_DIGITS)}</span>
+                                </>
+                            ) : null}
                         </div>
                     </div>
                 </div>
