@@ -13,6 +13,7 @@ import { CreateButton } from '@/components/button/CreateButton'
 import { ResetButton } from '@/components/button/ResetButton'
 import { toast } from '@/hooks/use-toast'
 import { PdfInvoiceLayout, PDF_VIEWPORT_WIDTH_PX } from '@/app/(protected)/pdf/components/PdfInvoiceLayout'
+import { buildInvoicePaymentStamp } from '@/lib/invoicePaymentStamp'
 
 export default function InvoicePdfPage() {
     const router = useRouter()
@@ -152,6 +153,7 @@ export default function InvoicePdfPage() {
                 hideSelectedOptions={hideSelectedOptions}
                 showInvoiceFees
                 remarksFooterLines={bankTransferLines}
+                paymentStamp={buildInvoicePaymentStamp(invoice)}
                 freeItemDisplay={freeItemDisplay}
             />
         </div>

@@ -7,6 +7,7 @@ import { assertLocalEnvironment, BASE_URL } from './helpers/env'
 import { gotoAndSettle, openSession, type Session } from './helpers/session'
 import { cleanupTestCases, createTestCase } from './helpers/testData'
 import { save, setChecked } from './helpers/itemTable'
+import { findPlainProduct, loadMaster } from './helpers/masterLookup'
 
 // 指定したロールの有効なユーザーとしてAPIを呼ぶ
 async function callAs(role: string, path: string, body: unknown) {
@@ -34,7 +35,10 @@ describe('入金の登録・取消の権限', () => {
         const page = await session.newPage()
         const customerId = await createTestCase(session, '入金権限')
         await gotoAndSettle(page, `/estimates/new?customerId=${customerId}`)
-        await setChecked(page, '式場祭壇', true)
+        // 品目0件は保存できないため、ふつうの商品を1つ入れる（商品名は決め打ちせず、その時のマスタから探す）
+        const plain = findPlainProduct(await loadMaster(session))
+        if (!plain) throw new Error('E2E: 今の商品マスタに、ふつうの商品（特別な設定の無い一般商品）がありません')
+        await setChecked(page, plain, true)
         const preId = await save(page)
         const formal = await session.api('POST', `/estimates/${preId}/confirm`)
         const invoice = await session.api('POST', `/invoices/customers/${customerId}/from-estimate/${formal.json.id}`)

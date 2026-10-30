@@ -60,6 +60,7 @@ export function UserFormDialog({
                     role: user.role ?? 'STAFF',
                     isAdmin: user.isAdmin ?? false,
                     requirePasswordChange: user.requirePasswordChange ?? false,
+                    sealImageUrl: user.sealImageUrl ?? '',
                 })
             } else {
                 reset(DEFAULT_FORM_VALUES)

@@ -17,10 +17,17 @@ import {
 } from './helpers/itemTable'
 import { readSaved } from './helpers/documents'
 import { saveAndExpectConsistent } from './helpers/assertions'
+import {
+    findLinkedFreeRowProduct,
+    findMultiRowWithFixed,
+    findParentAltar,
+    findPlainProduct,
+    loadMaster,
+    need,
+    type MultiRowProduct,
+} from './helpers/masterLookup'
 
-const PARENT_ALTAR = '式場祭壇'
-const MULTI_ROW_WITH_FIXED = '会葬礼状'
-const WITH_LINKED_FREE_ROW = '控室管理費'
+// 連動処理を持つ商品は、商品名ではなく役割でその時の商品マスタから探す（helpers/masterLookup.ts）
 const EXECUTION_SURCHARGE_ROW = '施行割増券'
 const NEGATIVE_FREE_ROW = 'E2E値引'
 
@@ -30,6 +37,8 @@ describe('請求書画面: チェックの付け外し', () => {
     let pdfPage: Page
     let formalEstimateId = ''
     let invoiceId = ''
+    let withFixed: MultiRowProduct | null = null
+    let linkedFree: string | null = null
 
     beforeAll(async () => {
         assertLocalEnvironment()
@@ -38,10 +47,19 @@ describe('請求書画面: チェックの付け外し', () => {
         pdfPage = await session.newPage()
         const customerId = await createTestCase(session, '請求')
 
-        // 事前相談見積を画面から作り、本見積 → 請求書の順に画面と同じAPIで作る
+        const master = await loadMaster(session)
+        const anchor = findPlainProduct(master)
+        if (!anchor) throw new Error('E2E: 今の商品マスタに、下支えに使えるふつうの商品（特別な設定の無い一般商品）がありません')
+        const parentAltar = findParentAltar(master)?.name ?? null
+        withFixed = findMultiRowWithFixed(master)
+        linkedFree = findLinkedFreeRowProduct(master)
+
+        // 事前相談見積を画面から作り、本見積 → 請求書の順に画面と同じAPIで作る。
+        // 品目0件では保存できないため、ふつうの商品を必ず1つ入れる（プランの初期セット品には頼らない）
         await gotoAndSettle(page, `/estimates/new?customerId=${customerId}`)
-        await setChecked(page, PARENT_ALTAR, true)
-        await setChecked(page, WITH_LINKED_FREE_ROW, true)
+        await setChecked(page, anchor, true)
+        if (parentAltar) await setChecked(page, parentAltar, true)
+        if (linkedFree) await setChecked(page, linkedFree, true)
         const preId = await save(page)
         const formal = await session.api('POST', `/estimates/${preId}/confirm`)
         if (formal.status !== 200) throw new Error(`E2E: 本見積を作成できません (${formal.status})`)
@@ -73,7 +91,9 @@ describe('請求書画面: チェックの付け外し', () => {
         expect(pick(screen), '請求書を開いた画面の合計と保存値').toEqual(pick(invoice))
     })
 
-    it('8. 請求書画面で付け外ししても、画面・保存値・PDFの合計が一致する', async () => {
+    it('8. 請求書画面で付け外ししても、画面・保存値・PDFの合計が一致する', async (ctx) => {
+        const MULTI_ROW_WITH_FIXED = need(ctx, withFixed, '固定料金の行を持つ複数行商品').name
+        const WITH_LINKED_FREE_ROW = need(ctx, linkedFree, '追加行を持つ商品')
         const before = await readScreenTotals(page)
         await setChecked(page, MULTI_ROW_WITH_FIXED, true)
         await setChecked(page, MULTI_ROW_WITH_FIXED, false)

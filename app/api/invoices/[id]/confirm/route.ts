@@ -54,9 +54,9 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
                 role === 'CLERK' ? { clerkConfirmedAt: nextAt, clerkConfirmedById: nextById } :
                 { approverConfirmedAt: nextAt, approverConfirmedById: nextById },
             include: {
-                staffConfirmedBy: { select: { id: true, name: true } },
-                clerkConfirmedBy: { select: { id: true, name: true } },
-                approverConfirmedBy: { select: { id: true, name: true } },
+                staffConfirmedBy: { select: { id: true, name: true, sealImageUrl: true } },
+                clerkConfirmedBy: { select: { id: true, name: true, sealImageUrl: true } },
+                approverConfirmedBy: { select: { id: true, name: true, sealImageUrl: true } },
             },
         })
 
@@ -65,15 +65,15 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
                 id: updated.id.toString(),
                 staffConfirmedAt: updated.staffConfirmedAt,
                 staffConfirmedBy: updated.staffConfirmedBy
-                    ? { id: updated.staffConfirmedBy.id.toString(), name: updated.staffConfirmedBy.name }
+                    ? { id: updated.staffConfirmedBy.id.toString(), name: updated.staffConfirmedBy.name, sealImageUrl: updated.staffConfirmedBy.sealImageUrl }
                     : null,
                 clerkConfirmedAt: updated.clerkConfirmedAt,
                 clerkConfirmedBy: updated.clerkConfirmedBy
-                    ? { id: updated.clerkConfirmedBy.id.toString(), name: updated.clerkConfirmedBy.name }
+                    ? { id: updated.clerkConfirmedBy.id.toString(), name: updated.clerkConfirmedBy.name, sealImageUrl: updated.clerkConfirmedBy.sealImageUrl }
                     : null,
                 approverConfirmedAt: updated.approverConfirmedAt,
                 approverConfirmedBy: updated.approverConfirmedBy
-                    ? { id: updated.approverConfirmedBy.id.toString(), name: updated.approverConfirmedBy.name }
+                    ? { id: updated.approverConfirmedBy.id.toString(), name: updated.approverConfirmedBy.name, sealImageUrl: updated.approverConfirmedBy.sealImageUrl }
                     : null,
             })
         )

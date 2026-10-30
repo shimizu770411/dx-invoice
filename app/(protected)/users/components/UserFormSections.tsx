@@ -3,7 +3,8 @@
 import { Controller, useFormContext } from 'react-hook-form'
 import { FormInput } from '@/components/form/FormInput'
 import { UserFormData, USER_ROLES } from '../schemas/UserFormSchema'
-import { USER_ROLE_LABELS, UserRole } from '@/lib/users'
+import { USER_ROLE_LABELS, UserRole, uploadUserSealImage } from '@/lib/users'
+import { SealImageInput } from '@/components/form/SealImageInput'
 
 interface UserFormSectionsProps {
     isEditing: boolean
@@ -200,6 +201,28 @@ export function UserFormSections({ isEditing, canEditRole }: UserFormSectionsPro
                         : '※ システム管理者フラグの変更はシステム管理者のみ行えます'}
                 </p>
             </div>
+
+            {/* 印影（システム管理者のみ登録・変更できる） */}
+            {canEditRole && (
+                <div>
+                    <label className="brand-label" style={{ display: 'block', marginBottom: '8px' }}>
+                        印影
+                    </label>
+                    <Controller
+                        name="sealImageUrl"
+                        control={control}
+                        render={({ field }) => (
+                            <SealImageInput value={field.value ?? ''} onChange={field.onChange} upload={uploadUserSealImage} label="印影" />
+                        )}
+                    />
+                    <p
+                        className="mt-1 font-mincho"
+                        style={{ fontSize: '12px', color: 'var(--brand-text-muted)', letterSpacing: '0.05em' }}
+                    >
+                        ※ 請求書の確認ボタンを押したとき、請求書PDFの押印欄にこの印影が出ます（背景が透明なPNG・WebP）
+                    </p>
+                </div>
+            )}
         </div>
     )
 }

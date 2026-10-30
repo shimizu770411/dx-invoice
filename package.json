@@ -12,6 +12,7 @@
         "test:watch": "vitest",
         "test:coverage": "vitest run --coverage",
         "test:e2e": "vitest run -c vitest.e2e.config.mts",
+        "test:e2e:invariants": "vitest run -c vitest.invariants.config.mts",
         "postinstall": "pnpm db:generate",
         "prebuild": "pnpm db:generate && pnpm db:migrate:deploy",
         "build:check": "pnpm build && node scripts/check-build.js",

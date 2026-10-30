@@ -4,6 +4,8 @@ import type { UserRole } from './users';
 export interface InvoiceConfirmedBy {
     id: string
     name: string
+    /** 確認した人の印影。請求書PDFの押印欄に出す（未登録なら null） */
+    sealImageUrl?: string | null
 }
 
 export interface InvoiceFreeItem {
@@ -72,6 +74,8 @@ export interface Invoice {
     freeItems?: InvoiceFreeItem[]
     customer?: any
     isPaid?: boolean
+    /** 入金日（入金済みのときだけ）。請求書PDFの入金欄に出す */
+    paidAt?: string | null
     staffConfirmedAt?: string | null
     staffConfirmedBy?: InvoiceConfirmedBy | null
     clerkConfirmedAt?: string | null

@@ -22,6 +22,8 @@ import {
     DITTO_MARK,
 } from '@/lib/customerPayer'
 import { useDateFormat } from '@/hooks/useDateFormat'
+import type { InvoicePaymentStamp } from '@/lib/invoicePaymentStamp'
+import { PdfPaymentStampBox } from './PdfPaymentStampBox'
 import {
     DEFAULT_FREE_ITEM_DISPLAY,
     FreeItemDisplay,
@@ -196,6 +198,8 @@ type Props = {
      * 本見積は振込みでの支払いのお願い、事前相談見積は有効期限。入力できる備考の行数は、この行数ぶん減らしてある（DocumentOtherFields.tsx）
      */
     remarksFooterLines?: string[]
+    /** 備考欄の一番下（振込先の下）に出す入金欄・押印欄（請求書のみ） */
+    paymentStamp?: InvoicePaymentStamp
     /** 下部の自由入力行の単価・数量を出すか（自社情報管理の設定）。未指定なら両方出す */
     freeItemDisplay?: FreeItemDisplay
 }
@@ -205,6 +209,9 @@ type Props = {
 const INVOICE_FEE_BLOCK_WIDTH = '83%'
 // 備考欄の文字サイズ（text-[0.75rem] と一致させる）。振込先の自動縮小の基準に使う
 const REMARKS_FONT_PX = 12
+// 受付Noのうち大きく出す末尾の桁数と、その文字サイズ（他の部分の0.8remから2段階上げた大きさ）
+const DOC_NO_EMPHASIS_DIGITS = 3
+const DOC_NO_EMPHASIS_FONT_SIZE = '1rem'
 
 // ──────────────────────────────────────────────────────────
 // テーブル行ビルダー
@@ -622,6 +629,7 @@ export function PdfInvoiceLayout({
     showSeparateFees,
     showInvoiceFees,
     remarksFooterLines = [],
+    paymentStamp,
     freeItemDisplay = DEFAULT_FREE_ITEM_DISPLAY,
 }: Props) {
     const { docNo, membershipPaidAmount, items } = doc
@@ -981,7 +989,14 @@ export function PdfInvoiceLayout({
                     </h1>
                     <div className="flex justify-end">
                         <div className="whitespace-nowrap border-b border-black pb-[2px] align-bottom text-[0.8rem] leading-none tracking-tight">
-                            受付No.{docNo ? ` ${docNo}` : ''}
+                            受付No.
+                            {docNo ? (
+                                <>
+                                    {` ${docNo.slice(0, -DOC_NO_EMPHASIS_DIGITS)}`}
+                                    {/* 下3桁は案件の見分けに使うため、他より大きく出す */}
+                                    <span style={{ fontSize: DOC_NO_EMPHASIS_FONT_SIZE }}>{docNo.slice(-DOC_NO_EMPHASIS_DIGITS)}</span>
+                                </>
+                            ) : null}
                         </div>
                     </div>
                 </div>
@@ -1500,6 +1515,12 @@ export function PdfInvoiceLayout({
                                     {remarksFooterLines.map((line, i) => (
                                         <AutoFitOneLineText key={i} text={line} basePx={REMARKS_FONT_PX} />
                                     ))}
+                                </div>
+                            ) : null}
+                            {/* 入金欄・押印欄（請求書のみ）。振込先の下、備考欄の一番下に固定で出す */}
+                            {paymentStamp ? (
+                                <div className="ml-2 mr-1 mb-1 shrink-0">
+                                    <PdfPaymentStampBox stamp={paymentStamp} formatDate={formatDate} />
                                 </div>
                             ) : null}
                         </div>

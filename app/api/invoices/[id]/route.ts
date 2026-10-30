@@ -53,12 +53,13 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
                     },
                     orderBy: { sortNo: 'asc' },
                 },
-                staffConfirmedBy: { select: { id: true, name: true } },
-                clerkConfirmedBy: { select: { id: true, name: true } },
-                approverConfirmedBy: { select: { id: true, name: true } },
+                staffConfirmedBy: { select: { id: true, name: true, sealImageUrl: true } },
+                clerkConfirmedBy: { select: { id: true, name: true, sealImageUrl: true } },
+                approverConfirmedBy: { select: { id: true, name: true, sealImageUrl: true } },
+                // 入金は追記式の記録（入金済み／取消）で、最新の記録が入金済みなら入金済み
                 payments: {
                     where: { targetType: 'INVOICE' },
-                    orderBy: { createdAt: 'desc' },
+                    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
                     take: 1,
                 },
             },
@@ -69,6 +70,8 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
         }
 
         const isPaid = invoice.payments[0]?.status === 'PAID'
+        // 請求書PDFの入金欄に出す入金日。入金済みのときだけ返す
+        const paidAt = isPaid ? invoice.payments[0].paidAt : null
 
         // 会費入金額を計算
         const membershipPaidAmount = sumMembershipPaidAmount(invoice.customer.memberships)
@@ -99,6 +102,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
                 },
                 membershipPaidAmount,
                 isPaid,
+                paidAt,
                 payments: undefined,
                 freeItems: allFreeItems,
                 items: invoice.items.map((item: any) => ({

@@ -8,6 +8,7 @@ import { assertLocalEnvironment } from './helpers/env'
 import { gotoAndSettle, openSession, type Session } from './helpers/session'
 import { cleanupTestCases, createTestCase } from './helpers/testData'
 import {
+    clickSaveExpectingRefusal,
     fillFreeRow,
     fillLinkedFreeRow,
     getLinkedFreeRow,
@@ -22,15 +23,22 @@ import {
 } from './helpers/itemTable'
 import { readPdf, readSaved } from './helpers/documents'
 import { saveAndExpectConsistent } from './helpers/assertions'
+import {
+    findLinkedFreeRowProduct,
+    findMultiRowWithFixed,
+    findParentAltar,
+    findPlainProduct,
+    findVariantGroupProduct,
+    loadMaster,
+    need,
+    type MultiRowProduct,
+    type ParentAltar,
+    type VariantGroupProduct,
+} from './helpers/masterLookup'
 
-// ローカルの商品マスタにある、連動処理を持つ商品
-const PARENT_ALTAR = '式場祭壇'
-const SET_CHILDREN = ['棺', '納棺用品一式', '骨壺', '寝台車']
-const MULTI_ROW_WITH_FIXED = '会葬礼状' // 「礼状版代（固定）」の固定料金行を持つ
-const MULTI_ROW_CHILD = '霊柩車' // 親祭壇の子で、車種（固定）＋距離加算の2行
-const WITH_LINKED_FREE_ROW = '控室管理費'
-const VARIANT_GROUP = '重箱'
+// 連動処理を持つ商品は、商品名ではなく役割でその時の商品マスタから探す（helpers/masterLookup.ts）
 const NEGATIVE_FREE_ROW = 'E2E値引'
+const NO_ITEMS_MESSAGE = '数量が1以上の品目を少なくとも1つ入力してください'
 // 明細の合計を確実に上回るマイナス額
 const BEYOND_ALL_ITEMS = 10_000_000
 
@@ -39,12 +47,24 @@ describe('見積画面: チェックの付け外し', () => {
     let page: Page
     let pdfPage: Page
     let estimateId = ''
+    // 役割ごとに、その時の商品マスタから探した商品（無ければ null。使うテストは理由を出して飛ばす）
+    let anchor: string | null = null
+    let parent: ParentAltar | null = null
+    let withFixed: MultiRowProduct | null = null
+    let linkedFree: string | null = null
+    let group: VariantGroupProduct | null = null
 
     beforeAll(async () => {
         assertLocalEnvironment()
         session = await openSession()
         page = await session.newPage()
         pdfPage = await session.newPage()
+        const master = await loadMaster(session)
+        anchor = findPlainProduct(master)
+        parent = findParentAltar(master)
+        withFixed = findMultiRowWithFixed(master)
+        linkedFree = findLinkedFreeRowProduct(master)
+        group = findVariantGroupProduct(master)
         const customerId = await createTestCase(session, '見積')
         await gotoAndSettle(page, `/estimates/new?customerId=${customerId}`)
     })
@@ -54,12 +74,20 @@ describe('見積画面: チェックの付け外し', () => {
         await cleanupTestCases()
     })
 
-    it('1. 新規作成直後の状態で登録しても、画面・保存値・PDFの合計が一致する', async () => {
+    // 以前は「新規作成直後のまま登録しても一致する」を確かめていたが、それはプランの初期セット品が自動で入る
+    // 前提に頼っていた（2026-10-20 に本番で初期セット品が外れて前提が崩れた）。品目0件は保存できない仕様なので、
+    // それを確かめたうえで、ふつうの商品を1つ入れて登録する
+    it('1. 品目が1つも無いと登録できず、ふつうの商品を1つ入れると登録でき、画面・保存値・PDFの合計が一致する', async (ctx) => {
+        const plain = need(ctx, anchor, 'ふつうの商品（特別な設定の無い一般商品）')
+        await clickSaveExpectingRefusal(page, NO_ITEMS_MESSAGE)
+        await setChecked(page, plain, true)
         const { id } = await saveAndExpectConsistent(session, page, pdfPage, 'estimate', '新規登録')
         estimateId = id
     })
 
-    it('2. 親祭壇にチェックすると子のセット商品も数量1でチェックされ、外すと子も数量0に戻る', async () => {
+    it('2. 親祭壇にチェックすると子のセット商品も数量1でチェックされ、外すと子も数量0に戻る', async (ctx) => {
+        const { name: PARENT_ALTAR, children: SET_CHILDREN, multiRowChild } = need(ctx, parent, '子商品を持つ親祭壇')
+        const MULTI_ROW_CHILD = need(ctx, multiRowChild, '親祭壇の子で複数行の商品')
         await setChecked(page, PARENT_ALTAR, true)
         for (const child of SET_CHILDREN) {
             expect(await isChecked(page, child), `${child} が連動してチェックされる`).toBe(true)
@@ -79,7 +107,8 @@ describe('見積画面: チェックの付け外し', () => {
         await saveAndExpectConsistent(session, page, pdfPage, 'estimate', '親祭壇あり')
     })
 
-    it('3. 固定料金の行を持つ商品は、チェックを外すと全行が数量0になり合計からも消える', async () => {
+    it('3. 固定料金の行を持つ商品は、チェックを外すと全行が数量0になり合計からも消える', async (ctx) => {
+        const MULTI_ROW_WITH_FIXED = need(ctx, withFixed, '固定料金の行を持つ複数行商品').name
         const before = await readScreenTotals(page)
         await setChecked(page, MULTI_ROW_WITH_FIXED, true)
         const qtysChecked = await getQtys(page, MULTI_ROW_WITH_FIXED)
@@ -94,7 +123,8 @@ describe('見積画面: チェックの付け外し', () => {
         await saveAndExpectConsistent(session, page, pdfPage, 'estimate', '固定料金の行を外した後')
     })
 
-    it('4. 追加行を持つ商品は、チェックで追加行が出て、外すと追加行の数量が0になり保存にも残らない', async () => {
+    it('4. 追加行を持つ商品は、チェックで追加行が出て、外すと追加行の数量が0になり保存にも残らない', async (ctx) => {
+        const WITH_LINKED_FREE_ROW = need(ctx, linkedFree, '追加行を持つ商品')
         await setChecked(page, WITH_LINKED_FREE_ROW, true)
         expect(await getLinkedFreeRow(page, WITH_LINKED_FREE_ROW), '追加行が出る').not.toBeNull()
         await fillLinkedFreeRow(page, WITH_LINKED_FREE_ROW, { name: 'E2E追加', qty: 2, general: 5000, member: 4000 })
@@ -113,16 +143,17 @@ describe('見積画面: チェックの付け外し', () => {
         expect(remaining, '数量1以上の追加行が残らない').toHaveLength(0)
     })
 
-    it('5. 種類のグループで選ぶ商品を数量2にしても、画面・保存値・PDFの合計が一致する', async () => {
+    it('5. 種類のグループで選ぶ商品を数量2にしても、画面・保存値・PDFの合計が一致する', async (ctx) => {
+        const { name: VARIANT_GROUP, baseVariant, otherVariant } = need(ctx, group, '種類をグループで選ぶ商品')
         await setChecked(page, VARIANT_GROUP, true)
-        await pickVariants(page, VARIANT_GROUP, ['Cセット', '49日もち'])
+        await pickVariants(page, VARIANT_GROUP, [baseVariant, otherVariant])
         await setQty(page, VARIANT_GROUP, 2)
         await saveAndExpectConsistent(session, page, pdfPage, 'estimate', 'グループ商品を数量2')
         // 開き直した画面でも数量2のまま（保存時に1へ戻されていないこと）
         expect((await getQtys(page, VARIANT_GROUP))[0], '開き直した後の数量').toBe(2)
         // PDFでも選んだ種類の行に数量が出る
         const pdfText = await pdfPage.evaluate(() => document.querySelector('#estimate-pdf-content')?.textContent ?? '')
-        expect(pdfText, 'PDFに数量の表記').toMatch(/Cセット[^]*?数量: 2/)
+        expect(pdfText, 'PDFに数量の表記').toMatch(new RegExp(`${escapeRegExp(baseVariant)}[^]*?数量: 2`))
         // 目視確認用（E2E_SCREENSHOT_DIR を指定したときだけ）。裏に回ったタブは撮影できないので前に出す
         if (process.env.E2E_SCREENSHOT_DIR) {
             await pdfPage.bringToFront()
@@ -157,3 +188,7 @@ describe('見積画面: チェックの付け外し', () => {
         expect(negative.grandTotal, '差引合計がマイナス').toBeLessThan(0)
     })
 })
+
+function escapeRegExp(text: string): string {
+    return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}

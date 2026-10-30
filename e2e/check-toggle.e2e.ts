@@ -20,11 +20,15 @@ import {
     setQty,
     setQtys,
 } from './helpers/itemTable'
-
-const MULTI_ROW_WITH_RETURN = '御供養'
-const WITH_LINKED_FREE_ROW = '控室管理費'
-const PARENT_ALTAR = '式場祭壇'
-const SET_CHILD = '棺'
+import {
+    findLinkedFreeRowProduct,
+    findMultiRowWithReturn,
+    findParentAltar,
+    loadMaster,
+    need,
+    type MultiRowProduct,
+    type ParentAltar,
+} from './helpers/masterLookup'
 
 describe.each([
     { kind: 'estimate' as const, screen: '見積画面' },
@@ -33,12 +37,20 @@ describe.each([
     let session: Session
     let page: Page
     let pdfPage: Page
+    // 役割ごとに、その時の商品マスタから探した商品（helpers/masterLookup.ts）
+    let withReturn: MultiRowProduct | null = null
+    let linkedFree: string | null = null
+    let parent: ParentAltar | null = null
 
     beforeAll(async () => {
         assertLocalEnvironment()
         session = await openSession()
         page = await session.newPage()
         pdfPage = await session.newPage()
+        const master = await loadMaster(session)
+        withReturn = findMultiRowWithReturn(master)
+        linkedFree = findLinkedFreeRowProduct(master)
+        parent = findParentAltar(master)
     })
 
     afterAll(async () => {
@@ -46,7 +58,9 @@ describe.each([
         await cleanupTestCases()
     })
 
-    it(`${screen}: 御供養の数量・返品数を入れてから外して入れ直すと、入れていた数量に戻る`, async () => {
+    it(`${screen}: 御供養の数量・返品数を入れてから外して入れ直すと、入れていた数量に戻る`, async (ctx) => {
+        // 加算行と返品行の2行で1商品のもの（御供養の役）
+        const MULTI_ROW_WITH_RETURN = need(ctx, withReturn?.screenRows === 2 ? withReturn : null, '加算行と返品行の2行で構成される商品').name
         await openBlankDocument(session, page, kind, `入れ直し御供養${screen}`)
         await setChecked(page, MULTI_ROW_WITH_RETURN, true)
         await setQtys(page, MULTI_ROW_WITH_RETURN, [200, 20])
@@ -59,7 +73,8 @@ describe.each([
         await saveAndExpectConsistent(session, page, pdfPage, kind, '御供養を入れ直した後')
     })
 
-    it(`${screen}: 追加行を持つ商品の数量と追加行を入れてから外して入れ直すと、どちらも元に戻る`, async () => {
+    it(`${screen}: 追加行を持つ商品の数量と追加行を入れてから外して入れ直すと、どちらも元に戻る`, async (ctx) => {
+        const WITH_LINKED_FREE_ROW = need(ctx, linkedFree, '追加行を持つ商品')
         await openBlankDocument(session, page, kind, `入れ直し追加行${screen}`)
         await setChecked(page, WITH_LINKED_FREE_ROW, true)
         await setQty(page, WITH_LINKED_FREE_ROW, 3)
@@ -73,7 +88,10 @@ describe.each([
         await saveAndExpectConsistent(session, page, pdfPage, kind, '追加行を持つ商品を入れ直した後')
     })
 
-    it(`${screen}: 親祭壇を外して入れ直すと、子商品も入れていた数量に戻る`, async () => {
+    it(`${screen}: 親祭壇を外して入れ直すと、子商品も入れていた数量に戻る`, async (ctx) => {
+        const altar = need(ctx, parent, '子商品を持つ親祭壇')
+        const PARENT_ALTAR = altar.name
+        const SET_CHILD = altar.children[0]
         await openBlankDocument(session, page, kind, `入れ直し親祭壇${screen}`)
         await setChecked(page, PARENT_ALTAR, true)
         await setQty(page, SET_CHILD, 2)
@@ -86,7 +104,8 @@ describe.each([
         await saveAndExpectConsistent(session, page, pdfPage, kind, '親祭壇を入れ直した後')
     })
 
-    it(`${screen}: 数量を0にするとチェックが外れ、未チェックの商品に数量を入れるとチェックが付く`, async () => {
+    it(`${screen}: 数量を0にするとチェックが外れ、未チェックの商品に数量を入れるとチェックが付く`, async (ctx) => {
+        const WITH_LINKED_FREE_ROW = need(ctx, linkedFree, '追加行を持つ商品')
         await openBlankDocument(session, page, kind, `数量とチェック${screen}`)
         await setChecked(page, WITH_LINKED_FREE_ROW, true)
         await setQty(page, WITH_LINKED_FREE_ROW, 0)

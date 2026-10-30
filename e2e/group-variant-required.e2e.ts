@@ -18,8 +18,8 @@ import {
     setChecked,
     variantDialogText,
 } from './helpers/itemTable'
+import { findVariantGroupProduct, loadMaster, need, type VariantGroupProduct } from './helpers/masterLookup'
 
-const VARIANT_GROUP = '重箱'
 const WARNING = '種類が選択されていません'
 
 describe.each([
@@ -28,11 +28,14 @@ describe.each([
 ])('重箱の種類未選択（$screen）', ({ kind, screen }) => {
     let session: Session
     let page: Page
+    // 種類をグループで選ぶ商品（重箱の役）。その時の商品マスタから探す（helpers/masterLookup.ts）
+    let group: VariantGroupProduct | null = null
 
     beforeAll(async () => {
         assertLocalEnvironment()
         session = await openSession()
         page = await session.newPage()
+        group = findVariantGroupProduct(await loadMaster(session))
     })
 
     afterAll(async () => {
@@ -40,7 +43,8 @@ describe.each([
         await cleanupTestCases()
     })
 
-    it(`${screen}: チェックすると種類選択が開き、選ばずに閉じようとすると注意が出て、そのまま外すとチェックが外れる`, async () => {
+    it(`${screen}: チェックすると種類選択が開き、選ばずに閉じようとすると注意が出て、そのまま外すとチェックが外れる`, async (ctx) => {
+        const { name: VARIANT_GROUP } = need(ctx, group, '種類をグループで選ぶ商品')
         await openBlankDocument(session, page, kind, `重箱未選択${screen}`)
         const before = await readScreenTotals(page)
 
@@ -59,22 +63,24 @@ describe.each([
         expect(await readScreenTotals(page), '合計は元のまま').toEqual(before)
     })
 
-    it(`${screen}: 注意が出たあとに種類を選んで確定すれば、チェックが付いたまま`, async () => {
+    it(`${screen}: 注意が出たあとに種類を選んで確定すれば、チェックが付いたまま`, async (ctx) => {
+        const { name: VARIANT_GROUP, baseVariant } = need(ctx, group, '種類をグループで選ぶ商品')
         await openBlankDocument(session, page, kind, `重箱注意後選択${screen}`)
         await setChecked(page, VARIANT_GROUP, true)
         await clickVariantDialogButton(page, 'キャンセル')
         expect(await variantDialogText(page), '注意が出る').toContain(WARNING)
 
-        await pickVariants(page, VARIANT_GROUP, ['Cセット'])
+        await pickVariants(page, VARIANT_GROUP, [baseVariant])
         expect(await isVariantDialogOpen(page), '確定で閉じる').toBe(false)
         expect(await isChecked(page, VARIANT_GROUP), '重箱にチェックが付いている').toBe(true)
         expect((await getQtys(page, VARIANT_GROUP))[0], '重箱の数量').toBe(1)
     })
 
-    it(`${screen}: 種類を選んである重箱は、種類選択を開いてキャンセルしてもそのまま閉じる`, async () => {
+    it(`${screen}: 種類を選んである重箱は、種類選択を開いてキャンセルしてもそのまま閉じる`, async (ctx) => {
+        const { name: VARIANT_GROUP, baseVariant } = need(ctx, group, '種類をグループで選ぶ商品')
         await openBlankDocument(session, page, kind, `重箱選択済み${screen}`)
         await setChecked(page, VARIANT_GROUP, true)
-        await pickVariants(page, VARIANT_GROUP, ['Cセット'])
+        await pickVariants(page, VARIANT_GROUP, [baseVariant])
         await page.evaluate((name: string) => {
             const row = Array.from(document.querySelectorAll('table tbody tr')).find((tr) =>
                 Array.from(tr.querySelectorAll('td')[1]?.querySelectorAll('span') ?? []).some((s) => s.textContent?.trim() === name)
