@@ -9,10 +9,15 @@ import { openSession, type Session } from './helpers/session'
 import { cleanupTestCases } from './helpers/testData'
 import { openBlankDocument } from './helpers/blankDocument'
 import { getQtys, isChecked, pickVariants, setChecked, setQty } from './helpers/itemTable'
-
-const VARIANT_GROUP = '重箱'
-const MULTI_ROW_WITH_RETURN = '御供養'
-const PLAIN_PRODUCT = '控室管理費'
+import {
+    findLinkedFreeRowProduct,
+    findMultiRowWithReturn,
+    findVariantGroupProduct,
+    loadMaster,
+    need,
+    type MultiRowProduct,
+    type VariantGroupProduct,
+} from './helpers/masterLookup'
 
 describe.each([
     { kind: 'estimate' as const, screen: '見積画面' },
@@ -20,11 +25,19 @@ describe.each([
 ])('重箱の種類選択: ほかの商品のチェック（$screen）', ({ kind, screen }) => {
     let session: Session
     let page: Page
+    // 役割ごとに、その時の商品マスタから探した商品（helpers/masterLookup.ts）
+    let group: VariantGroupProduct | null = null
+    let withReturn: MultiRowProduct | null = null
+    let otherProduct: string | null = null
 
     beforeAll(async () => {
         assertLocalEnvironment()
         session = await openSession()
         page = await session.newPage()
+        const master = await loadMaster(session)
+        group = findVariantGroupProduct(master)
+        withReturn = findMultiRowWithReturn(master)
+        otherProduct = findLinkedFreeRowProduct(master)
     })
 
     afterAll(async () => {
@@ -32,13 +45,16 @@ describe.each([
         await cleanupTestCases()
     })
 
-    it(`${screen}: 重箱の種類を選んでも、先にチェックした商品のチェックが外れない`, async () => {
+    it(`${screen}: 重箱の種類を選んでも、先にチェックした商品のチェックが外れない`, async (ctx) => {
+        const { name: VARIANT_GROUP, baseVariant } = need(ctx, group, '種類をグループで選ぶ商品')
+        const MULTI_ROW_WITH_RETURN = need(ctx, withReturn, '返品行のある複数行商品').name
+        const PLAIN_PRODUCT = need(ctx, otherProduct, '追加行を持つ商品')
         await openBlankDocument(session, page, kind, `重箱チェック${screen}`)
         await setChecked(page, MULTI_ROW_WITH_RETURN, true)
         await setQty(page, MULTI_ROW_WITH_RETURN, 200)
         await setChecked(page, PLAIN_PRODUCT, true)
         await setChecked(page, VARIANT_GROUP, true)
-        await pickVariants(page, VARIANT_GROUP, ['Cセット'])
+        await pickVariants(page, VARIANT_GROUP, [baseVariant])
 
         expect(await isChecked(page, MULTI_ROW_WITH_RETURN), `${MULTI_ROW_WITH_RETURN} のチェックが残る`).toBe(true)
         expect((await getQtys(page, MULTI_ROW_WITH_RETURN))[0], `${MULTI_ROW_WITH_RETURN} の数量`).toBe(200)

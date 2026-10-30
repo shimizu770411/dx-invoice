@@ -22,6 +22,8 @@ import {
     DITTO_MARK,
 } from '@/lib/customerPayer'
 import { useDateFormat } from '@/hooks/useDateFormat'
+import type { InvoicePaymentStamp } from '@/lib/invoicePaymentStamp'
+import { PdfPaymentStampBox } from './PdfPaymentStampBox'
 import {
     DEFAULT_FREE_ITEM_DISPLAY,
     FreeItemDisplay,
@@ -196,6 +198,8 @@ type Props = {
      * 本見積は振込みでの支払いのお願い、事前相談見積は有効期限。入力できる備考の行数は、この行数ぶん減らしてある（DocumentOtherFields.tsx）
      */
     remarksFooterLines?: string[]
+    /** 備考欄の一番下（振込先の下）に出す入金欄・押印欄（請求書のみ） */
+    paymentStamp?: InvoicePaymentStamp
     /** 下部の自由入力行の単価・数量を出すか（自社情報管理の設定）。未指定なら両方出す */
     freeItemDisplay?: FreeItemDisplay
 }
@@ -622,6 +626,7 @@ export function PdfInvoiceLayout({
     showSeparateFees,
     showInvoiceFees,
     remarksFooterLines = [],
+    paymentStamp,
     freeItemDisplay = DEFAULT_FREE_ITEM_DISPLAY,
 }: Props) {
     const { docNo, membershipPaidAmount, items } = doc
@@ -1500,6 +1505,12 @@ export function PdfInvoiceLayout({
                                     {remarksFooterLines.map((line, i) => (
                                         <AutoFitOneLineText key={i} text={line} basePx={REMARKS_FONT_PX} />
                                     ))}
+                                </div>
+                            ) : null}
+                            {/* 入金欄・押印欄（請求書のみ）。振込先の下、備考欄の一番下に固定で出す */}
+                            {paymentStamp ? (
+                                <div className="ml-2 mr-1 mb-1 shrink-0">
+                                    <PdfPaymentStampBox stamp={paymentStamp} formatDate={formatDate} />
                                 </div>
                             ) : null}
                         </div>

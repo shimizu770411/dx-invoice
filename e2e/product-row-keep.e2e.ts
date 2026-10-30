@@ -8,10 +8,12 @@ import { assertLocalEnvironment } from './helpers/env'
 import { gotoAndSettle, openSession, settle, type Session } from './helpers/session'
 import { cleanupTestCases, createTestCase } from './helpers/testData'
 import { getQtys, isChecked, readScreenTotals, save, setChecked, setQty } from './helpers/itemTable'
+import { findMultiRowWithReturn, findParentAltar, loadMaster, need } from './helpers/masterLookup'
 
-// 複数行構成の商品（霊柩車: 固定料金の行＋距離の行、御供養: 返品行あり）
-const MULTI_ROW_PRODUCTS = ['霊柩車', '御供養']
-const PARENT_ALTAR = '式場祭壇'
+// 複数行構成の商品（霊柩車の役: 親祭壇の子で固定料金の行＋距離の行、御供養の役: 返品行あり）。
+// その時の商品マスタから役割で探す（helpers/masterLookup.ts）
+let MULTI_ROW_PRODUCTS: string[] = []
+let RETURN_PRODUCT: string | null = null
 
 async function savedRowLinks(estimateId: string) {
     const items = await prisma.estimateItem.findMany({
@@ -56,12 +58,18 @@ describe('商品マスタの保存: 既存の見積とのつながり', () => {
         assertLocalEnvironment()
         session = await openSession()
         page = await session.newPage()
+        const master = await loadMaster(session)
+        const parent = findParentAltar(master)
+        RETURN_PRODUCT = findMultiRowWithReturn(master)?.name ?? null
+        MULTI_ROW_PRODUCTS = [parent?.multiRowChild ?? null, RETURN_PRODUCT].filter((n): n is string => !!n)
+        if (MULTI_ROW_PRODUCTS.length === 0) return
+
         const customerId = await createTestCase(session, '商品マスタ保存')
         await gotoAndSettle(page, `/estimates/new?customerId=${customerId}`)
-        // 霊柩車は祭壇のセット商品で、親の祭壇を選ぶまで行が出ない
-        await setChecked(page, PARENT_ALTAR, true)
+        // 霊柩車の役の商品は祭壇のセット商品で、親の祭壇を選ぶまで行が出ない
+        if (parent?.multiRowChild) await setChecked(page, parent.name, true)
         for (const name of MULTI_ROW_PRODUCTS) await setChecked(page, name, true)
-        await setQty(page, '御供養', 30)
+        if (RETURN_PRODUCT) await setQty(page, RETURN_PRODUCT, 30)
         estimateId = await save(page)
     })
 
@@ -70,9 +78,10 @@ describe('商品マスタの保存: 既存の見積とのつながり', () => {
         await cleanupTestCases()
     })
 
-    it('複数行構成の商品を変更せずに保存しても、見積の明細の行・種類のつながりと合計が変わらない', async () => {
+    it('複数行構成の商品を変更せずに保存しても、見積の明細の行・種類のつながりと合計が変わらない', async (ctx) => {
+        need(ctx, MULTI_ROW_PRODUCTS.length > 0 ? MULTI_ROW_PRODUCTS : null, '複数行構成の商品（親祭壇の子で複数行のもの、または返品行のあるもの）')
         const before = await savedRowLinks(estimateId)
-        expect(before.length, '霊柩車・御供養の明細が保存されている').toBeGreaterThan(0)
+        expect(before.length, `${MULTI_ROW_PRODUCTS.join('・')}の明細が保存されている`).toBeGreaterThan(0)
         expect(before.every((i) => i.productRowId !== null && i.productRowVariantId !== null), '保存直後はつながっている').toBe(true)
         await gotoAndSettle(page, `/estimates/${estimateId}`)
         const totalsBefore = await readScreenTotals(page)
@@ -87,7 +96,7 @@ describe('商品マスタの保存: 既存の見積とのつながり', () => {
         for (const name of MULTI_ROW_PRODUCTS) {
             expect(await isChecked(page, name), `${name} がチェックされたまま`).toBe(true)
         }
-        expect((await getQtys(page, '御供養'))[0], '御供養の数量').toBe(30)
+        if (RETURN_PRODUCT) expect((await getQtys(page, RETURN_PRODUCT))[0], `${RETURN_PRODUCT}の数量`).toBe(30)
         expect(await readScreenTotals(page), '見積画面の合計が変わらない').toEqual(totalsBefore)
     })
 })

@@ -20,6 +20,8 @@ export interface User {
   isAdmin: boolean;
   requirePasswordChange: boolean;
   isActive: boolean;
+  /** 印影画像のURL。請求書PDFの押印欄に出す */
+  sealImageUrl?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -33,6 +35,7 @@ export interface CreateUserData {
   role?: UserRole;
   isAdmin?: boolean;
   requirePasswordChange?: boolean;
+  sealImageUrl?: string | null;
 }
 
 export interface UpdateUserData {
@@ -45,6 +48,7 @@ export interface UpdateUserData {
   isAdmin?: boolean;
   requirePasswordChange?: boolean;
   isActive?: boolean;
+  sealImageUrl?: string | null;
 }
 
 export async function getUsers(name?: string): Promise<User[]> {
@@ -66,4 +70,14 @@ export async function createUser(data: CreateUserData): Promise<User> {
 export async function updateUser(id: string, data: UpdateUserData): Promise<User> {
   const response = await apiClient.put<User>(`/users/${id}`, data);
   return response.data;
+}
+
+// 印影画像のアップロード（管理者のみ）。返ってきたURLをユーザーの sealImageUrl として保存する
+export async function uploadUserSealImage(file: File): Promise<string> {
+  const form = new FormData();
+  form.append('file', file);
+  const response = await apiClient.post<{ url: string }>('/upload/user-seal', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data.url;
 }

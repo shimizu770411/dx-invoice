@@ -7,6 +7,8 @@ node_modules/
 
 # Testing
 coverage/
+# 通しテストを前回流した日時（マスタ変更の一覧を出す基準。e2e/globalSetup.ts）
+.e2e-last-run
 
 # Production
 dist/

@@ -12,6 +12,8 @@ export default defineConfig({
         environment: 'node',
         globals: true,
         include: ['e2e/**/*.e2e.ts'],
+        // 開始時に、前回テスト以降の商品マスタ・プラン設定の変更を一覧で出す（e2e/globalSetup.ts）
+        globalSetup: ['e2e/globalSetup.ts'],
         // 同じDBと開発サーバーを使うため、並列にせず1つずつ流す
         fileParallelism: false,
         testTimeout: E2E_TIMEOUT_MS,

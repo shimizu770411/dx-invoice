@@ -28,6 +28,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
                 isAdmin: true,
                 requirePasswordChange: true,
                 isActive: true,
+                sealImageUrl: true,
                 createdAt: true,
                 updatedAt: true,
             },
@@ -113,6 +114,8 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
         }
         if (canManageRole && data.isAdmin !== undefined) updateData.isAdmin = data.isAdmin === true
         if (canManageRole && data.isActive !== undefined) updateData.isActive = data.isActive === true
+        // 印影は請求書PDFの押印欄に出るため、変更はシステム管理者のみ
+        if (canManageRole && data.sealImageUrl !== undefined) updateData.sealImageUrl = data.sealImageUrl || null
         if (data.requirePasswordChange !== undefined) updateData.requirePasswordChange = data.requirePasswordChange === true
         if (data.password) {
             updateData.password = await bcrypt.hash(data.password, 10)
@@ -132,6 +135,7 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
                 isAdmin: true,
                 requirePasswordChange: true,
                 isActive: true,
+                sealImageUrl: true,
                 createdAt: true,
                 updatedAt: true,
             },

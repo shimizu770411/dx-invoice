@@ -41,6 +41,7 @@ export async function GET(request: NextRequest) {
                 isAdmin: true,
                 requirePasswordChange: true,
                 isActive: true,
+                sealImageUrl: true,
                 createdAt: true,
                 updatedAt: true,
             },
@@ -114,6 +115,8 @@ export async function POST(request: NextRequest) {
                 role: canManageRole && ['STAFF', 'CLERK', 'APPROVER', 'ACCOUNTING'].includes(data.role) ? data.role : 'STAFF',
                 isAdmin: canManageRole && data.isAdmin === true,
                 requirePasswordChange: data.requirePasswordChange === true,
+                // 印影は請求書PDFの押印欄に出るため、登録はシステム管理者のみ
+                sealImageUrl: canManageRole && data.sealImageUrl ? String(data.sealImageUrl) : null,
             },
             select: {
                 id: true,
@@ -125,6 +128,7 @@ export async function POST(request: NextRequest) {
                 isAdmin: true,
                 requirePasswordChange: true,
                 isActive: true,
+                sealImageUrl: true,
                 createdAt: true,
                 updatedAt: true,
             },

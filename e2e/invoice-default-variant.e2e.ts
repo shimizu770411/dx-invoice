@@ -9,8 +9,7 @@ import { assertLocalEnvironment } from './helpers/env'
 import { gotoAndSettle, openSession, type Session } from './helpers/session'
 import { cleanupTestCases, createTestCase } from './helpers/testData'
 import { getTypeText, save, setChecked, setPlan } from './helpers/itemTable'
-
-const SEED_PRODUCT = '控室管理費'
+import { findPlainProduct, loadMaster } from './helpers/masterLookup'
 
 describe('請求書画面: 後からチェックした商品の初期の種類', () => {
     let session: Session
@@ -48,7 +47,6 @@ describe('請求書画面: 後からチェックした商品の初期の種類',
             (s) =>
                 s.productItem.isActive &&
                 !s.productItem.isSetChild &&
-                s.productItem.name !== SEED_PRODUCT &&
                 s.overrideDefaultVariant &&
                 s.productItem.variants.length > 1 &&
                 s.productItem.variants[0].id !== s.overrideDefaultVariant.id
@@ -56,6 +54,9 @@ describe('請求書画面: 後からチェックした商品の初期の種類',
         if (!target) throw new Error('E2E: 先頭以外の種類を初期セット品にしたプラン別設定が見つかりません')
         const product = target.productItem.name
         const expectedVariant = target.overrideDefaultVariant!.name
+        // 見積を保存するために入れておく商品（品目0件は保存できない）。対象の商品以外の、そのプランで出るふつうの商品
+        const SEED_PRODUCT = findPlainProduct(await loadMaster(session, target.plan.name), [product])
+        if (!SEED_PRODUCT) throw new Error(`E2E: ${target.plan.name} に、下支えに使えるふつうの商品がありません`)
 
         // そのプランで、対象商品を入れずに見積を保存し、本見積 → 請求書を作る
         const customerId = await createTestCase(session, '請求書初期種類')

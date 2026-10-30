@@ -19,9 +19,8 @@ import {
     setChecked,
     setQty,
 } from './helpers/itemTable'
+import { findLinkedFreeRowProduct, findParentAltar, loadMaster, need } from './helpers/masterLookup'
 
-const WITH_LINKED_FREE_ROW = '控室管理費'
-const PARENT_ALTAR = '式場祭壇'
 const selected = (rows: Awaited<ReturnType<typeof readAllRows>>) =>
     rows.filter((r) => r.checked || r.qtys.some((q) => q > 0))
 
@@ -32,12 +31,18 @@ describe.each([
     let session: Session
     let page: Page
     let pdfPage: Page
+    // 役割ごとに、その時の商品マスタから探した商品（helpers/masterLookup.ts）
+    let linkedFree: string | null = null
+    let parentAltar: string | null = null
 
     beforeAll(async () => {
         assertLocalEnvironment()
         session = await openSession()
         page = await session.newPage()
         pdfPage = await session.newPage()
+        const master = await loadMaster(session)
+        linkedFree = findLinkedFreeRowProduct(master)
+        parentAltar = findParentAltar(master)?.name ?? null
     })
 
     afterAll(async () => {
@@ -45,7 +50,8 @@ describe.each([
         await cleanupTestCases()
     })
 
-    it(`${screen}: 控室管理費の数量を0にすると、追加行は合計にも保存にも入らない`, async () => {
+    it(`${screen}: 控室管理費の数量を0にすると、追加行は合計にも保存にも入らない`, async (ctx) => {
+        const WITH_LINKED_FREE_ROW = need(ctx, linkedFree, '追加行を持つ商品')
         await openBlankDocument(session, page, kind, `追加行と親の数量${screen}`)
         const withoutParent = await readScreenTotals(page)
         await setChecked(page, WITH_LINKED_FREE_ROW, true)
@@ -60,7 +66,8 @@ describe.each([
         expect(remaining, '追加行は保存されない').toHaveLength(0)
     })
 
-    it(`${screen}: 控室管理費の数量を0にしてから戻すと、追加行が元の内容で戻る`, async () => {
+    it(`${screen}: 控室管理費の数量を0にしてから戻すと、追加行が元の内容で戻る`, async (ctx) => {
+        const WITH_LINKED_FREE_ROW = need(ctx, linkedFree, '追加行を持つ商品')
         await openBlankDocument(session, page, kind, `追加行の戻り${screen}`)
         await setChecked(page, WITH_LINKED_FREE_ROW, true)
         await fillLinkedFreeRow(page, WITH_LINKED_FREE_ROW, { name: 'E2E追加', qty: 2, general: 5000, member: 4000 })
@@ -72,7 +79,8 @@ describe.each([
         expect(await readScreenTotals(page), '合計が元に戻る').toEqual(withLinkedRow)
     })
 
-    it(`${screen}: 親祭壇の数量を0にして戻すと、子商品が元の数量で戻り、0の間は合計に入らない`, async () => {
+    it(`${screen}: 親祭壇の数量を0にして戻すと、子商品が元の数量で戻り、0の間は合計に入らない`, async (ctx) => {
+        const PARENT_ALTAR = need(ctx, parentAltar, '子商品を持つ親祭壇')
         await openBlankDocument(session, page, kind, `親祭壇の数量${screen}`)
         const withoutAltar = await readScreenTotals(page)
         await setChecked(page, PARENT_ALTAR, true)

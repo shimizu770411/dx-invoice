@@ -19,7 +19,10 @@ export const REMARKS_ROWS = 15 - REMARKS_FIXED_BLOCK_ROWS
 // 請求書は備考欄の最下部に振込先（口座1行＋口座名義1行）を出すため、その分だけ入力できる行を減らす。
 // 振込先2行とその上の余白で、実測では備考本文3行ぶんの高さを使う（11行入力すると9行目以降が振込先と重なる）
 const INVOICE_BANK_TRANSFER_RESERVED_ROWS = 3
-export const INVOICE_REMARKS_ROWS = REMARKS_ROWS - INVOICE_BANK_TRANSFER_RESERVED_ROWS
+// さらに振込先の下（備考欄の一番下）に入金欄・押印欄（済の印・入金日・領収書No／事務・責任者・担当者の押印）を出すため、その分も減らす。
+// 実測では8行入力すると7行目以降が欄に隠れ、5行なら1行ぶんの余白を残して収まる
+const INVOICE_PAYMENT_STAMP_RESERVED_ROWS = 3
+export const INVOICE_REMARKS_ROWS = REMARKS_ROWS - INVOICE_BANK_TRANSFER_RESERVED_ROWS - INVOICE_PAYMENT_STAMP_RESERVED_ROWS
 export const INVOICE_MAX_REMARKS_LENGTH = REMARKS_LINE_LENGTH * INVOICE_REMARKS_ROWS
 // 見積は備考欄の最下部に1行出す（本見積は「お支払いは振込みにてお願いします」、事前相談見積は「有効期限3ヶ月」）ため、
 // その分だけ入力できる行を減らす。実測では11行入力すると最終行が重なり、10行なら1行ぶんの余白を残して収まる。

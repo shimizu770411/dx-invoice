@@ -12,6 +12,8 @@ const userFormBaseSchema = z.object({
     role: z.enum(['STAFF', 'CLERK', 'APPROVER', 'ACCOUNTING']),
     isAdmin: z.boolean(),
     requirePasswordChange: z.boolean(),
+    // 印影画像のURL（未登録は空文字）
+    sealImageUrl: z.string(),
 })
 
 export const createUserFormSchema = userFormBaseSchema.extend({
@@ -33,4 +35,5 @@ export const DEFAULT_FORM_VALUES: UserFormData = {
     role: 'STAFF',
     isAdmin: false,
     requirePasswordChange: false,
+    sealImageUrl: '',
 }

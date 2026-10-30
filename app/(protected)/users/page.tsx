@@ -23,6 +23,8 @@ export default function UsersPage() {
 
     const { data: users = [], isLoading } = useUsersQuery(appliedSearch || undefined)
     const { data: currentUser } = useQuery({ queryKey: ['me'], queryFn: getMe })
+    // ロール・管理者の印・印影を変更できるのはシステム管理者のみ
+    const canEditRole = currentUser?.isAdmin ?? false
     const createMutation = useCreateUserMutation()
     const updateMutation = useUpdateUserMutation()
 
@@ -58,6 +60,8 @@ export default function UsersPage() {
                     role: data.role,
                     isAdmin: data.isAdmin,
                     requirePasswordChange: data.requirePasswordChange,
+                    // 印影の変更は管理者のみ（API側でも管理者以外からの値は無視する）
+                    ...(canEditRole ? { sealImageUrl: data.sealImageUrl || null } : {}),
                     ...(data.password ? { password: data.password } : {}),
                 }
                 await updateMutation.mutateAsync({ id: editDialog.user.id, data: updateData })
@@ -72,6 +76,7 @@ export default function UsersPage() {
                     role: data.role,
                     isAdmin: data.isAdmin,
                     requirePasswordChange: data.requirePasswordChange,
+                    ...(canEditRole ? { sealImageUrl: data.sealImageUrl || null } : {}),
                 })
                 toast({ title: '登録しました' })
             }
@@ -197,7 +202,7 @@ export default function UsersPage() {
                 user={editDialog.user}
                 onClose={handleCloseDialog}
                 onSubmit={handleSubmit}
-                canEditRole={currentUser?.isAdmin ?? false}
+                canEditRole={canEditRole}
                 isAdminViewer={currentUser?.isAdmin ?? false}
                 isSelf={editDialog.user?.id === currentUser?.id}
                 onToggleActive={handleToggleActive}

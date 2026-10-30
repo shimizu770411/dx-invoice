@@ -382,6 +382,23 @@ export async function setMember(page: Page, isMember: boolean): Promise<void> {
     await settle(page)
 }
 
+// 画面下部の保存ボタンを押し、保存されずに指定の通知が出ることを確かめる（品目0件で登録しようとした場合など）。
+// 通知は数秒で消えるため、押した直後に画面の文字から探す
+export async function clickSaveExpectingRefusal(page: Page, message: string): Promise<void> {
+    const before = page.url()
+    const clicked = await page.evaluate(() => {
+        const button = Array.from(document.querySelectorAll('button')).find((b) =>
+            /^(登\s*録|更\s*新|更新（本見積）)$/.test(b.textContent?.trim() ?? '')
+        )
+        if (!button || (button as HTMLButtonElement).disabled) return false
+        ;(button as HTMLButtonElement).click()
+        return true
+    })
+    if (!clicked) throw new Error('E2E: 保存ボタンが押せません')
+    await page.waitForFunction((m: string) => document.body.innerText.includes(m), { timeout: 10_000 }, message)
+    if (page.url() !== before) throw new Error(`E2E: 保存されないはずが画面が移動しました (${page.url()})`)
+}
+
 // 画面下部の保存ボタン（登録・更新）を押し、保存が終わるまで待つ。保存後の書類IDを返す
 export async function save(page: Page): Promise<string> {
     const before = page.url()

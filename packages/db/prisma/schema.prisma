@@ -110,6 +110,8 @@ model User {
   isAdmin               Boolean  @default(false) @map("is_admin")
   requirePasswordChange Boolean  @default(false) @map("require_password_change")
   isActive              Boolean  @default(true) @map("is_active")
+  // 印影画像（Vercel BlobのURL）。請求書PDFの押印欄に、確認ボタンを押した人の印影として出す。登録は管理者のみ
+  sealImageUrl          String?  @db.VarChar(500) @map("seal_image_url")
   createdAt  DateTime @default(now()) @db.Timestamptz(6) @map("created_at")
   updatedAt  DateTime @updatedAt @db.Timestamptz(6) @map("updated_at")
 

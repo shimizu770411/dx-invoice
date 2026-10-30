@@ -10,23 +10,26 @@ import { cleanupTestCases } from './helpers/testData'
 import { openBlankDocument } from './helpers/blankDocument'
 import { getQtys, isChecked, pickVariants, save, setChecked, setPlan, setQty } from './helpers/itemTable'
 import { saveAndExpectConsistent } from './helpers/assertions'
+import { findPlanHidingParent, findVariantGroupProduct, loadMaster, need, type VariantGroupProduct } from './helpers/masterLookup'
 
-const VARIANT_GROUP = '重箱'
-// 家族葬27万円コースでは神式祭壇などの祭壇が出ず、明細が短く作り直される。湯灌・メイクは並びの後ろのほうの商品
-const SHINTO_ALTAR = '神式祭壇'
-const LATE_PRODUCT = '湯灌・メイク'
-const PLAN_WITHOUT_SHINTO_ALTAR = '家族葬27万円コース'
+// 商品・プランは、その時の商品マスタとプラン設定から役割で探す（helpers/masterLookup.ts）
 
 describe('見積画面: プラン切替と重箱', () => {
     let session: Session
     let page: Page
     let pdfPage: Page
+    let group: VariantGroupProduct | null = null
+    // 基本プランでは出るが別のプランでは出ない親祭壇（例: 家族葬27万円コースでの神式祭壇）と、
+    // どちらのプランにも出る並びの後ろのほうのふつうの商品
+    let hiding: Awaited<ReturnType<typeof findPlanHidingParent>> = null
 
     beforeAll(async () => {
         assertLocalEnvironment()
         session = await openSession()
         page = await session.newPage()
         pdfPage = await session.newPage()
+        group = findVariantGroupProduct(await loadMaster(session))
+        hiding = await findPlanHidingParent(session)
     })
 
     afterAll(async () => {
@@ -34,14 +37,15 @@ describe('見積画面: プラン切替と重箱', () => {
         await cleanupTestCases()
     })
 
-    it('重箱の種類と数量を選んでからプランを切り替えても、選んだまま残り、保存後も同じ', async () => {
+    it('重箱の種類と数量を選んでからプランを切り替えても、選んだまま残り、保存後も同じ', async (ctx) => {
+        const { name: VARIANT_GROUP, baseVariant } = need(ctx, group, '種類をグループで選ぶ商品')
         // 今のプランとは別の、有効なプランへ切り替える
         const plans = await prisma.plan.findMany({ where: { isActive: true }, orderBy: { id: 'asc' }, select: { name: true } })
         if (plans.length < 2) throw new Error('E2E: 切り替え先のプランがありません（有効なプランが2つ以上必要）')
 
         await openBlankDocument(session, page, 'estimate', 'プラン切替重箱')
         await setChecked(page, VARIANT_GROUP, true)
-        await pickVariants(page, VARIANT_GROUP, ['Cセット'])
+        await pickVariants(page, VARIANT_GROUP, [baseVariant])
         await setQty(page, VARIANT_GROUP, 3)
 
         await setPlan(page, plans[1].name)
@@ -64,7 +68,12 @@ describe('見積画面: プラン切替と重箱', () => {
     // 2026-10-20 モンキーテストで発見。商品が減るプランに切り替えると、消えた行の入力欄が描き直しの途中で
     // フォームにもう一度登録され、実際の明細より後ろに中身の無い行が残っていた。その行が入力チェックで弾かれ、
     // 「登録」を押しても通知も無く保存されなかった
-    it('親祭壇と後ろのほうの商品の数量を入れてから、その親祭壇が出ないプランに切り替えても、登録できる', async () => {
+    it('親祭壇と後ろのほうの商品の数量を入れてから、その親祭壇が出ないプランに切り替えても、登録できる', async (ctx) => {
+        const { parent: SHINTO_ALTAR, plan: PLAN_WITHOUT_SHINTO_ALTAR, lateProduct: LATE_PRODUCT } = need(
+            ctx,
+            hiding,
+            '基本プランでは出るが別のプランでは出ない親祭壇'
+        )
         await openBlankDocument(session, page, 'estimate', 'プラン切替後の登録')
         await setChecked(page, SHINTO_ALTAR, true)
         await setQty(page, LATE_PRODUCT, 2)
