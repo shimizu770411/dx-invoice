@@ -209,9 +209,9 @@ type Props = {
 const INVOICE_FEE_BLOCK_WIDTH = '83%'
 // 備考欄の文字サイズ（text-[0.75rem] と一致させる）。振込先の自動縮小の基準に使う
 const REMARKS_FONT_PX = 12
-// 受付Noのうち大きく出す末尾の桁数と、その文字サイズ（他の部分の0.8remから2段階上げた大きさ）
+// 受付Noのうち大きく出す末尾の桁数と、その文字サイズ（他の部分の0.8remから4段階上げた大きさ）
 const DOC_NO_EMPHASIS_DIGITS = 3
-const DOC_NO_EMPHASIS_FONT_SIZE = '1rem'
+const DOC_NO_EMPHASIS_FONT_SIZE = '1.25rem'
 
 // ──────────────────────────────────────────────────────────
 // テーブル行ビルダー
