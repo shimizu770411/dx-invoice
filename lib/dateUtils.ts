@@ -35,6 +35,41 @@ export function formatDateJapanese(dateString: string | Date | null | undefined)
     }
 }
 
+// 新しい元号から順に並べる（開始日以降ならその元号）
+const ERA_SHORT_TABLE = [
+    { letter: 'R', start: '2019-05-01', startYear: 2019 },
+    { letter: 'H', start: '1989-01-08', startYear: 1989 },
+    { letter: 'S', start: '1926-12-25', startYear: 1926 },
+    { letter: 'T', start: '1912-07-30', startYear: 1912 },
+    { letter: 'M', start: '1868-01-25', startYear: 1868 },
+] as const
+
+/**
+ * 日付を元号記号＋yy/mm/dd の短い和暦でフォーマット（例: H21/09/08, R01/06/27）
+ * PDFの会員表など、幅の狭い欄で使う。
+ *
+ * 会員の入会日・完納日はDBの日付型で、`2009-09-08T00:00:00.000Z` の形で届く。
+ * new Date して地域の時刻で読むと、日本より西のタイムゾーンでは前日になるため、
+ * 文字列は先頭の年月日をそのまま読み、Date は UTC の年月日で読む。
+ */
+export function formatDateEraShort(value: string | Date | null | undefined): string {
+    if (!value) return ''
+    let ymd: string
+    if (typeof value === 'string') {
+        const m = value.match(/^(\d{4}-\d{2}-\d{2})/)
+        if (!m) return ''
+        ymd = m[1]
+    } else {
+        if (isNaN(value.getTime())) return ''
+        ymd = value.toISOString().slice(0, 10)
+    }
+    const era = ERA_SHORT_TABLE.find((e) => ymd >= e.start)
+    if (!era) return ''
+    const [y, mm, dd] = ymd.split('-')
+    const eraYear = String(Number(y) - era.startYear + 1).padStart(2, '0')
+    return `${era.letter}${eraYear}/${mm}/${dd}`
+}
+
 /**
  * dateFormat 設定に基づいて日付をフォーマット
  */

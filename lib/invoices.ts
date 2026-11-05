@@ -76,6 +76,8 @@ export interface Invoice {
     isPaid?: boolean
     /** 入金日（入金済みのときだけ）。請求書PDFの入金欄に出す */
     paidAt?: string | null
+    /** 領収書No.（入金済みで、入金登録のときに入れた場合だけ）。請求書PDFの押印欄の No に出す */
+    paidReceiptNo?: string | null
     staffConfirmedAt?: string | null
     staffConfirmedBy?: InvoiceConfirmedBy | null
     clerkConfirmedAt?: string | null

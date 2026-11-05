@@ -17,8 +17,11 @@ export function UserFormSections({ isEditing, canEditRole }: UserFormSectionsPro
         formState: { errors },
     } = useFormContext<UserFormData>()
 
+    // 縦に並べると画面を縮小しないと全体が収まらないため、2列に並べる（狭い画面では1列）。
+    // 左右の並び: 名前｜電話番号、パスワード｜メールアドレス、パスワード変更の強制｜生年月日、
+    // ロール（選択肢が4つ並ぶので2列ぶん）、システム管理者｜印影
     return (
-        <div className="flex flex-col gap-4">
+        <div className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
             <FormInput name="name" control={control} label="名前" required error={errors.name} />
             <FormInput name="tel" control={control} label="電話番号" type="tel" required error={errors.tel} />
             <FormInput
@@ -29,8 +32,9 @@ export function UserFormSections({ isEditing, canEditRole }: UserFormSectionsPro
                 required={!isEditing}
                 error={errors.password}
             />
+            <FormInput name="email" control={control} label="メールアドレス" type="email" error={errors.email} />
 
-            {/* 次回ログイン時パスワード変更強制 */}
+            {/* 次回ログイン時パスワード変更強制。右の生年月日の入力欄と下端をそろえる */}
             <Controller
                 name="requirePasswordChange"
                 control={control}
@@ -38,7 +42,7 @@ export function UserFormSections({ isEditing, canEditRole }: UserFormSectionsPro
                     <button
                         type="button"
                         onClick={() => field.onChange(!field.value)}
-                        className="font-mincho text-left transition-all"
+                        className="font-mincho text-left transition-all md:self-end"
                         style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -82,11 +86,10 @@ export function UserFormSections({ isEditing, canEditRole }: UserFormSectionsPro
                 )}
             />
 
-            <FormInput name="email" control={control} label="メールアドレス" type="email" error={errors.email} />
             <FormInput name="birthDate" control={control} label="生年月日" type="date" error={errors.birthDate} />
 
-            {/* ロール */}
-            <div>
+            {/* ロール（選択肢が4つ横に並ぶため2列ぶんの幅を使う） */}
+            <div className="md:col-span-2">
                 <label
                     className="brand-label"
                     style={{ display: 'block', marginBottom: '8px' }}

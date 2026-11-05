@@ -3,7 +3,7 @@
 import type { InvoicePaymentStamp } from '@/lib/invoicePaymentStamp'
 
 // 紙の請求書の手書き欄と同じ配置にする。
-// 左：入金｜日付｜（入金日） ／ （済の丸印）｜No｜（空欄・手書き）　右：事務｜責任者｜担当者 の押印マス
+// 左：入金｜日付｜（入金日） ／ （済の丸印）｜No｜（領収書No.。未入力なら空欄）　右：事務｜責任者｜担当者 の押印マス
 const BORDER = '1px solid #000'
 // 印影の大きさ。押印マスの行の高さはこれに上下の余白を足したもの
 const STAMP_SIZE_PX = 28
@@ -70,8 +70,8 @@ export function PdfPaymentStampBox({ stamp, formatDate }: Props) {
                             ) : null}
                         </td>
                         <td style={cellStyle()}>No</td>
-                        {/* 領収書Noは手書きするため空欄 */}
-                        <td style={cellStyle()} />
+                        {/* 領収書No.。入金登録のときに入れた番号を出す。未入力なら空欄（手書きできる） */}
+                        <td style={cellStyle({ textAlign: 'left', letterSpacing: '0.05em' })}>{stamp.receiptNo ?? ''}</td>
                     </tr>
                 </tbody>
             </table>
