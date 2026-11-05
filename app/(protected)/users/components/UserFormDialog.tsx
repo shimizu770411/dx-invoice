@@ -71,7 +71,8 @@ export function UserFormDialog({
     return (
         <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
             <DialogContent
-                className="max-w-lg"
+                // 入力欄を2列に並べるため横幅を広げる（UserFormSections）
+                className="max-w-3xl"
                 style={{
                     border: '1px solid var(--brand-border)',
                     borderTop: '4px solid var(--brand-navy)',
