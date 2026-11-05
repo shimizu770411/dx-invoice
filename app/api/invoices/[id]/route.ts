@@ -72,6 +72,8 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
         const isPaid = invoice.payments[0]?.status === 'PAID'
         // 請求書PDFの入金欄に出す入金日。入金済みのときだけ返す
         const paidAt = isPaid ? invoice.payments[0].paidAt : null
+        // 押印欄の No に出す領収書No.（入金登録のときに入れた番号。未入力なら null）
+        const paidReceiptNo = isPaid ? invoice.payments[0].receiptNo : null
 
         // 会費入金額を計算
         const membershipPaidAmount = sumMembershipPaidAmount(invoice.customer.memberships)
@@ -103,6 +105,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
                 membershipPaidAmount,
                 isPaid,
                 paidAt,
+                paidReceiptNo,
                 payments: undefined,
                 freeItems: allFreeItems,
                 items: invoice.items.map((item: any) => ({

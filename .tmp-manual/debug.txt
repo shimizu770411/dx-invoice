@@ -1,0 +1,7 @@
+http://localhost:3000/cases header=false nav=true
+見本の案件・見積・請求書
+before-save url=http://localhost:3000/estimates/new?customerId=188
+2.確認ボタン（担当者で
+4.PDFボタン（入金前
+3.入金登録（事務員でロ
+5.印刷されたPDF（入

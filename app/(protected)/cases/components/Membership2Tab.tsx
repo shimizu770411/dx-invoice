@@ -6,6 +6,7 @@ import { FormCurrencyInput } from '@/components/form/FormCurrencyInput'
 import { FormAutocomplete } from '@/components/form/FormAutocomplete'
 import { FormEraDateSelect } from '@/components/form/FormEraDateSelect'
 import { MEMBERSHIP_RELATION_OPTIONS } from '../constants/casesOptions'
+import { MembershipStatusFields } from './MembershipStatusFields'
 
 const INDEX = 1
 
@@ -48,6 +49,9 @@ export function Membership2Tab() {
                     maxYear={new Date().getFullYear()}
                     error={errors.memberships?.[INDEX]?.joinedAt}
                 />
+
+                {/* 状況 / 完納日 */}
+                <MembershipStatusFields index={INDEX} />
 
                 {/* 会員名 */}
                 <div style={{ gridColumn: '1 / -1' }}>

@@ -17,6 +17,13 @@ enum Gender {
   OTHER
 }
 
+// 会員の状況（継続中 / 保留 / 完納）
+enum MembershipStatus {
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+}
+
 enum CremationProcessType {
   FAMILY
   NEIGHBORHOOD
@@ -228,6 +235,8 @@ model CustomerMembership {
   paymentAmount       Int?      @map("payment_amount")
   salesStaffName      String?   @db.VarChar(100) @map("sales_staff_name")
   relationToDeceased  String?   @db.VarChar(50) @map("relation_to_deceased")
+  status              MembershipStatus?
+  completedAt         DateTime? @db.Date @map("completed_at")
   createdAt           DateTime  @default(now()) @db.Timestamptz(6) @map("created_at")
   updatedAt           DateTime  @updatedAt @db.Timestamptz(6) @map("updated_at")
 
@@ -781,6 +790,8 @@ model Payment {
   paidAt                DateTime          @db.Timestamptz(6) @map("paid_at")
   amount                Int               @default(0)
   memo                  String?           @db.VarChar(255)
+  // 領収書No.（数字7桁・任意）。入金登録のときに入れ、請求書PDFの押印欄の No に出す（lib/receiptNo.ts）
+  receiptNo             String?           @db.VarChar(7) @map("receipt_no")
   createdById            BigInt?           @map("created_by_id")
   invoiceId              BigInt?           @map("invoice_id")
   flowerBillingTargetId BigInt?           @map("flower_billing_target_id")

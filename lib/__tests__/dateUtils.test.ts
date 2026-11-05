@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseDateRange, calculateDateRange } from '../dateUtils'
+import { parseDateRange, calculateDateRange, formatDateEraShort } from '../dateUtils'
 
 // -------------------------------------------------------
 // parseDateRange
@@ -103,5 +103,37 @@ describe('calculateDateRange', () => {
         const result = calculateDateRange('invalid', '2026-03')
         expect(result.from).toBeUndefined()
         expect(result.to).toBe('2026-03-31')
+    })
+})
+
+// -------------------------------------------------------
+// formatDateEraShort（PDF会員表の入会日・完納日：元号記号＋yy/mm/dd）
+// -------------------------------------------------------
+describe('formatDateEraShort', () => {
+    it('平成・令和を H / R に置き換え、年月日を2桁にそろえる', () => {
+        expect(formatDateEraShort('2009-09-08')).toBe('H21/09/08')
+        expect(formatDateEraShort('2019-06-27')).toBe('R01/06/27')
+        expect(formatDateEraShort('2026-11-05')).toBe('R08/11/05')
+    })
+
+    it('改元日の前後で元号が切り替わる', () => {
+        expect(formatDateEraShort('2019-04-30')).toBe('H31/04/30')
+        expect(formatDateEraShort('2019-05-01')).toBe('R01/05/01')
+        expect(formatDateEraShort('1989-01-07')).toBe('S64/01/07')
+        expect(formatDateEraShort('1989-01-08')).toBe('H01/01/08')
+        expect(formatDateEraShort('1926-12-24')).toBe('T15/12/24')
+        expect(formatDateEraShort('1926-12-25')).toBe('S01/12/25')
+    })
+
+    it('DBから来る日付（UTC 0時の日時文字列・Date）でも日付がずれない', () => {
+        expect(formatDateEraShort('2009-09-08T00:00:00.000Z')).toBe('H21/09/08')
+        expect(formatDateEraShort(new Date('2009-09-08T00:00:00.000Z'))).toBe('H21/09/08')
+    })
+
+    it('空・不正な値は空文字', () => {
+        expect(formatDateEraShort(null)).toBe('')
+        expect(formatDateEraShort(undefined)).toBe('')
+        expect(formatDateEraShort('')).toBe('')
+        expect(formatDateEraShort('abc')).toBe('')
     })
 })

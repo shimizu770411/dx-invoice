@@ -1,7 +1,7 @@
 /**
  * 請求書PDFの備考欄（振込先の下）に出す入金欄・押印欄の中身。
  * 紙の請求書に手で書き込んでいた欄（入金済の「済」・入金日・領収書No／事務・責任者・担当者の押印）を印字する。
- * 領収書Noは手書きするため、ここでは扱わない（PDFでは空欄の枠だけ出す）。
+ * 領収書No.は入金登録のときに入れた番号を出す。未入力なら空欄のまま（手書きできる）。
  */
 
 export type StampPerson = { name: string; sealImageUrl?: string | null }
@@ -17,12 +17,15 @@ export type InvoicePaymentStamp = {
     isPaid: boolean
     /** 入金日。入金済みのときだけ */
     paidAt: string | Date | null
+    /** 領収書No.。入金済みで、入金登録のときに入れた場合だけ */
+    receiptNo: string | null
     cells: InvoiceStampCell[]
 }
 
 type InvoiceLike = {
     isPaid?: boolean | null
     paidAt?: string | Date | null
+    paidReceiptNo?: string | null
     staffConfirmedBy?: StampPerson | null
     clerkConfirmedBy?: StampPerson | null
     approverConfirmedBy?: StampPerson | null
@@ -37,6 +40,7 @@ export function buildInvoicePaymentStamp(invoice: InvoiceLike): InvoicePaymentSt
     return {
         isPaid,
         paidAt: isPaid ? (invoice.paidAt ?? null) : null,
+        receiptNo: isPaid ? (invoice.paidReceiptNo ?? null) : null,
         cells: [
             { label: '事務', person: invoice.clerkConfirmedBy ?? null },
             { label: '責任者', person: invoice.approverConfirmedBy ?? null },

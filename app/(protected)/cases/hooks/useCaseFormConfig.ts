@@ -63,6 +63,8 @@ export function getFormDefaultValues(): CaseFormData {
                 paymentAmount: undefined,
                 salesStaffName: '',
                 relationToDeceased: '',
+                status: '',
+                completedAt: undefined,
             },
             {
                 rowNo: 2,
@@ -76,6 +78,8 @@ export function getFormDefaultValues(): CaseFormData {
                 paymentAmount: undefined,
                 salesStaffName: '',
                 relationToDeceased: '',
+                status: '',
+                completedAt: undefined,
             },
             {
                 rowNo: 3,
@@ -89,6 +93,8 @@ export function getFormDefaultValues(): CaseFormData {
                 paymentAmount: undefined,
                 salesStaffName: '',
                 relationToDeceased: '',
+                status: '',
+                completedAt: undefined,
             },
         ],
     }
@@ -139,6 +145,9 @@ export function transformSubmitData(data: CaseFormData, formatDateForISO: (val: 
             paymentAmountOnce: m.paymentAmountOnce ? parseInt(m.paymentAmountOnce.toString()) : undefined,
             paymentTimes: m.paymentTimes ? parseInt(m.paymentTimes.toString()) : undefined,
             paymentAmount: m.paymentAmount ? parseInt(m.paymentAmount.toString()) : undefined,
+            // 完納日は「完納」のときだけ送る（保留・継続中に完納日が残らないように）
+            completedAt:
+                m.status === 'COMPLETED' && m.completedAt ? new Date(m.completedAt).toISOString() : undefined,
         })),
     }
     // 郵便番号フィールドを除外（APIには送信しない）

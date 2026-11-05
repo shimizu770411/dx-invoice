@@ -93,6 +93,8 @@ export default function EditCustomerPage() {
                         ? formData.memberships.map((m) => ({
                               ...m,
                               joinedAt: formatDateForInput(m.joinedAt).split('T')[0],
+                              completedAt: formatDateForInput(m.completedAt).split('T')[0],
+                              status: m.status ?? '',
                           }))
                         : defaultValues.memberships,
             }

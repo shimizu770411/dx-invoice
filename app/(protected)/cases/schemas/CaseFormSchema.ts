@@ -35,6 +35,8 @@ export const customerMembershipSchema = z.object({
     ),
     salesStaffName: z.string().optional(),
     relationToDeceased: z.string().optional(),
+    status: z.string().optional(),
+    completedAt: z.string().optional(),
 })
 
 // 案件フォームのメインスキーマ

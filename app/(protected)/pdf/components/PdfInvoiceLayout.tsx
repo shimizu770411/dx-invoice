@@ -99,6 +99,7 @@ export type PdfMembership = {
     paymentAmountOnce?: number | null
     salesStaffName?: string | null
     relationToDeceased?: string | null
+    status?: 'ACTIVE' | 'ON_HOLD' | 'COMPLETED' | null
 }
 
 export type PdfDocumentCustomer = {
@@ -1647,7 +1648,7 @@ export function PdfInvoiceLayout({
             </div>
             {/* 互助会テーブル（差引合計の下・全幅・独立枠）: 自然な高さのまま、flexShrink:0で縮められないようにする */}
             <div style={{ flexShrink: 0 }}>
-                <PdfMembershipTable memberships={customer?.memberships} formatDate={formatDate} />
+                <PdfMembershipTable memberships={customer?.memberships} />
             </div>
             </div>
 

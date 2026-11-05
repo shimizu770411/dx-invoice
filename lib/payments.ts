@@ -3,6 +3,8 @@ import apiClient from './api';
 export interface CreatePaymentData {
   paidAt: string;
   memo?: string;
+  /** 領収書No.（数字7桁・任意。lib/receiptNo.ts）。入金登録のときだけ使う */
+  receiptNo?: string;
 }
 
 export async function createInvoicePayment(

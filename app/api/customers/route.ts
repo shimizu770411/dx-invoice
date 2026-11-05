@@ -396,6 +396,12 @@ export async function POST(request: NextRequest) {
                                 paymentAmount: toIntOrNull(membership.paymentAmount),
                                 salesStaffName: toNullIfEmpty(membership.salesStaffName),
                                 relationToDeceased: toNullIfEmpty(membership.relationToDeceased),
+                                status: toNullIfEmpty(membership.status),
+                                // 完納日は「完納」のときだけ保存する
+                                completedAt:
+                                    membership.status === 'COMPLETED' && membership.completedAt
+                                        ? new Date(membership.completedAt)
+                                        : null,
                             },
                         })
                     }

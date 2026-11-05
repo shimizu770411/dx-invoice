@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requirePaymentRole } from '@/lib/auth-middleware'
 import { serializeBigInt } from '@/lib/prisma-utils'
+import { isValidReceiptNo, normalizeReceiptNo, RECEIPT_NO_INVALID_MESSAGE } from '@/lib/receiptNo'
 
 export async function POST(request: NextRequest, props: { params: Promise<{ invoiceId: string }> }) {
     const params = await props.params
@@ -15,6 +16,12 @@ export async function POST(request: NextRequest, props: { params: Promise<{ invo
         const { invoiceId } = params
         const data = await request.json()
         const userId = authResult.payload.sub
+
+        // 領収書No.（任意・数字7桁）。画面でも確かめているが、画面を通さない呼び出しでも不正な値を保存しない
+        if (!isValidReceiptNo(data.receiptNo)) {
+            // 画面は 400 の error をそのまま通知に出す（lib/errorHandler.ts の extractValidationErrorMessage）
+            return NextResponse.json({ error: RECEIPT_NO_INVALID_MESSAGE }, { status: 400 })
+        }
 
         // 請求書を取得
         const invoice = await prisma.invoice.findUnique({
@@ -36,6 +43,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ invo
                 paidAt: new Date(data.paidAt),
                 amount: invoice.grandTotal,
                 memo: data.memo,
+                receiptNo: normalizeReceiptNo(data.receiptNo),
                 createdById: userId ? BigInt(userId) : null,
             },
         })
