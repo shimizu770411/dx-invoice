@@ -1,9 +1,10 @@
-// 領収書PDFの明細に、選択されていない商品が出ないことの通しテスト。
-// 以前の領収書は商品マスタの全商品を品名だけの空行として並べていたが、請求書PDFと同じく
-// 選択された商品（数量が入っている明細）だけを出すようにした。
+// 領収書PDFの通しテスト。
+// ・明細に選択されていない商品が出ないこと。以前は商品マスタの全商品を品名だけの空行として並べていたが、
+//   請求書PDFと同じく選択された商品（数量が入っている明細）だけを出すようにした。
+// ・PDFがA4 1ページに収まること。
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Page } from 'puppeteer-core'
-import { assertLocalEnvironment } from './helpers/env'
+import { assertLocalEnvironment, BASE_URL } from './helpers/env'
 import { gotoAndSettle, openSession, type Session } from './helpers/session'
 import { cleanupTestCases } from './helpers/testData'
 import { openBlankDocument } from './helpers/blankDocument'
@@ -50,5 +51,16 @@ describe('領収書PDFの明細', () => {
         const rows = await receiptItemRows(page, invoiceId)
         expect(rows.map((r) => r.label)).toEqual([anchor])
         expect(rows[0].amount, '選択した商品には金額が出る').not.toBe('')
+    })
+
+    // 以前は明細欄を37行で埋めていたため、行が少なくても小計〜差引合計が2ページ目に押し出されていた
+    it('領収書PDFはA4 1ページに収まる', async () => {
+        const res = await fetch(`${BASE_URL}/api/pdf/receipt/${invoiceId}`, {
+            headers: { cookie: `access_token=${session.token}` },
+        })
+        expect(res.status).toBe(200)
+        const pdf = Buffer.from(await res.arrayBuffer()).toString('latin1')
+        const pages = (pdf.match(/\/Type\s*\/Page[^s]/g) ?? []).length
+        expect(pages).toBe(1)
     })
 })

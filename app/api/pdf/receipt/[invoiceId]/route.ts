@@ -3,6 +3,8 @@ import { requireAuth } from '@/lib/auth-middleware'
 import { getBrowser, createJstPage } from '@/lib/puppeteer'
 import { prisma } from '@/lib/prisma'
 import { recordReceiptIssue } from '@/lib/operationLog'
+import { fitContentToOnePage } from '@/lib/pdfFitToPage'
+import { PDF_VIEWPORT_HEIGHT_PX, PDF_VIEWPORT_WIDTH_PX } from '@/app/(protected)/pdf/components/pdfLayoutConstants'
 
 /** Vercel Serverless 最大実行時間（秒） */
 export const maxDuration = 60
@@ -39,6 +41,10 @@ export async function GET(request: NextRequest, props: { params: Promise<{ invoi
     try {
         const page = await createJstPage(browser)
 
+        // ビューポート幅をA4実寸に固定する。1ページに収まるかの判定は画面上の高さで行うため、
+        // 印刷時と同じ幅で折り返させておかないと高さの見積りがずれる
+        await page.setViewport({ width: PDF_VIEWPORT_WIDTH_PX, height: PDF_VIEWPORT_HEIGHT_PX })
+
         // 認証クッキーをセット
         if (accessToken) {
             await page.setCookie({
@@ -65,6 +71,9 @@ export async function GET(request: NextRequest, props: { params: Promise<{ invoi
         // Webフォントの読み込み完了を待つ（コールドスタート等でネットワークが遅い場合、
         // フォールバックフォントのまま描画されて1文字ずつ均等配置のレイアウトが崩れることがあるため）
         await page.evaluateHandle('document.fonts.ready')
+
+        // 明細行が多く1ページに収まらない領収書は、全体を縮小して1ページに収める
+        await fitContentToOnePage(page, 'receipt-pdf-content')
 
         const pdfBuffer = await page.pdf({
             format: 'A4',

@@ -206,7 +206,10 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
 
     const addressee = customer?.payerName || customer?.chiefMournerName || ''
     const issuedAt = fmtDate(new Date())
-    const FIXED_ITEM_ROWS = 37
+    // 明細欄は空行で埋めてこの行数にそろえる。37行では行が少なくてもA4 1ページに収まらず、
+    // 末尾（小計〜差引合計）が2ページ目に押し出されていた。30行なら2段の行が数行あっても収まる。
+    // これを超える書類はPDF生成時に全体を縮小して1ページに収める（lib/pdfFitToPage.ts）
+    const FIXED_ITEM_ROWS = 30
     const displayRows = buildDisplayRows(products, doc.items, doc.freeItems)
     // 満期サービス行は商品行群の直後ではなく、明細欄の最終行（小計の直前）に固定表示する
     const normalRows = displayRows.filter((row) => !row.isMaturity)
