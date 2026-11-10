@@ -97,6 +97,13 @@ export async function assignEstimateDocNo(id: string): Promise<string> {
     return response.data.docNo
 }
 
+/** 請求書作成後の本見積の見積番号を変更する（請求番号も同じ番号に揃う）。auto は葬儀日の年月で採番し直す */
+export async function changeEstimateDocNo(id: string, params: { docNo: string } | { auto: true }): Promise<string> {
+    const response = await apiClient.put<{ docNo: string | null }>(`/estimates/${id}/doc-no`, params)
+    if (!response.data?.docNo) throw new Error('見積番号を変更できませんでした')
+    return response.data.docNo
+}
+
 export async function confirmEstimate(id: string): Promise<{ id: string }> {
     const response = await apiClient.post<{ id: string }>(`/estimates/${id}/confirm`)
     return response.data

@@ -144,11 +144,18 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
                         memberships: true,
                     },
                 },
+                invoices: { select: { id: true } },
             },
         })
 
         if (!estimate) {
             return NextResponse.json({ error: '見積が見つかりません' }, { status: 404 })
+        }
+
+        // 請求書作成済みの本見積は画面でも閲覧のみにしているが、APIを直接呼ばれても変えさせない。
+        // 見積番号の変更だけは専用の窓口（/estimates/[id]/doc-no の PUT）で受ける
+        if (estimate.estimateType === 'FORMAL' && estimate.invoices.length > 0) {
+            return NextResponse.json({ error: '請求書が作成済みのため、この本見積は更新できません' }, { status: 400 })
         }
 
         // 事前相談見積では見積番号を入力・変更させない（見積番号は本見積で採番する）。

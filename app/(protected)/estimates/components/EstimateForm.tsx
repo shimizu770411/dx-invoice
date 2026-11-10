@@ -13,6 +13,7 @@ import { EstimateItemTable } from './EstimateItemTable'
 import { EstimateOtherFields } from './EstimateOtherFields'
 import { EstimateCustomerSummary } from './EstimateCustomerSummary'
 import { EstimateBasicInfo } from './EstimateBasicInfo'
+import { EstimateDocNoChangeDialog } from './EstimateDocNoChangeDialog'
 import { useDocumentItemHandlers } from '@/hooks/useDocumentItemHandlers'
 import { trimStaleFormRows, validationErrorTitle } from '@/lib/documentFormGuards'
 import type { DocumentFormData } from '@/components/document/DocumentItemTable'
@@ -204,6 +205,17 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
     }
 
     const [isAssigningDocNo, setIsAssigningDocNo] = useState(false)
+    const [isDocNoChangeOpen, setIsDocNoChangeOpen] = useState(false)
+    const watchedDocNo = useWatch({ control, name: 'docNo' })
+
+    // 請求書作成済みの本見積の見積番号を変えた後の反映。請求番号も同じ番号に変わっているため、
+    // 案件一覧などに出る番号も取り直す
+    const handleDocNoChanged = (docNo: string) => {
+        resetField('docNo', { defaultValue: docNo })
+        queryClient.invalidateQueries({ queryKey: ['customers'] })
+        queryClient.invalidateQueries({ queryKey: ['customer'] })
+        toast({ title: `見積番号・請求番号を「${docNo}」に変更しました`, variant: 'success', duration: 2000 })
+    }
 
     // 本見積の作成時に葬儀・告別式の開始日時が未入力で番号が付かなかった見積に、後から採番する。
     // 番号はサーバー側でその場で保存されるので、画面の値も「保存済み」として差し替え、
@@ -292,9 +304,27 @@ function EstimateFormContent({ mode, customer, estimate, items, setItems, freeIt
                 )}
 
                 {mode === 'edit' && !isConfirmed && estimate?.estimateType === 'FORMAL' && estimate?.hasInvoice && (
-                    <div className="mb-4 rounded border border-amber-400 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                        請求書が作成済みのため、この本見積は閲覧のみです。
+                    <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded border border-amber-400 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                        <span>請求書が作成済みのため、この本見積は閲覧のみです。</span>
+                        {/* 番号を間違えたまま請求書を作った場合に備え、見積番号だけは変えられるようにする（請求番号も揃う） */}
+                        <button
+                            type="button"
+                            onClick={() => setIsDocNoChangeOpen(true)}
+                            className="font-mincho cursor-pointer whitespace-nowrap rounded border border-transparent bg-[var(--brand-navy-light)] px-4 py-2 text-sm text-white"
+                        >
+                            見積番号を変更
+                        </button>
                     </div>
+                )}
+
+                {estimate && (
+                    <EstimateDocNoChangeDialog
+                        open={isDocNoChangeOpen}
+                        estimateId={estimate.id}
+                        currentDocNo={watchedDocNo}
+                        onClose={() => setIsDocNoChangeOpen(false)}
+                        onChanged={handleDocNoChanged}
+                    />
                 )}
 
                 <EstimateCustomerSummary customer={customer} />
