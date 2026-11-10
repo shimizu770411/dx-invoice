@@ -38,9 +38,10 @@ function buildDisplayRows(
     items: PdfDocumentItem[],
     freeItems?: PdfFreeItem[]
 ): DisplayRow[] {
-    // 複数行構成商品にも対応：商品IDごとに全 estimateItem を保持
+    // 複数行構成商品にも対応：商品IDごとに全 estimateItem を保持（選択されていない数量0の明細は除く）
     const itemsByProductId = new Map<string, PdfDocumentItem[]>()
     for (const item of items) {
+        if ((item.qty ?? 0) <= 0) continue
         const pid = item.productItemId ?? ''
         if (!pid) continue
         if (!itemsByProductId.has(pid)) {
@@ -60,13 +61,8 @@ function buildDisplayRows(
     for (const product of products) {
         const itemsForProduct = itemsByProductId.get(product.id) ?? []
         if (itemsForProduct.length === 0) {
-            // 未選択の親セットは非表示
-            if (product.isSetParent) continue
-            rows.push({
-                label: product.name,
-                estimateItem: null,
-                showProductVariantName: !!product.showProductVariantName,
-            })
+            // 選択されていない商品は表示しない（請求書PDFと同じ）
+            continue
         } else {
             // 複数行構成商品（同じ productItemId の複数行）は、1行目のみ品名と摘要を表示
             // ただし useForDescriptionLabel=true の行は、実際にその種類が選ばれた行自体に摘要を表示する
@@ -139,6 +135,7 @@ function buildDisplayRows(
     // 親付きフリー行（parentProductItemId あり）は商品直下で既に表示済みのため除外
     for (const fi of freeItems ?? []) {
         if (fi.parentProductItemId) continue
+        if ((fi.qty ?? 0) <= 0) continue
         if (isCancellationFeeRow(fi.productItemName)) continue
         // 施行割増券は満期サービスと同様に明細欄の最終行（小計の直前）に固定表示する
         const isMaturity = fi.productItemName === '満期サービス' || fi.productItemName === '施行割増券'
