@@ -16,6 +16,19 @@ export async function findNextEstimateDocNo(tx: Prisma.TransactionClient, funera
     return buildNextDocNo(funeralFrom, existing.map((e) => e.docNo))
 }
 
+/**
+ * 請求書作成後に見積番号を振り直すときの採番。請求書の番号も同時に書き換えるため、
+ * 請求書だけで別の番号に直されているものとも重ならないよう、見積と請求書の両方の最大値+1にする。
+ */
+export async function findNextDocNoForEstimateAndInvoices(tx: Prisma.TransactionClient, funeralFrom: Date): Promise<string> {
+    const prefix = buildDocNoPrefix(funeralFrom)
+    const [estimates, invoices] = await Promise.all([
+        tx.estimate.findMany({ where: { docNo: { startsWith: prefix } }, select: { docNo: true } }),
+        tx.invoice.findMany({ where: { docNo: { startsWith: prefix } }, select: { docNo: true } }),
+    ])
+    return buildNextDocNo(funeralFrom, [...estimates, ...invoices].map((d) => d.docNo))
+}
+
 /** 同時に採番されて番号が重複した（DBの一意制約に引っかかった）か */
 export function isDocNoConflictError(error: unknown): boolean {
     if (!(error instanceof Prisma.PrismaClientKnownRequestError)) return false
