@@ -600,15 +600,10 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
                                 </tr>
                             </tbody>
                         </table>
-                        {/* 備考 */}
+                        {/* 備考。請求書の備考欄は請求書向けの内容のため領収書には出さず、手書きできる空欄にする（2026-11-12 ユーザー指示） */}
                         <div className="flex min-h-0 flex-1 flex-col overflow-hidden border border-t-0 border-black text-sm">
                             <div className="min-h-0 flex-1 overflow-hidden px-1">
                                 <div>備考</div>
-                                <div className="mx-2">
-                                    {doc.remarks ? (
-                                        <div className="whitespace-pre-wrap break-words">{doc.remarks}</div>
-                                    ) : null}
-                                </div>
                             </div>
                             {/* 押印欄。手書きの領収証と同じく備考欄の下端に置く。
                                 取扱者印には領収書を承認した人（事務員・決裁者）の印影を出す。承認印・主帳印は手で押すため空欄 */}

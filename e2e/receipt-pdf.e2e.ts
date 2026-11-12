@@ -4,6 +4,7 @@
 // ・PDFがA4 1ページに収まること。
 // ・請求書PDFで金額の代わりに「セット」「サービス」等と出る明細は、領収書でも同じ文言を出すこと。
 // ・会社設定で登録した角印を出すこと。
+// ・請求書の備考欄の文字は領収書の備考欄に出さないこと。
 // ・金額と小計は請求書PDFと同じ計算で出すこと（セット商品が定価のまま保存された古い書類でも一致する）。
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Page } from 'puppeteer-core'
@@ -100,6 +101,17 @@ describe('領収書PDFの明細', () => {
             () => (document.querySelector('#receipt-pdf-content img[alt="角印"]') as HTMLImageElement | null)?.src ?? null
         )
         expect(src, '角印の画像').not.toBeNull()
+    })
+
+    // 請求書の備考欄は請求書向けの内容なので、領収書の備考欄には出さない（空欄で手書きできる）
+    it('請求書の備考欄に入れた文字は、領収書の備考欄に出ない', async () => {
+        const remarks = '請求書だけの備考_E2E'
+        await prisma.invoice.update({ where: { id: BigInt(invoiceId) }, data: { remarks } })
+        await gotoAndSettle(page, `/pdf/receipt/${invoiceId}`)
+        await page.waitForSelector('#receipt-pdf-content tbody')
+        const text = await page.evaluate(() => document.getElementById('receipt-pdf-content')?.textContent ?? '')
+        expect(text).toContain('備考')
+        expect(text).not.toContain(remarks)
     })
 
     // 以前は明細欄を37行で埋めていたため、行が少なくても小計〜差引合計が2ページ目に押し出されていた
