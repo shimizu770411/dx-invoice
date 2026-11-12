@@ -4,11 +4,10 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { getInvoice } from '@/lib/invoices'
 import { getProducts } from '@/lib/products'
-import { withProductsMissingFromMaster } from '@/lib/documentMissingProducts'
 import { getCompanyProfile } from '@/lib/company'
 import { DEFAULT_FREE_ITEM_DISPLAY, FreeItemDisplay, toFreeItemDisplay } from '@/lib/pdfFreeItemDisplay'
 import { buildBankTransferLines } from '@/lib/separateFees'
-import { getProductPlanSettings, applyPlanOverrides, BASE_PLAN_ID } from '@/lib/plans'
+import { applyPlanToPdfDocument } from '@/lib/pdfDocumentPlan'
 import { CreateButton } from '@/components/button/CreateButton'
 import { ResetButton } from '@/components/button/ResetButton'
 import { toast } from '@/hooks/use-toast'
@@ -56,38 +55,11 @@ export default function InvoicePdfPage() {
                 console.error('Failed to load company profile:', companyError)
             }
 
-            // プラン別商品設定の内容を商品情報に反映する。取得に失敗しても
-            // PDF自体は元データのまま表示できるよう、ここだけ個別にフォールバックする。
-            let overriddenProducts = productsData
-            try {
-                const planId = (invoiceData as any).planId || BASE_PLAN_ID
-                const planSettings = await getProductPlanSettings(planId)
-                overriddenProducts = applyPlanOverrides(productsData, planSettings)
-            } catch (planError) {
-                console.error('Failed to apply plan overrides:', planError)
-            }
-
-            // 商品マスタから消えた商品（無効化された商品など）の明細もPDFに出るよう、
-            // 保存済み明細が参照している商品を商品リストに補う
-            overriddenProducts = withProductsMissingFromMaster(overriddenProducts, invoiceData.items || [])
-
-            const overriddenProductMap = new Map(overriddenProducts.map((p) => [p.id, p]))
-            const patchedInvoice = {
-                ...invoiceData,
-                items: (invoiceData.items || []).map((item: any) => {
-                    const overridden = item.productItemId ? overriddenProductMap.get(item.productItemId) : undefined
-                    if (!overridden) return item
-                    // productItem.variants内のisDefaultSet上書きは、明細行が選択中の productVariant 自体にも反映する必要がある
-                    const overriddenVariant = item.productVariantId
-                        ? overridden.variants?.find((v: any) => v.id === item.productVariantId)
-                        : undefined
-                    return {
-                        ...item,
-                        productItem: overridden,
-                        productVariant: overriddenVariant ?? item.productVariant,
-                    }
-                }),
-            }
+            // プラン別商品設定を明細と商品リストに反映する（見積・領収書のPDFと共通）
+            const { document: patchedInvoice, products: overriddenProducts } = await applyPlanToPdfDocument(
+                invoiceData as any,
+                productsData
+            )
 
             setInvoice(patchedInvoice)
             setProducts(overriddenProducts)

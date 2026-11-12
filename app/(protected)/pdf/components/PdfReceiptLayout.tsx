@@ -11,6 +11,9 @@ import {
     calcGrandTotal,
     isCancellationFeeRow,
     freeItemUnitPrice,
+    noChargeReasonFor,
+    NO_CHARGE_LABELS,
+    calcDocumentItemAmount,
 } from '@/lib/documentTotals'
 
 export type { PdfDocument, PdfDocumentCustomer }
@@ -194,7 +197,11 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
     // 小計・消費税・合計・差引合計はすべて実際の items / freeItems から再計算する。
     // 一部だけDB保存値を出すと、同じ表の中で「合計 − 会費入金額 ≠ 差引合計」になる
     const isMember = docAny.isMember === true
-    const itemsSubtotal = doc.items.reduce((sum, item) => sum + (item.amount || 0), 0)
+    // 明細1行の金額は、保存値ではなく請求書PDFと同じ共通処理で出す。
+    // 「セット」の控えを保存する前に作られた古い書類は、セット商品が定価のまま保存されており、
+    // 保存値を足すと領収書だけ請求額より多くなっていた
+    const itemAmount = (item: PdfDocumentItem): number => calcDocumentItemAmount(item, item.qty, isMember)
+    const itemsSubtotal = doc.items.reduce((sum, item) => sum + itemAmount(item), 0)
     // フリー項目の小計。解約手数料の除外と、会員だけに効く割引（満期サービス・施行割増券）の
     // 扱いは共通処理に任せる
     const freeSubtotal = calcFreeItemsSubtotal(doc.freeItems, isMember)
@@ -285,7 +292,17 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
                 <td
                     className={`border border-r-0 border-black px-1 text-right ${mergeCls}`}
                 >
-                    {row.estimateItem ? fmtAmount(row.estimateItem.amount) : ''}
+                    {(() => {
+                        if (!row.estimateItem) return ''
+                        // 0円扱いの明細は、請求書PDFと同じく金額の代わりに「セット」「サービス」等を印字する。
+                        // 自由入力行は商品情報を持たないため対象外
+                        const noChargeReason = row.isFreeItem ? null : noChargeReasonFor(row.estimateItem, isMember)
+                        return noChargeReason ? (
+                            <span style={{ fontWeight: 600 }}>{NO_CHARGE_LABELS[noChargeReason]}</span>
+                        ) : (
+                            fmtAmount(itemAmount(row.estimateItem))
+                        )
+                    })()}
                 </td>
             </tr>
         </Fragment>
