@@ -1,0 +1,420 @@
+<title>領収書の宛名と承認印</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500&family=Noto+Serif+JP:wght@400;500;600&display=swap">
+<style>
+    /* 縦一列の読み物。これまでのリリースノートと同じ紺・金・ワインの配色と明朝 */
+    :root {
+        --navy: #020e70;
+        --navy-light: #2a3490;
+        --gold: #c4ae6a;
+        --gold-soft: #8a7e5c;
+        --crimson: #9a1f28;
+        --seal: #c0262d;
+        --ground: #f7f6f2;
+        --surface: #fffefb;
+        --border: #e5e1d4;
+        --rule: #d4cfc0;
+        --text: #1a1a1a;
+        --muted: #6b6b6b;
+
+        --mincho: 'Noto Serif JP', '游明朝 Medium', 'Yu Mincho', YuMincho, 'Hiragino Mincho ProN', serif;
+        --garamond: 'EB Garamond', 'Noto Serif JP', serif;
+    }
+
+    @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+            --navy: #b9c0ff;
+            --navy-light: #98a2f0;
+            --gold: #d8c488;
+            --gold-soft: #b3a479;
+            --crimson: #ef8f96;
+            --seal: #f08a8f;
+            --ground: #14141a;
+            --surface: #1c1c24;
+            --border: #33323c;
+            --rule: #45444f;
+            --text: #eceae4;
+            --muted: #a09e98;
+            color-scheme: dark;
+        }
+    }
+
+    :root[data-theme="dark"] {
+        --navy: #b9c0ff;
+        --navy-light: #98a2f0;
+        --gold: #d8c488;
+        --gold-soft: #b3a479;
+        --crimson: #ef8f96;
+        --seal: #f08a8f;
+        --ground: #14141a;
+        --surface: #1c1c24;
+        --border: #33323c;
+        --rule: #45444f;
+        --text: #eceae4;
+        --muted: #a09e98;
+        color-scheme: dark;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+        margin: 0;
+        padding-block: clamp(32px, 6vw, 72px);
+        padding-left: max(20px, calc((100% - 760px) / 2));
+        padding-right: max(20px, calc((100% - 760px) / 2));
+        background: var(--ground);
+        color: var(--text);
+        font-family: var(--mincho);
+        font-size: 16px;
+        line-height: 1.9;
+        -webkit-font-smoothing: antialiased;
+    }
+
+    .masthead { display: flex; flex-direction: column; gap: 14px; padding-bottom: 26px; border-bottom: 1px solid var(--rule); }
+    .eyebrow {
+        font-family: var(--garamond);
+        font-size: 12px;
+        letter-spacing: 0.34em;
+        text-transform: uppercase;
+        color: var(--gold-soft);
+    }
+    h1 {
+        margin: 0;
+        font-size: clamp(26px, 5vw, 36px);
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        line-height: 1.45;
+        color: var(--navy);
+        text-wrap: balance;
+    }
+    .meta { display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: 13px; color: var(--muted); letter-spacing: 0.08em; }
+    .meta .num { font-family: var(--garamond); font-size: 15px; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+
+    .lede { margin: 26px 0 0; font-size: 16px; color: var(--text); letter-spacing: 0.03em; }
+
+    section { margin-top: 52px; }
+    h2 {
+        margin: 0 0 6px;
+        padding-left: 14px;
+        border-left: 3px solid var(--gold);
+        font-size: 20px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        line-height: 1.5;
+        color: var(--navy);
+        text-wrap: balance;
+    }
+    .sub { margin: 0 0 22px 17px; font-size: 13px; color: var(--muted); letter-spacing: 0.08em; }
+
+    h3 {
+        margin: 30px 0 10px;
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        color: var(--text);
+    }
+
+    p { margin: 0 0 14px; letter-spacing: 0.03em; }
+    p:last-child { margin-bottom: 0; }
+
+    ul { margin: 0 0 14px; padding-left: 1.3em; }
+    li { margin-bottom: 7px; letter-spacing: 0.03em; }
+    li:last-child { margin-bottom: 0; }
+
+    /* 操作手順。押す順番そのものが情報なので番号を振る */
+    ol.steps { margin: 16px 0 20px; padding: 0; list-style: none; counter-reset: step; display: grid; gap: 12px; }
+    ol.steps li {
+        counter-increment: step;
+        display: grid;
+        grid-template-columns: 2em minmax(0, 1fr);
+        gap: 12px;
+        margin: 0;
+        align-items: baseline;
+    }
+    ol.steps li::before {
+        content: counter(step);
+        font-family: var(--garamond);
+        font-size: 18px;
+        color: var(--gold-soft);
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* 画面のボタン・欄の名前 */
+    .ui {
+        display: inline-block;
+        padding: 0 8px;
+        border: 1px solid var(--rule);
+        background: var(--surface);
+        font-size: 0.9em;
+        letter-spacing: 0.06em;
+        line-height: 1.7;
+        white-space: nowrap;
+    }
+
+    /* これまで / これから の対比 */
+    .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); border: 1px solid var(--border); margin: 18px 0 20px; }
+    .compare > div { background: var(--surface); padding: 18px 20px; min-width: 0; }
+    .compare .tag {
+        display: block;
+        margin-bottom: 10px;
+        font-family: var(--garamond);
+        font-size: 11px;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+    }
+    .compare .before .tag { color: var(--muted); }
+    .compare .after .tag { color: var(--navy); }
+    .compare p { font-size: 14.5px; line-height: 1.85; }
+    .compare .after { box-shadow: inset 3px 0 0 var(--gold); }
+
+    /* 画面・帳票の見え方サンプル */
+    .specimen {
+        margin: 18px 0 20px;
+        padding: 20px 22px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        font-size: 13.5px;
+        line-height: 2;
+        letter-spacing: 0.02em;
+        overflow-x: auto;
+    }
+    .specimen .cap {
+        display: block;
+        margin-bottom: 12px;
+        font-family: var(--garamond);
+        font-size: 11px;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        color: var(--gold-soft);
+    }
+    .specimen .dim { color: var(--muted); }
+
+    /* 操作ボタン列のサンプル */
+    .flow { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; white-space: nowrap; }
+    .flow .btn { padding: 3px 12px; border: 1px solid var(--navy); color: var(--navy); font-size: 13px; letter-spacing: 0.1em; }
+    .flow .btn.gold { border-color: var(--gold); background: var(--gold); color: #1a1a1a; }
+    .flow .btn.new { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--crimson); }
+    .flow .arrow { color: var(--muted); font-size: 12px; }
+
+    /* 入金登録ダイアログの宛名欄のサンプル */
+    .field { display: grid; gap: 6px; max-width: 420px; }
+    .field .label { font-size: 13px; color: var(--navy); letter-spacing: 0.1em; }
+    .field .row { display: flex; gap: 6px; }
+    .field .input { flex: 1; min-width: 0; padding: 6px 12px; border: 1px solid var(--rule); background: var(--ground); font-size: 14px; }
+    .field .pick { padding: 6px 10px; border: 1px solid var(--rule); color: var(--navy); font-size: 12.5px; letter-spacing: 0.1em; }
+
+    /* 押印欄のサンプル */
+    .stamps { display: grid; grid-template-columns: repeat(3, minmax(64px, 96px)); border: 1px solid var(--text); width: max-content; }
+    .stamps > div { border-left: 1px solid var(--text); text-align: center; }
+    .stamps > div:first-child { border-left: none; }
+    .stamps .head { padding: 2px 6px; border-bottom: 1px solid var(--text); font-size: 12px; letter-spacing: 0.1em; }
+    .stamps .box { height: 72px; display: grid; place-items: center; }
+    .stamps .mark {
+        width: 40px; height: 40px;
+        border: 1.5px solid var(--seal);
+        border-radius: 50%;
+        color: var(--seal);
+        display: grid; place-items: center;
+        font-size: 12px; line-height: 1.15;
+        writing-mode: vertical-rl;
+    }
+    .stamps .hint { font-size: 11px; color: var(--muted); }
+
+    table { width: 100%; border-collapse: collapse; margin: 16px 0 20px; font-size: 14px; }
+    caption { text-align: left; padding-bottom: 9px; font-size: 13px; color: var(--muted); letter-spacing: 0.08em; }
+    th, td { padding: 9px 12px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; letter-spacing: 0.03em; }
+    th { font-weight: 600; font-size: 12.5px; letter-spacing: 0.12em; color: var(--gold-soft); border-bottom-color: var(--rule); }
+    .table-wrap { overflow-x: auto; }
+
+    /* 対応が必要な項目 */
+    .action { margin-top: 52px; padding: 26px 28px; background: var(--surface); border: 1px solid var(--border); border-top: 3px solid var(--crimson); }
+    .action h2 { border-left: none; padding-left: 0; color: var(--crimson); }
+    .action .sub { margin-left: 0; }
+
+    .note { margin-top: 22px; padding-top: 18px; border-top: 1px dotted var(--rule); font-size: 14px; color: var(--muted); }
+
+    footer { margin-top: 56px; padding-top: 22px; border-top: 1px solid var(--rule); font-size: 12.5px; color: var(--muted); letter-spacing: 0.08em; }
+
+    @media (max-width: 560px) {
+        .compare { grid-template-columns: 1fr; }
+        .specimen { font-size: 12.5px; padding: 16px; }
+        .action { padding: 22px 18px; }
+    }
+</style>
+
+<header class="masthead">
+    <span class="eyebrow">Release Notes</span>
+    <h1>領収書の宛名・承認印・角印と、金額欄の「セット」表示</h1>
+    <div class="meta">
+        <span>玉泉院 葬儀業務システム</span>
+        <span class="num">2026年11月12日</span>
+    </div>
+</header>
+
+<p class="lede">
+    領収書を手書きの領収証に近づける改修です。
+    入金登録のときに領収書の宛名を選べるようにし、事務員・決裁者が「領収書承認」を押すと、その人の印影が領収書の取扱者印に押されるようにしました。
+    あわせて、領収書に会社の角印を出し、金額欄には請求書と同じく「セット」「サービス」と表示するようにしています。
+</p>
+
+<section>
+    <h2>入金登録で、領収書の宛名を選べるように</h2>
+    <p class="sub">入金登録の画面 / 領収書</p>
+
+    <div class="compare">
+        <div class="before">
+            <span class="tag">これまで</span>
+            <p>領収書の宛名は、案件に登録した支払者名（空なら喪主名）で決まり、変えられませんでした。</p>
+        </div>
+        <div class="after">
+            <span class="tag">これから</span>
+            <p>入金登録の画面に<strong>「領収書の宛名」</strong>欄があり、支払者・喪主の切り替えや、自由な書き換えができます。</p>
+        </div>
+    </div>
+
+    <div class="specimen">
+        <span class="cap">入金登録の画面</span>
+        <div class="field">
+            <span class="label">領収書の宛名</span>
+            <div class="row">
+                <span class="input">山田　花子</span>
+                <span class="pick">支払者</span>
+                <span class="pick">喪主</span>
+            </div>
+        </div>
+    </div>
+
+    <h3>操作方法</h3>
+    <ol class="steps">
+        <li><span>案件一覧の行、または各画面の上部で <span class="ui">入金登録</span> を押します。</span></li>
+        <li><span><span class="ui">領収書の宛名</span> 欄には、最初から支払者名（空なら喪主名）が入っています。そのままでよければ何もしなくて構いません。</span></li>
+        <li><span>喪主宛てにする場合は <span class="ui">喪主</span>、支払者宛てに戻す場合は <span class="ui">支払者</span> を押すと、案件に登録された名前に入れ替わります。会社名など別の宛名にする場合は、欄を直接書き換えてください（100文字まで）。</span></li>
+        <li><span>入金日などを確認して <span class="ui">保存</span> を押します。以後、領収書にはこの宛名が出ます。</span></li>
+    </ol>
+
+    <ul>
+        <li>案件に名前が登録されていない側のボタンは押せません</li>
+        <li>宛名を空欄のまま保存した場合や、この改修より前に入金登録した案件は、これまでと同じく支払者名（空なら喪主名）で出ます</li>
+        <li>敬称は、これまでどおり「様」です</li>
+    </ul>
+</section>
+
+<section>
+    <h2>領収書承認と押印欄</h2>
+    <p class="sub">案件の操作ボタン / 領収書（備考欄の下）</p>
+
+    <p>
+        領収書の備考欄の下に、手書きの領収証と同じ<strong>承認印・主帳印・取扱者印</strong>の押印欄を設けました。
+        案件の操作ボタンに<strong>「領収書承認」</strong>を追加し、これを押した人の印影が<strong>取扱者印</strong>に押されます。
+    </p>
+
+    <div class="specimen">
+        <span class="cap">案件の操作ボタン（入金登録の後）</span>
+        <div class="flow" aria-label="入金取消、領収書承認、領収書発行の順に並ぶ">
+            <span class="btn">入金取消</span><span class="arrow">›</span>
+            <span class="btn new">領収書承認</span><span class="arrow">›</span>
+            <span class="btn gold">領収書発行</span>
+        </div>
+    </div>
+
+    <h3>操作方法</h3>
+    <ol class="steps">
+        <li><span>入金登録を済ませます。入金登録の前は <span class="ui">領収書承認</span> を押せません。</span></li>
+        <li><span>事務員または決裁者が <span class="ui">領収書承認</span> を押します。「領収書を承認しました」と表示され、ボタンが <span class="ui">承認取消</span> に変わります。</span></li>
+        <li><span><span class="ui">領収書発行</span> を押すと、取扱者印に承認した人の印影が押された領収書が開きます。</span></li>
+    </ol>
+
+    <div class="specimen">
+        <span class="cap">領収書の押印欄</span>
+        <div class="stamps">
+            <div><div class="head">承認印</div><div class="box"><span class="hint">手で押印</span></div></div>
+            <div><div class="head">主帳印</div><div class="box"><span class="hint">手で押印</span></div></div>
+            <div><div class="head">取扱者印</div><div class="box"><span class="mark">山田</span></div></div>
+        </div>
+    </div>
+
+    <div class="table-wrap">
+        <table>
+            <caption>押印欄と、誰の印が入るか</caption>
+            <thead>
+                <tr><th>欄</th><th>入るもの</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>取扱者印</td><td>「領収書承認」を押した事務員・決裁者の印影。印影が未登録の人の場合は名前が出ます</td></tr>
+                <tr><td>承認印・主帳印</td><td>空欄です。印刷後に手で押してください</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3>承認を取り消すとき</h3>
+    <p>
+        <span class="ui">承認取消</span> を押し、確認で「OK」を選ぶと承認が外れ、取扱者印は空欄に戻ります。
+        別の人が承認し直すと、その人の印影に替わります。
+    </p>
+
+    <ul>
+        <li><strong>承認・承認取消ができるのは、事務員と決裁者だけ</strong>です。担当者・経理には、ボタンが鍵付きで押せない状態で表示されます</li>
+        <li>承認しなくても領収書は発行できます。その場合、取扱者印は空欄です</li>
+        <li><strong>入金を取り消すと、承認も外れます。</strong>入金登録をし直したときは、もう一度「領収書承認」を押してください</li>
+    </ul>
+</section>
+
+<section>
+    <h2>領収書に会社の角印を表示</h2>
+    <p class="sub">領収書 / 自社情報管理の「角印」</p>
+
+    <p>
+        自社情報管理で登録している角印を、領収書の会社名の横に表示するようにしました。
+        手書きの領収証と同じく、「沖縄 玉泉院」の「院」に重なる位置に押されます。
+        これまで角印が出ていたのは供花の請求書だけでした。
+    </p>
+    <ul>
+        <li>角印を差し替えたいときは、自社情報管理の「角印」で画像を登録し直してください。次に発行する領収書から反映されます</li>
+        <li>供花の領収書には、今回は表示していません</li>
+    </ul>
+</section>
+
+<section>
+    <h2>領収書の金額欄に「セット」「サービス」を表示</h2>
+    <p class="sub">領収書</p>
+
+    <div class="compare">
+        <div class="before">
+            <span class="tag">これまで</span>
+            <p>請求書では「セット」と出る明細も、領収書の金額欄には「0」と出ていました。</p>
+        </div>
+        <div class="after">
+            <span class="tag">これから</span>
+            <p>請求書と同じく、金額欄に<strong>「セット」「サービス」「満期サービス」</strong>と表示します。</p>
+        </div>
+    </div>
+
+    <ul>
+        <li>領収書の明細の金額と、小計・消費税・合計・差引合計を、請求書と同じ計算で出すようにしました。請求書と領収書の金額は常に一致します</li>
+        <li>9月中旬より前に作られた一部の古い請求書では、セット商品の金額が領収書の合計に含まれてしまう不具合がありました。あわせて直しています。該当する請求書で領収書が発行された記録はありません</li>
+    </ul>
+</section>
+
+<div class="action">
+    <h2>ご確認いただきたいこと</h2>
+    <p class="sub">印影の登録 / 入金済みの案件の宛名</p>
+
+    <h3>事務員・決裁者の印影の登録</h3>
+    <p>
+        印影を登録していない決裁者の方が1名いらっしゃいます。この方が「領収書承認」を押すと、取扱者印には印影の代わりに名前が出ます。
+        印影を押したい場合は、管理者の方が<strong>社員画面</strong>でその方の印影を登録してください（請求書の押印欄と同じ印影が使われます）。
+    </p>
+
+    <h3>すでに入金登録している案件の宛名を変えたいとき</h3>
+    <p>
+        領収書の宛名は入金登録のときに入れる仕組みのため、入金登録の後からは変えられません。
+        宛名を変えたい場合は、<span class="ui">入金取消</span> をしてから、宛名を入れて <span class="ui">入金登録</span> をし直してください。
+        入金を取り消すと領収書の承認も外れるので、必要に応じて「領収書承認」も押し直してください。
+    </p>
+</div>
+
+<footer>
+    玉泉院 葬儀業務システム ／ 2026年11月12日 ／ 領収書まわりの改修
+</footer>

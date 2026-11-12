@@ -3,6 +3,11 @@ import { prisma } from '@/lib/prisma'
 import { requirePaymentRole } from '@/lib/auth-middleware'
 import { serializeBigInt } from '@/lib/prisma-utils'
 import { isValidReceiptNo, normalizeReceiptNo, RECEIPT_NO_INVALID_MESSAGE } from '@/lib/receiptNo'
+import {
+    isValidReceiptAddressee,
+    normalizeReceiptAddressee,
+    RECEIPT_ADDRESSEE_TOO_LONG_MESSAGE,
+} from '@/lib/receiptAddressee'
 
 export async function POST(request: NextRequest, props: { params: Promise<{ invoiceId: string }> }) {
     const params = await props.params
@@ -21,6 +26,10 @@ export async function POST(request: NextRequest, props: { params: Promise<{ invo
         if (!isValidReceiptNo(data.receiptNo)) {
             // 画面は 400 の error をそのまま通知に出す（lib/errorHandler.ts の extractValidationErrorMessage）
             return NextResponse.json({ error: RECEIPT_NO_INVALID_MESSAGE }, { status: 400 })
+        }
+        // 領収書の宛名（任意）。DBの列の長さを超える値で保存に失敗しないよう、先に断る
+        if (!isValidReceiptAddressee(data.receiptAddressee)) {
+            return NextResponse.json({ error: RECEIPT_ADDRESSEE_TOO_LONG_MESSAGE }, { status: 400 })
         }
 
         // 請求書を取得
@@ -44,6 +53,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ invo
                 amount: invoice.grandTotal,
                 memo: data.memo,
                 receiptNo: normalizeReceiptNo(data.receiptNo),
+                receiptAddressee: normalizeReceiptAddressee(data.receiptAddressee),
                 createdById: userId ? BigInt(userId) : null,
             },
         })

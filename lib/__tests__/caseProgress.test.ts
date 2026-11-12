@@ -18,12 +18,13 @@ function step(progress: Parameters<typeof buildCaseSteps>[0], key: CaseStepKey) 
 }
 
 describe('操作ボタンの並び', () => {
-    it('情報編集 → 見積 → 請求 → 入金 → 領収書 → 供花 の順に並ぶ', () => {
+    it('情報編集 → 見積 → 請求 → 入金 → 領収書承認 → 領収書 → 供花 の順に並ぶ', () => {
         expect(buildCaseSteps(noDocuments, true).map((s) => s.key)).toEqual([
             'case',
             'estimate',
             'invoice',
             'payment',
+            'receiptApproval',
             'receipt',
             'flowers',
         ])
@@ -37,6 +38,7 @@ describe('操作ボタンの並び', () => {
             'estimate',
             'invoice',
             'payment',
+            'receiptApproval',
             'receipt',
         ])
     })
@@ -55,6 +57,7 @@ describe('操作ボタンの並び', () => {
             'estimate',
             'invoice',
             'payment',
+            'receiptApproval',
             'receipt',
             'flowers',
         ])
@@ -175,6 +178,40 @@ describe('次に進めるかどうか', () => {
         expect(buildCaseSteps(noDocuments, false).find((s) => s.key === 'payment')?.lockedReason).toBe('請求書作成後に使用できます')
     })
 
+    describe('領収書承認', () => {
+        const invoiced = { hasEstimate: true, estimateType: 'FORMAL' as const, hasInvoice: true, isPaid: false }
+        const paid = { ...invoiced, isPaid: true }
+        const approvalStep = (progress: Parameters<typeof buildCaseSteps>[0], canApprove: boolean) =>
+            buildCaseSteps(progress, true, canApprove).find((s) => s.key === 'receiptApproval')
+
+        it('入金するまで押せない', () => {
+            expect(approvalStep(invoiced, true)).toMatchObject({ disabled: true, lockedReason: '入金登録後に使用できます' })
+        })
+
+        it('入金済みなら事務員・決裁者は「領収書承認」を押せる', () => {
+            expect(approvalStep(paid, true)).toMatchObject({ disabled: false, label: '領収書承認' })
+        })
+
+        it('承認済みなら「承認取消」に変わり、事務員・決裁者は取り消せる', () => {
+            expect(approvalStep({ ...paid, isReceiptApproved: true }, true)).toMatchObject({
+                disabled: false,
+                label: '承認取消',
+                variant: 'done',
+            })
+        })
+
+        it('事務員・決裁者以外は押せず、理由が出る', () => {
+            expect(approvalStep(paid, false)).toMatchObject({
+                disabled: true,
+                lockedReason: '領収書の承認・承認取消は事務員・決裁者のみ行えます',
+            })
+        })
+
+        it('承認しなくても、入金済みなら領収書は発行できる', () => {
+            expect(buildCaseSteps(paid, true, true).find((s) => s.key === 'receipt')?.disabled).toBe(false)
+        })
+    })
+
     it('情報編集と供花はいつでも押せる', () => {
         expect(step(noDocuments, 'case')?.disabled).toBe(false)
         expect(step(noDocuments, 'flowers')?.disabled).toBe(false)
@@ -251,6 +288,7 @@ describe('DBの取得結果から進捗を組み立てる', () => {
             hasInvoice: false,
             invoiceId: null,
             isPaid: false,
+            isReceiptApproved: false,
         })
     })
 
@@ -299,6 +337,31 @@ describe('DBの取得結果から進捗を組み立てる', () => {
             invoices: [{ id: 30n, payments: [{ status: 'CANCELLED' }] }],
         })
         expect(progress.isPaid).toBe(false)
+    })
+
+    it('今の入金に承認した人が記録されていれば、領収書は承認済み', () => {
+        const approved = toCaseProgress({
+            ...base,
+            estimates: [],
+            invoices: [{ id: 30n, payments: [{ status: 'PAID', receiptApprovedById: 4n }] }],
+        })
+        expect(approved.isReceiptApproved).toBe(true)
+        const notApproved = toCaseProgress({
+            ...base,
+            estimates: [],
+            invoices: [{ id: 30n, payments: [{ status: 'PAID', receiptApprovedById: null }] }],
+        })
+        expect(notApproved.isReceiptApproved).toBe(false)
+    })
+
+    it('入金を取り消すと、領収書の承認も外れる', () => {
+        // 取消は新しい記録として追加され、承認した人は記録されていない
+        const progress = toCaseProgress({
+            ...base,
+            estimates: [],
+            invoices: [{ id: 30n, payments: [{ status: 'CANCELLED', receiptApprovedById: null }] }],
+        })
+        expect(progress.isReceiptApproved).toBe(false)
     })
 
     it('請求書はあるが入金の記録が無ければ未入金', () => {

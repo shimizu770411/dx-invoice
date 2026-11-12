@@ -3,6 +3,7 @@
 //   請求書PDFと同じく選択された商品（数量が入っている明細）だけを出すようにした。
 // ・PDFがA4 1ページに収まること。
 // ・請求書PDFで金額の代わりに「セット」「サービス」等と出る明細は、領収書でも同じ文言を出すこと。
+// ・会社設定で登録した角印を出すこと。
 // ・金額と小計は請求書PDFと同じ計算で出すこと（セット商品が定価のまま保存された古い書類でも一致する）。
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Page } from 'puppeteer-core'
@@ -87,6 +88,18 @@ describe('領収書PDFの明細', () => {
         const rows = await receiptItemRows(page, invoiceId)
         expect(rows.map((r) => r.label)).toEqual([anchor])
         expect(rows[0].amount, '選択した商品には金額が出る').not.toBe('')
+    })
+
+    // 手書きの領収証と同じく、会社設定で登録した角印を会社名の横（「玉泉院」の右端）に押す
+    it('会社設定に角印が登録されていれば、領収書に角印が出る', async (ctx) => {
+        const company = await prisma.companyProfile.findFirst()
+        need(ctx, company?.sealImageUrl, '会社設定に登録された角印')
+        await gotoAndSettle(page, `/pdf/receipt/${invoiceId}`)
+        await page.waitForSelector('#receipt-pdf-content tbody')
+        const src = await page.evaluate(
+            () => (document.querySelector('#receipt-pdf-content img[alt="角印"]') as HTMLImageElement | null)?.src ?? null
+        )
+        expect(src, '角印の画像').not.toBeNull()
     })
 
     // 以前は明細欄を37行で埋めていたため、行が少なくても小計〜差引合計が2ページ目に押し出されていた

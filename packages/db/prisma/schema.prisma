@@ -123,6 +123,7 @@ model User {
   updatedAt  DateTime @updatedAt @db.Timestamptz(6) @map("updated_at")
 
   createdPayments Payment[] @relation("CreatedBy")
+  receiptApprovedPayments Payment[] @relation("PaymentReceiptApprovedBy")
   staffConfirmedInvoices    Invoice[] @relation("InvoiceStaffConfirmedBy")
   clerkConfirmedInvoices    Invoice[] @relation("InvoiceClerkConfirmedBy")
   approverConfirmedInvoices Invoice[] @relation("InvoiceApproverConfirmedBy")
@@ -792,6 +793,11 @@ model Payment {
   memo                  String?           @db.VarChar(255)
   // 領収書No.（数字7桁・任意）。入金登録のときに入れ、請求書PDFの押印欄の No に出す（lib/receiptNo.ts）
   receiptNo             String?           @db.VarChar(7) @map("receipt_no")
+  // 領収書の宛名（任意）。入金登録のときに入れ、領収書PDFの宛名に出す。空なら支払者名→喪主名（lib/receiptAddressee.ts）
+  receiptAddressee      String?           @db.VarChar(100) @map("receipt_addressee")
+  // 領収書を承認した人（事務員・決裁者）と日時。承認した人の印影を領収書の取扱者印に出す。取り消すと null に戻す
+  receiptApprovedById   BigInt?           @map("receipt_approved_by_id")
+  receiptApprovedAt     DateTime?         @db.Timestamptz(6) @map("receipt_approved_at")
   createdById            BigInt?           @map("created_by_id")
   invoiceId              BigInt?           @map("invoice_id")
   flowerBillingTargetId BigInt?           @map("flower_billing_target_id")
@@ -801,6 +807,7 @@ model Payment {
 
   customer              Customer          @relation(fields: [customerId], references: [id], onDelete: Cascade)
   createdBy             User?             @relation("CreatedBy", fields: [createdById], references: [id])
+  receiptApprovedBy     User?             @relation("PaymentReceiptApprovedBy", fields: [receiptApprovedById], references: [id])
   invoice               Invoice?          @relation(fields: [invoiceId], references: [id])
   flowerBillingTarget   FlowerBillingTarget? @relation(fields: [flowerBillingTargetId], references: [id])
   flower                Flower?           @relation(fields: [flowerId], references: [id], onDelete: SetNull)

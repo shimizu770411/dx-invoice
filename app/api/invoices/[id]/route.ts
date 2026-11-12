@@ -61,6 +61,8 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
                     where: { targetType: 'INVOICE' },
                     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
                     take: 1,
+                    // 領収書を承認した人。印影を領収書の取扱者印に出す
+                    include: { receiptApprovedBy: { select: { id: true, name: true, sealImageUrl: true } } },
                 },
             },
         })
@@ -74,6 +76,13 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
         const paidAt = isPaid ? invoice.payments[0].paidAt : null
         // 押印欄の No に出す領収書No.（入金登録のときに入れた番号。未入力なら null）
         const paidReceiptNo = isPaid ? invoice.payments[0].receiptNo : null
+        // 領収書の宛名（入金登録のときに入れた宛名。未入力なら null で、領収書は支払者名→喪主名で出す）
+        const paidReceiptAddressee = isPaid ? invoice.payments[0].receiptAddressee : null
+        // 領収書を承認した人（事務員・決裁者）。承認していなければ null で、取扱者印は空欄
+        const approver = isPaid ? invoice.payments[0].receiptApprovedBy : null
+        const receiptApprovedBy = approver
+            ? { id: approver.id.toString(), name: approver.name, sealImageUrl: approver.sealImageUrl }
+            : null
 
         // 会費入金額を計算
         const membershipPaidAmount = sumMembershipPaidAmount(invoice.customer.memberships)
@@ -106,6 +115,8 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
                 isPaid,
                 paidAt,
                 paidReceiptNo,
+                paidReceiptAddressee,
+                receiptApprovedBy,
                 payments: undefined,
                 freeItems: allFreeItems,
                 items: invoice.items.map((item: any) => ({

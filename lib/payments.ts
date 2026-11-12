@@ -5,6 +5,8 @@ export interface CreatePaymentData {
   memo?: string;
   /** 領収書No.（数字7桁・任意。lib/receiptNo.ts）。入金登録のときだけ使う */
   receiptNo?: string;
+  /** 領収書の宛名（任意。lib/receiptAddressee.ts）。入金登録のときだけ使う */
+  receiptAddressee?: string;
 }
 
 export async function createInvoicePayment(
@@ -20,6 +22,12 @@ export async function cancelInvoicePayment(
   data: CreatePaymentData,
 ) {
   const response = await apiClient.post(`/payments/invoice/${invoiceId}/cancel`, data);
+  return response.data;
+}
+
+/** 領収書の承認（approve=true）・承認取消（false）。承認した人の印影が領収書の取扱者印に出る */
+export async function setReceiptApproval(invoiceId: string, approve: boolean) {
+  const response = await apiClient.post(`/payments/invoice/${invoiceId}/receipt-approval`, { approve });
   return response.data;
 }
 

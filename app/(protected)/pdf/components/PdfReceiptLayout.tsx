@@ -4,6 +4,7 @@ import { getCompanyProfile, CompanyProfile } from '@/lib/company'
 import { shouldShowFreeItemUnitPrice, toFreeItemDisplay } from '@/lib/pdfFreeItemDisplay'
 import type { PdfDocument, PdfDocumentCustomer, PdfProductItem, PdfDocumentItem, PdfFreeItem } from './PdfInvoiceLayout'
 import { displayProductItemName } from '@/lib/documentDisplayNames'
+import { resolveReceiptAddressee } from '@/lib/receiptAddressee'
 import {
     buildMembershipPaymentRows,
     KEYAKI_ROW_INDEX,
@@ -161,6 +162,9 @@ function buildDisplayRows(
     return rows
 }
 
+// 備考欄の下の押印欄の見出し（手書きの領収証と同じ並び）
+const RECEIPT_STAMP_LABELS = ['承認印', '主帳印', '取扱者印'] as const
+
 type Props = {
     contentId: string
     containerRef?: RefObject<HTMLDivElement | null>
@@ -211,7 +215,10 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
     // 会費入金額は互助会員が事前に積み立てたお金なので、会員の書類でのみ控除する
     const grandTotal = calcGrandTotal(total, membershipPaidAmount, isMember)
 
-    const addressee = customer?.payerName || customer?.chiefMournerName || ''
+    // 入金登録のときに入れた宛名。入れていない入金は支払者名→喪主名
+    const addressee = resolveReceiptAddressee(docAny.paidReceiptAddressee, customer)
+    // 領収書を承認した人（事務員・決裁者）。取扱者印にこの人の印影を出す
+    const receiptApprover: { name: string; sealImageUrl: string | null } | null = docAny.receiptApprovedBy ?? null
     const issuedAt = fmtDate(new Date())
     // 明細欄は空行で埋めてこの行数にそろえる。37行では行が少なくてもA4 1ページに収まらず、
     // 末尾（小計〜差引合計）が2ページ目に押し出されていた。30行なら2段の行が数行あっても収まる。
@@ -364,7 +371,7 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
 
                     <div className="w-[45%]">
                         {/* 会社情報 */}
-                        {company && <PdfCompanyProfile company={company} />}
+                        {company && <PdfCompanyProfile company={company} showSeal />}
                     </div>
                 </div>
 
@@ -594,13 +601,54 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
                             </tbody>
                         </table>
                         {/* 備考 */}
-                        <div className="min-h-0 flex-1 overflow-hidden border border-t-0 border-black px-1 text-sm">
-                            <div>備考</div>
-                            <div className="mx-2">
-                                {doc.remarks ? (
-                                    <div className="whitespace-pre-wrap break-words">{doc.remarks}</div>
-                                ) : null}
+                        <div className="flex min-h-0 flex-1 flex-col overflow-hidden border border-t-0 border-black text-sm">
+                            <div className="min-h-0 flex-1 overflow-hidden px-1">
+                                <div>備考</div>
+                                <div className="mx-2">
+                                    {doc.remarks ? (
+                                        <div className="whitespace-pre-wrap break-words">{doc.remarks}</div>
+                                    ) : null}
+                                </div>
                             </div>
+                            {/* 押印欄。手書きの領収証と同じく備考欄の下端に置く。
+                                取扱者印には領収書を承認した人（事務員・決裁者）の印影を出す。承認印・主帳印は手で押すため空欄 */}
+                            <table className="w-full table-fixed border-collapse text-[0.75rem]">
+                                <tbody>
+                                    <tr>
+                                        {RECEIPT_STAMP_LABELS.map((label, i) => (
+                                            <td
+                                                key={label}
+                                                className={`border border-black py-0.5 text-center tracking-[0.1em] ${i === 0 ? 'border-l-0' : ''} ${i === RECEIPT_STAMP_LABELS.length - 1 ? 'border-r-0' : ''}`}
+                                            >
+                                                {label}
+                                            </td>
+                                        ))}
+                                    </tr>
+                                    <tr>
+                                        {RECEIPT_STAMP_LABELS.map((label, i) => (
+                                            <td
+                                                key={label}
+                                                className={`h-[4.5rem] border border-b-0 border-black p-0.5 text-center align-middle ${i === 0 ? 'border-l-0' : ''} ${i === RECEIPT_STAMP_LABELS.length - 1 ? 'border-r-0' : ''}`}
+                                            >
+                                                {label === '取扱者印' && receiptApprover ? (
+                                                    receiptApprover.sealImageUrl ? (
+                                                        // PDFはサーバーのChromeで作るため、遅延読み込みされない通常の img で読み込む
+                                                        // eslint-disable-next-line @next/next/no-img-element
+                                                        <img
+                                                            src={receiptApprover.sealImageUrl}
+                                                            alt={`${receiptApprover.name}の印影`}
+                                                            className="mx-auto h-[2.75rem] w-[2.75rem] object-contain"
+                                                        />
+                                                    ) : (
+                                                        // 印影が未登録の人が承認した場合は、承認済みと分かるよう名前を出す（請求書PDFの押印欄と同じ）
+                                                        <span className="break-all text-[0.625rem]">{receiptApprover.name}</span>
+                                                    )
+                                                ) : null}
+                                            </td>
+                                        ))}
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
