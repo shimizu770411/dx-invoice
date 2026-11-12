@@ -78,6 +78,10 @@ export interface Invoice {
     paidAt?: string | null
     /** 領収書No.（入金済みで、入金登録のときに入れた場合だけ）。請求書PDFの押印欄の No に出す */
     paidReceiptNo?: string | null
+    /** 領収書の宛名（入金済みで、入金登録のときに入れた場合だけ）。無ければ領収書は支払者名→喪主名 */
+    paidReceiptAddressee?: string | null
+    /** 領収書を承認した人（入金済みで承認されている場合だけ）。印影を領収書の取扱者印に出す */
+    receiptApprovedBy?: { id: string; name: string; sealImageUrl: string | null } | null
     staffConfirmedAt?: string | null
     staffConfirmedBy?: InvoiceConfirmedBy | null
     clerkConfirmedAt?: string | null

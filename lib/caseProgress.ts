@@ -9,7 +9,7 @@
  * 一覧とバーで「請求書が押せる条件」が食い違うのを防ぐため。
  */
 
-import { PAYMENT_ROLE_DENIED_MESSAGE } from '@/lib/paymentPermission'
+import { PAYMENT_ROLE_DENIED_MESSAGE, RECEIPT_APPROVAL_ROLE_DENIED_MESSAGE } from '@/lib/paymentPermission'
 
 /** 書類の有無だけで決まる状態。案件一覧の行データもそのまま渡せる形にしてある */
 export interface CaseProgressLike {
@@ -19,6 +19,8 @@ export interface CaseProgressLike {
     preConsultEstimateId?: string | null
     hasInvoice: boolean
     isPaid: boolean
+    /** 今の入金で領収書が承認済みか（承認した人の印影が領収書の取扱者印に出る） */
+    isReceiptApproved?: boolean
 }
 
 /** 1案件ぶんの進捗。切替バーはこれを受け取って各画面へのリンクを組み立てる */
@@ -39,6 +41,7 @@ export type CaseStepKey =
     | 'estimate'
     | 'invoice'
     | 'payment'
+    | 'receiptApproval'
     | 'receipt'
     | 'flowers'
 
@@ -48,7 +51,7 @@ export type CaseStepVariant = 'primary' | 'gold' | 'done' | 'alert' | 'accent'
 /**
  * 並びの区切り。
  * edit（情報編集）と parallel（供花）は本線から外れるため、flow との間に区切り線を入れる。
- * flow の中は見積 → 請求 → 入金 → 領収書 の順で、間に矢印を入れる。
+ * flow の中は見積 → 請求 → 入金 → 領収書承認 → 領収書 の順で、間に矢印を入れる。
  */
 export type CaseStepGroup = 'edit' | 'flow' | 'parallel'
 
@@ -71,7 +74,9 @@ export interface CaseStep {
 export function buildCaseSteps(
     progress: CaseProgressLike,
     /** ログイン中のユーザーが入金の登録・取消をできるか（事務員・経理・決裁者のみ。lib/paymentPermission.ts） */
-    canManagePayment: boolean
+    canManagePayment: boolean,
+    /** ログイン中のユーザーが領収書を承認・承認取消できるか（事務員・決裁者のみ。lib/paymentPermission.ts） */
+    canApproveReceipt: boolean = false
 ): CaseStep[] {
     const hasFormalEstimate = progress.estimateType === 'FORMAL'
     const steps: CaseStep[] = [
@@ -115,6 +120,20 @@ export function buildCaseSteps(
             ? '請求書作成後に使用できます'
             : !canManagePayment
               ? PAYMENT_ROLE_DENIED_MESSAGE
+              : undefined,
+    })
+
+    // 承認しなくても領収書は発行できる（取扱者印が空欄になるだけ）。承認後は同じボタンで取り消せる
+    steps.push({
+        key: 'receiptApproval',
+        group: 'flow',
+        label: progress.isReceiptApproved ? '承認取消' : '領収書承認',
+        variant: progress.isReceiptApproved ? 'done' : 'primary',
+        disabled: !progress.isPaid || !canApproveReceipt,
+        lockedReason: !progress.isPaid
+            ? '入金登録後に使用できます'
+            : !canApproveReceipt
+              ? RECEIPT_APPROVAL_ROLE_DENIED_MESSAGE
               : undefined,
     })
 
@@ -179,7 +198,7 @@ export const CASE_PROGRESS_INCLUDE = {
         select: {
             id: true,
             payments: {
-                select: { status: true },
+                select: { status: true, receiptApprovedById: true },
                 where: { targetType: 'INVOICE' },
                 orderBy: { createdAt: 'desc' },
                 take: 1,
@@ -193,7 +212,10 @@ interface CaseProgressSource {
     receptionNo?: string | null
     deceasedName?: string | null
     estimates: { id: bigint | number | string; status?: string | null; estimateType?: string | null }[]
-    invoices: { id: bigint | number | string; payments: { status?: string | null }[] }[]
+    invoices: {
+        id: bigint | number | string
+        payments: { status?: string | null; receiptApprovedById?: bigint | number | string | null }[]
+    }[]
 }
 
 /**
@@ -219,5 +241,6 @@ export function toCaseProgress(customer: CaseProgressSource): CaseProgress {
         hasInvoice: customer.invoices.length > 0,
         invoiceId: invoice ? invoice.id.toString() : null,
         isPaid: latestPayment?.status === 'PAID',
+        isReceiptApproved: latestPayment?.status === 'PAID' && latestPayment.receiptApprovedById != null,
     }
 }

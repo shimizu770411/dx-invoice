@@ -16,7 +16,8 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCustomersQuery } from '@/hooks/useCustomer'
 import { buildCaseSteps, CaseStepKey } from '@/lib/caseProgress'
-import { canManagePayment } from '@/lib/paymentPermission'
+import { canApproveReceipt, canManagePayment } from '@/lib/paymentPermission'
+import { useReceiptApproval } from '@/hooks/usePayment'
 import { caseStepButtonStyle } from '@/components/case/caseStepButtonStyle'
 import { PaymentDialog } from '@/components/case/PaymentDialog'
 import { createInvoiceFromEstimate } from '@/lib/invoices'
@@ -99,6 +100,9 @@ export default function CasesPage() {
     const isAdmin = currentUser?.isAdmin === true
     // 入金の登録・取消は事務員・経理・決裁者だけ。ログイン情報の取得前は押せない側に倒す
     const canPay = canManagePayment(currentUser?.role)
+    // 領収書の承認・承認取消は事務員・決裁者だけ
+    const canApprove = canApproveReceipt(currentUser?.role)
+    const receiptApproval = useReceiptApproval()
     const formatDate = useDateFormat()
 
     const loading = customersLoading
@@ -313,11 +317,12 @@ export default function CasesPage() {
 
                         // ステップの状態（ラベル・配色・使えるかどうか）は、この一覧と各画面上部の切替バーで共通にしている。
                         // 片方だけ条件を変えると、同じ案件なのに画面によって押せるボタンが違う、という食い違いが起きる
-                        const steps = buildCaseSteps(item, canPay)
+                        const steps = buildCaseSteps(item, canPay, canApprove)
                         const stepOf = (key: CaseStepKey) => steps.find((s) => s.key === key)!
                         const estStep = stepOf('estimate')
                         const invStep = stepOf('invoice')
                         const payStep = stepOf('payment')
+                        const approvalStep = stepOf('receiptApproval')
                         const recStep = stepOf('receipt')
                         // 事前相談見積の別枠ボタンは、本見積を作ったあとだけ並ぶ
                         const preConsultStep = steps.find((s) => s.key === 'preConsultEstimate')
@@ -431,6 +436,20 @@ export default function CasesPage() {
                                 >
                                     {payStep.disabled && <LockIcon />}
                                     <ResponsiveActionLabel label={payStep.label} />
+                                </button>
+                                <Arrow />
+                                <button
+                                    onClick={() => {
+                                        if (approvalStep.disabled || !item.invoiceId) return
+                                        void receiptApproval.toggle(item.invoiceId, item.isReceiptApproved === true)
+                                    }}
+                                    disabled={approvalStep.disabled || receiptApproval.isPending}
+                                    style={caseStepButtonStyle(approvalStep.variant, approvalStep.disabled)}
+                                    className={`font-mincho ${CASE_ROW_BTN_SIZE_CLASSES}`}
+                                    title={approvalStep.lockedReason}
+                                >
+                                    {approvalStep.disabled && <LockIcon />}
+                                    <ResponsiveActionLabel label={approvalStep.label} />
                                 </button>
                                 <Arrow />
                                 <button

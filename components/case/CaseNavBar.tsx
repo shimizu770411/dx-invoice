@@ -4,7 +4,8 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { buildCaseSteps, resolveCurrentStepKey, CaseScreen, CaseStep } from '@/lib/caseProgress'
-import { canManagePayment } from '@/lib/paymentPermission'
+import { canApproveReceipt, canManagePayment } from '@/lib/paymentPermission'
+import { useReceiptApproval } from '@/hooks/usePayment'
 import { getMe } from '@/lib/auth'
 import { useCaseProgressQuery } from '@/hooks/useCaseProgress'
 import { caseStepButtonStyle } from './caseStepButtonStyle'
@@ -48,12 +49,13 @@ export function CaseNavBar({ customerId, current, currentEstimateId, isDirty = f
     const { data: currentUser } = useQuery({ queryKey: ['me'], queryFn: getMe })
     const [paymentOpen, setPaymentOpen] = useState(false)
     const [creatingInvoice, setCreatingInvoice] = useState(false)
+    const receiptApproval = useReceiptApproval()
 
     // 進捗が届くまでは枠だけ出しておく。
     // 何も描かないと、届いた瞬間にバーの高さぶん画面が下にずれて入力中の位置が動く
     if (!progress) return <div style={{ height: NAV_BAR_HEIGHT }} className="mb-5" aria-hidden />
 
-    const steps = buildCaseSteps(progress, canManagePayment(currentUser?.role))
+    const steps = buildCaseSteps(progress, canManagePayment(currentUser?.role), canApproveReceipt(currentUser?.role))
 
     const currentKey = resolveCurrentStepKey(steps, current, currentEstimateId, progress.preConsultEstimateId)
 
@@ -119,6 +121,10 @@ export function CaseNavBar({ customerId, current, currentEstimateId, isDirty = f
             case 'payment':
                 // 画面遷移ではなくその場で登録するため、未保存の確認は不要
                 setPaymentOpen(true)
+                return
+            case 'receiptApproval':
+                // その場で承認・承認取消するだけなので、未保存の確認は不要
+                if (progress.invoiceId) void receiptApproval.toggle(progress.invoiceId, progress.isReceiptApproved === true)
                 return
             case 'receipt':
                 // 別タブでPDFを開くだけなので、今の画面の入力はそのまま残る

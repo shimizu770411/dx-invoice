@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyToken } from './jwt'
 import { prisma } from './prisma'
-import { canManagePayment, PAYMENT_ROLE_DENIED_MESSAGE } from './paymentPermission'
+import {
+    canApproveReceipt,
+    canManagePayment,
+    PAYMENT_ROLE_DENIED_MESSAGE,
+    RECEIPT_APPROVAL_ROLE_DENIED_MESSAGE,
+} from './paymentPermission'
 
 /**
  * JWT認証ミドルウェア
@@ -58,6 +63,28 @@ export async function requirePaymentRole(request: NextRequest): Promise<{ payloa
 
     if (!canManagePayment(user?.role)) {
         return NextResponse.json({ error: PAYMENT_ROLE_DENIED_MESSAGE }, { status: 403 })
+    }
+
+    return authResult
+}
+
+/**
+ * 領収書の承認・承認取消の権限チェック
+ * requireAuth に加えて users.role が事務員・決裁者のいずれかかを確認する
+ */
+export async function requireReceiptApprovalRole(request: NextRequest): Promise<{ payload: any } | NextResponse> {
+    const authResult = await requireAuth(request)
+    if (authResult instanceof NextResponse) {
+        return authResult
+    }
+
+    const user = await prisma.user.findUnique({
+        where: { id: BigInt(authResult.payload.sub) },
+        select: { role: true },
+    })
+
+    if (!canApproveReceipt(user?.role)) {
+        return NextResponse.json({ error: RECEIPT_APPROVAL_ROLE_DENIED_MESSAGE }, { status: 403 })
     }
 
     return authResult

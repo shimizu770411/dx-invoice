@@ -253,6 +253,7 @@ export async function GET(request: NextRequest) {
                 hasInvoice: progress.hasInvoice,
                 invoiceId: progress.invoiceId ?? undefined,
                 isPaid: progress.isPaid,
+                isReceiptApproved: progress.isReceiptApproved,
                 chiefMournerCity: customer.chiefMournerCity
                     ? {
                           id: customer.chiefMournerCity.id.toString(),

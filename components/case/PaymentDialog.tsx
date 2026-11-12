@@ -1,10 +1,18 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useCreatePaymentMutation, useCancelPaymentMutation } from '@/hooks/usePayment'
-import { extractValidationErrorMessage, handleOperationError } from '@/lib/errorHandler'
+import { extractValidationErrorMessage, handleLoadError, handleOperationError } from '@/lib/errorHandler'
 import { toast } from '@/hooks/use-toast'
 import { isValidReceiptNo, RECEIPT_NO_INVALID_MESSAGE, RECEIPT_NO_LENGTH } from '@/lib/receiptNo'
+import {
+    defaultReceiptAddressee,
+    isValidReceiptAddressee,
+    normalizeReceiptAddressee,
+    RECEIPT_ADDRESSEE_MAX_LENGTH,
+    RECEIPT_ADDRESSEE_TOO_LONG_MESSAGE,
+} from '@/lib/receiptAddressee'
+import { getInvoice } from '@/lib/invoices'
 
 /**
  * 入金登録・入金取消のダイアログ。
@@ -25,6 +33,32 @@ export function PaymentDialog({ invoiceId, isPaid, onClose }: PaymentDialogProps
     const [paymentData, setPaymentData] = useState({ paidAt: new Date().toISOString().split('T')[0], memo: '' })
     // 領収書No.（任意・数字7桁）。請求書PDFの押印欄の No に出す。入金登録のときだけ入力する
     const [receiptNo, setReceiptNo] = useState('')
+    // 領収書の宛名。支払者と喪主のどちらに宛てるかは案件で違うため、入金登録のときに選ぶ。
+    // 初期値は支払者名、それが空なら喪主名（以前の領収書と同じ宛名）
+    const [receiptAddressee, setReceiptAddressee] = useState('')
+    const [names, setNames] = useState<{ payerName: string | null; chiefMournerName: string | null }>({
+        payerName: null,
+        chiefMournerName: null,
+    })
+    useEffect(() => {
+        if (isPaid) return
+        let cancelled = false
+        getInvoice(invoiceId)
+            .then((invoice) => {
+                if (cancelled) return
+                const payerName = normalizeReceiptAddressee(invoice.customer?.payerName)
+                const chiefMournerName = normalizeReceiptAddressee(invoice.customer?.chiefMournerName)
+                setNames({ payerName, chiefMournerName })
+                // 読み込み中に入力を始めていたら、その入力を消さない
+                setReceiptAddressee((current) => current || defaultReceiptAddressee({ payerName, chiefMournerName }))
+            })
+            .catch((error) => {
+                if (!cancelled) handleLoadError(error)
+            })
+        return () => {
+            cancelled = true
+        }
+    }, [invoiceId, isPaid])
     const createPaymentMutation = useCreatePaymentMutation()
     const cancelPaymentMutation = useCancelPaymentMutation()
     const saving = createPaymentMutation.isPending || cancelPaymentMutation.isPending
@@ -34,11 +68,18 @@ export function PaymentDialog({ invoiceId, isPaid, onClose }: PaymentDialogProps
             toast({ title: RECEIPT_NO_INVALID_MESSAGE, variant: 'destructive', duration: 3000 })
             return
         }
+        if (!isPaid && !isValidReceiptAddressee(receiptAddressee)) {
+            toast({ title: RECEIPT_ADDRESSEE_TOO_LONG_MESSAGE, variant: 'destructive', duration: 3000 })
+            return
+        }
         try {
             if (isPaid) {
                 await cancelPaymentMutation.mutateAsync({ invoiceId, data: paymentData })
             } else {
-                await createPaymentMutation.mutateAsync({ invoiceId, data: { ...paymentData, receiptNo: receiptNo.trim() } })
+                await createPaymentMutation.mutateAsync({
+                    invoiceId,
+                    data: { ...paymentData, receiptNo: receiptNo.trim(), receiptAddressee: receiptAddressee.trim() },
+                })
             }
             // 一覧と各画面の進捗表示は useCreatePaymentMutation 側で取り直される
             onClose()
@@ -106,6 +147,64 @@ export function PaymentDialog({ invoiceId, isPaid, onClose }: PaymentDialogProps
                         }}
                     />
                 </div>
+
+                {/* 領収書の宛名（入金登録のときだけ。取消では入力しない） */}
+                {!isPaid && (
+                    <div className="mb-5">
+                        <label
+                            className="mb-2 block font-mincho"
+                            style={{
+                                fontSize: '14px',
+                                fontWeight: 500,
+                                color: 'var(--brand-navy)',
+                                letterSpacing: '0.1em',
+                            }}
+                        >
+                            領収書の宛名
+                        </label>
+                        <div className="flex gap-2">
+                            <input
+                                type="text"
+                                maxLength={RECEIPT_ADDRESSEE_MAX_LENGTH}
+                                value={receiptAddressee}
+                                onChange={(e) => setReceiptAddressee(e.target.value)}
+                                className="min-w-0 flex-1 focus:outline-none transition-colors"
+                                style={{
+                                    padding: '12px 14px',
+                                    fontSize: '16px',
+                                    border: '1px solid var(--brand-input-border)',
+                                    backgroundColor: 'var(--brand-ivory-light)',
+                                }}
+                            />
+                            {/* 案件に登録された支払者・喪主の名前をワンタッチで入れる */}
+                            {([
+                                ['支払者', names.payerName],
+                                ['喪主', names.chiefMournerName],
+                            ] as const).map(([label, name]) => (
+                                <button
+                                    key={label}
+                                    type="button"
+                                    onClick={() => name && setReceiptAddressee(name)}
+                                    disabled={!name}
+                                    title={name ? `${label}の名前（${name}）を入れる` : `${label}の名前が登録されていません`}
+                                    className="shrink-0 font-mincho transition-colors"
+                                    style={{
+                                        padding: '0 12px',
+                                        backgroundColor: '#ffffff',
+                                        color: name ? 'var(--brand-navy)' : 'var(--brand-text-muted)',
+                                        border: '1px solid var(--brand-border)',
+                                        fontSize: '13px',
+                                        letterSpacing: '0.1em',
+                                        cursor: name ? 'pointer' : 'not-allowed',
+                                        opacity: name ? 1 : 0.5,
+                                    }}
+                                >
+                                    {label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 {/* 領収書No.（入金登録のときだけ。取消では入力しない） */}
                 {!isPaid && (

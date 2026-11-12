@@ -19,6 +19,8 @@ export interface CustomerListItem {
     hasInvoice: boolean
     invoiceId?: string
     isPaid: boolean
+    /** 今の入金で領収書が承認済みか */
+    isReceiptApproved?: boolean
     chiefMournerCity: { id: string; name: string } | null
     chiefMournerTown: { id: string; name: string } | null
 }
