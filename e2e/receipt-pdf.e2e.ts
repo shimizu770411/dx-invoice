@@ -2,12 +2,33 @@
 // ・明細に選択されていない商品が出ないこと。以前は商品マスタの全商品を品名だけの空行として並べていたが、
 //   請求書PDFと同じく選択された商品（数量が入っている明細）だけを出すようにした。
 // ・PDFがA4 1ページに収まること。
+// ・請求書PDFで金額の代わりに「セット」「サービス」等と出る明細は、領収書でも同じ文言を出すこと。
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Page } from 'puppeteer-core'
 import { assertLocalEnvironment, BASE_URL } from './helpers/env'
 import { gotoAndSettle, openSession, type Session } from './helpers/session'
 import { cleanupTestCases } from './helpers/testData'
 import { openBlankDocument } from './helpers/blankDocument'
+import { findParentAltar, loadMaster, need } from './helpers/masterLookup'
+import { save, setChecked } from './helpers/itemTable'
+import { NO_CHARGE_LABELS } from '@/lib/documentTotals'
+
+const NO_CHARGE_TEXTS = Object.values(NO_CHARGE_LABELS)
+
+// 請求書PDFの明細で、金額の代わりに「セット」等が出ている欄の文言（上から順）。
+// 書類の会員区分に対応する金額欄は、各行のいちばん右の欄（一般の書類には会員価格列が無い）
+async function invoicePdfNoChargeLabels(page: Page, invoiceId: string): Promise<string[]> {
+    await gotoAndSettle(page, `/pdf/invoice/${invoiceId}`)
+    await page.waitForSelector('#invoice-pdf-content tfoot')
+    return page.evaluate((texts) => {
+        return Array.from(document.querySelectorAll('#invoice-pdf-content tr'))
+            .map((tr) => {
+                const tds = tr.querySelectorAll('td')
+                return (tds[tds.length - 1]?.textContent ?? '').trim()
+            })
+            .filter((t) => texts.includes(t))
+    }, NO_CHARGE_TEXTS)
+}
 
 // 領収書の明細欄（小計より上）で、品名が入っている行の「品名」と「金額」
 async function receiptItemRows(page: Page, invoiceId: string): Promise<{ label: string; amount: string }[]> {
@@ -62,5 +83,22 @@ describe('領収書PDFの明細', () => {
         const pdf = Buffer.from(await res.arrayBuffer()).toString('latin1')
         const pages = (pdf.match(/\/Type\s*\/Page[^s]/g) ?? []).length
         expect(pages).toBe(1)
+    })
+
+    // 金額欄の「セット」等は、請求書PDFと領収書で同じ明細に同じ文言が出る
+    it('請求書PDFで「セット」と出る明細は、領収書でも「セット」と出る', async (ctx) => {
+        const parent = need(ctx, findParentAltar(await loadMaster(session)), '子商品を持つ親祭壇')
+        await openBlankDocument(session, page, 'invoice', '領収書セット表示')
+        const setInvoiceId = page.url().match(/\/invoices\/(\d+)/)![1]
+        // 親祭壇を入れると子商品が連動して入り、セット（0円）扱いになる
+        await setChecked(page, parent.name, true)
+        await save(page)
+
+        const invoiceLabels = await invoicePdfNoChargeLabels(page, setInvoiceId)
+        expect(invoiceLabels.filter((l) => l === 'セット').length, '請求書PDFにセットの明細がある').toBeGreaterThan(0)
+        const receiptLabels = (await receiptItemRows(page, setInvoiceId))
+            .map((r) => r.amount)
+            .filter((a) => NO_CHARGE_TEXTS.includes(a))
+        expect(receiptLabels).toEqual(invoiceLabels)
     })
 })

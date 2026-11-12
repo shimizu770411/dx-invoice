@@ -11,6 +11,8 @@ import {
     calcGrandTotal,
     isCancellationFeeRow,
     freeItemUnitPrice,
+    noChargeReasonFor,
+    NO_CHARGE_LABELS,
 } from '@/lib/documentTotals'
 
 export type { PdfDocument, PdfDocumentCustomer }
@@ -285,7 +287,17 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
                 <td
                     className={`border border-r-0 border-black px-1 text-right ${mergeCls}`}
                 >
-                    {row.estimateItem ? fmtAmount(row.estimateItem.amount) : ''}
+                    {(() => {
+                        if (!row.estimateItem) return ''
+                        // 0円扱いの明細は、請求書PDFと同じく金額の代わりに「セット」「サービス」等を印字する。
+                        // 自由入力行は商品情報を持たないため対象外
+                        const noChargeReason = row.isFreeItem ? null : noChargeReasonFor(row.estimateItem, isMember)
+                        return noChargeReason ? (
+                            <span style={{ fontWeight: 600 }}>{NO_CHARGE_LABELS[noChargeReason]}</span>
+                        ) : (
+                            fmtAmount(row.estimateItem.amount)
+                        )
+                    })()}
                 </td>
             </tr>
         </Fragment>
