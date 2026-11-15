@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseDateRange, calculateDateRange, formatDateEraShort } from '../dateUtils'
+import { parseDateRange, calculateDateRange, formatDateEraShort, toJapanDateInputValue } from '../dateUtils'
 
 // -------------------------------------------------------
 // parseDateRange
@@ -135,5 +135,23 @@ describe('formatDateEraShort', () => {
         expect(formatDateEraShort(undefined)).toBe('')
         expect(formatDateEraShort('')).toBe('')
         expect(formatDateEraShort('abc')).toBe('')
+    })
+})
+
+// -------------------------------------------------------
+// toJapanDateInputValue
+// -------------------------------------------------------
+describe('toJapanDateInputValue', () => {
+    it('日本時間の 0〜9時（世界標準時では前日）でも、日本時間の日付になる', () => {
+        // 日本時間 2026-11-16 06:27 = 世界標準時 2026-11-15 21:27
+        expect(toJapanDateInputValue(new Date('2026-11-15T21:27:00Z'))).toBe('2026-11-16')
+    })
+
+    it('日本時間の 23時台はその日のまま', () => {
+        expect(toJapanDateInputValue(new Date('2026-11-16T14:59:00Z'))).toBe('2026-11-16')
+    })
+
+    it('月・日は2桁にそろえる', () => {
+        expect(toJapanDateInputValue(new Date('2026-01-04T03:00:00Z'))).toBe('2026-01-04')
     })
 })
