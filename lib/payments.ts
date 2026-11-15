@@ -3,7 +3,7 @@ import apiClient from './api';
 export interface CreatePaymentData {
   paidAt: string;
   memo?: string;
-  /** 領収書No.（数字7桁・任意。lib/receiptNo.ts）。入金登録のときだけ使う */
+  /** 領収書No.（数字6桁・任意。lib/receiptNo.ts）。入金登録のときだけ使う */
   receiptNo?: string;
   /** 領収書の宛名（任意。lib/receiptAddressee.ts）。入金登録のときだけ使う */
   receiptAddressee?: string;

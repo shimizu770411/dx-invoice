@@ -791,7 +791,7 @@ model Payment {
   paidAt                DateTime          @db.Timestamptz(6) @map("paid_at")
   amount                Int               @default(0)
   memo                  String?           @db.VarChar(255)
-  // 領収書No.（数字7桁・任意）。入金登録のときに入れ、請求書PDFの押印欄の No に出す（lib/receiptNo.ts）
+  // 領収書No.（数字6桁・任意。VarChar(7) は7桁だった頃の名残）。入金登録のときに入れ、請求書PDFの押印欄の No に出す（lib/receiptNo.ts）
   receiptNo             String?           @db.VarChar(7) @map("receipt_no")
   // 領収書の宛名（任意）。入金登録のときに入れ、領収書PDFの宛名に出す。空なら支払者名→喪主名（lib/receiptAddressee.ts）
   receiptAddressee      String?           @db.VarChar(100) @map("receipt_addressee")

@@ -1,5 +1,5 @@
-// 入金登録の「領収書No.」（任意・数字7桁）の通しテスト。
-// 入れた番号が保存され、請求書PDFの押印欄の No に出ること、7桁の数字以外は保存されないことを確かめる。
+// 入金登録の「領収書No.」（任意・数字6桁）の通しテスト。
+// 入れた番号が保存され、請求書PDFの押印欄の No に出ること、6桁の数字以外は保存されないことを確かめる。
 // 画面の入力欄を通さずにAPIを直接呼ばれても不正な値を保存しないよう、APIでも断る。
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Page } from 'puppeteer-core'
@@ -54,20 +54,20 @@ describe('入金登録の領収書No.', () => {
         await cleanupTestCases()
     })
 
-    it('7桁の数字以外（6桁・8桁・英字まじり）は保存されない', async () => {
-        for (const receiptNo of ['625310', '62531080', '625310A']) {
+    it('6桁の数字以外（5桁・7桁・英字まじり）は保存されない', async () => {
+        for (const receiptNo of ['62531', '6253108', '62531A']) {
             const res = await callAsClerk(`/payments/invoice/${invoiceId}/paid`, { paidAt: '2026-11-05', memo: '', receiptNo })
             expect(res.status, `${receiptNo} は断る`).toBe(400)
-            expect(res.json?.error, '理由').toContain('7桁の数字')
+            expect(res.json?.error, '理由').toContain('6桁の数字')
         }
         expect(await latestPayment(invoiceId), '入金は作られない').toBeNull()
     })
 
-    it('7桁の数字で入金登録すると保存され、請求書PDFの押印欄の No に出る', async () => {
-        const res = await callAsClerk(`/payments/invoice/${invoiceId}/paid`, { paidAt: '2026-11-05', memo: '', receiptNo: '6253108' })
+    it('6桁の数字で入金登録すると保存され、請求書PDFの押印欄の No に出る', async () => {
+        const res = await callAsClerk(`/payments/invoice/${invoiceId}/paid`, { paidAt: '2026-11-05', memo: '', receiptNo: '625310' })
         expect(res.status).toBe(200)
-        expect((await latestPayment(invoiceId))?.receiptNo).toBe('6253108')
-        expect(await pdfReceiptNoCell(page, invoiceId), 'PDFの No').toBe('6253108')
+        expect((await latestPayment(invoiceId))?.receiptNo).toBe('625310')
+        expect(await pdfReceiptNoCell(page, invoiceId), 'PDFの No').toBe('625310')
     })
 
     it('入金を取り消すと、PDFの No は空欄に戻る', async () => {
