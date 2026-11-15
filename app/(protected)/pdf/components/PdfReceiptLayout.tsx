@@ -221,6 +221,8 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
     const receiptApprover: { name: string; sealImageUrl: string | null } | null = docAny.receiptApprovedBy ?? null
     // 領収書の日付は入金日（入金登録で入れた日）。発行した日にすると、後日の再発行で日付が変わってしまう
     const paidDate = fmtDate(docAny.paidAt)
+    // 入金登録のときに入れた領収書No.。入れていなければ空欄で、手書きできるよう「No.」と下線だけ出す
+    const receiptNo: string = docAny.paidReceiptNo ?? ''
     // 明細欄は空行で埋めてこの行数にそろえる。37行では行が少なくてもA4 1ページに収まらず、
     // 末尾（小計〜差引合計）が2ページ目に押し出されていた。30行なら2段の行が数行あっても収まる。
     // これを超える書類はPDF生成時に全体を縮小して1ページに収める（lib/pdfFitToPage.ts）
@@ -346,8 +348,13 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
                         <hr className="my-0 w-full border-t-2 border-black" />
                         <div className="tracking-[0.4em]">{paidDate}</div>
                     </div>
-                    {/* 右スペーサー（左右均等のため） */}
-                    <div />
+                    {/* 領収書No.（右上。左の収入印紙欄と左右均等の幅を取る） */}
+                    <div className="justify-self-end pt-2 pr-2">
+                        <div className="flex items-end gap-2 border-b border-black pb-0.5 min-w-[9rem]">
+                            <span>No.</span>
+                            <span className="tracking-[0.15em]">{receiptNo}</span>
+                        </div>
+                    </div>
                 </div>
 
                 <div className="mb-2 mt-4 flex items-center justify-between gap-2">

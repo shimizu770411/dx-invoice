@@ -70,6 +70,17 @@ describe('入金登録の領収書No.', () => {
         expect(await pdfReceiptNoCell(page, invoiceId), 'PDFの No').toBe('625310')
     })
 
+    it('領収書PDFの右上にも領収書No.が出る', async () => {
+        await gotoAndSettle(page, `/pdf/receipt/${invoiceId}`)
+        await page.waitForSelector('#receipt-pdf-content tbody')
+        const noText = await page.evaluate(() => {
+            const label = Array.from(document.querySelectorAll('#receipt-pdf-content span')).find((s) => s.textContent === 'No.')
+            return (label?.nextElementSibling?.textContent ?? '').trim()
+        })
+        expect(noText).toBe('625310')
+        await page.screenshot({ path: '/tmp/receipt-no.png', clip: { x: 0, y: 0, width: 1200, height: 400 } })
+    })
+
     it('入金を取り消すと、PDFの No は空欄に戻る', async () => {
         const res = await callAsClerk(`/payments/invoice/${invoiceId}/cancel`, { paidAt: '2026-11-05', memo: '' })
         expect(res.status).toBe(200)
