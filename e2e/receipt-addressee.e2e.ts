@@ -92,6 +92,17 @@ describe('入金登録の領収書の宛名', () => {
         await cancel()
     })
 
+    it('領収書の日付は、PDFを開いた日ではなく入金登録で入れた入金日が出る', async () => {
+        expect((await pay({ paidAt: '2026-10-03' })).status).toBe(200)
+        await gotoAndSettle(page, `/pdf/receipt/${invoiceId}`)
+        await page.waitForSelector('#receipt-pdf-content tbody')
+        const dateText = await page.evaluate(
+            () => document.querySelector('#receipt-pdf-content h1')?.parentElement?.lastElementChild?.textContent?.trim() ?? ''
+        )
+        expect(dateText).toBe('10月03日')
+        await cancel()
+    })
+
     it('上限文字数を超える宛名は保存しない', async () => {
         const res = await pay({ receiptAddressee: 'あ'.repeat(RECEIPT_ADDRESSEE_MAX_LENGTH + 1) })
         expect(res.status).toBe(400)

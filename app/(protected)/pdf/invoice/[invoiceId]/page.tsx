@@ -13,6 +13,7 @@ import { ResetButton } from '@/components/button/ResetButton'
 import { toast } from '@/hooks/use-toast'
 import { PdfInvoiceLayout, PDF_VIEWPORT_WIDTH_PX } from '@/app/(protected)/pdf/components/PdfInvoiceLayout'
 import { buildInvoicePaymentStamp } from '@/lib/invoicePaymentStamp'
+import { toJapanDateInputValue } from '@/lib/dateUtils'
 
 export default function InvoicePdfPage() {
     const router = useRouter()
@@ -79,7 +80,7 @@ export default function InvoicePdfPage() {
             const url = URL.createObjectURL(blob)
             const a = document.createElement('a')
             a.href = url
-            a.download = `請求書_${invoice?.docNo || invoiceId}_${new Date().toISOString().split('T')[0]}.pdf`
+            a.download = `請求書_${invoice?.docNo || invoiceId}_${toJapanDateInputValue()}.pdf`
             a.click()
             URL.revokeObjectURL(url)
         } catch (error) {

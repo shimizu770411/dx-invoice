@@ -13,6 +13,7 @@ import {
     RECEIPT_ADDRESSEE_TOO_LONG_MESSAGE,
 } from '@/lib/receiptAddressee'
 import { getInvoice } from '@/lib/invoices'
+import { toJapanDateInputValue } from '@/lib/dateUtils'
 
 /**
  * 入金登録・入金取消のダイアログ。
@@ -29,9 +30,9 @@ interface PaymentDialogProps {
 }
 
 export function PaymentDialog({ invoiceId, isPaid, onClose }: PaymentDialogProps) {
-    // 入金日の初期値は今日。開くたびに作り直されるよう、呼び出し側は開いている間だけこれを描画する
-    const [paymentData, setPaymentData] = useState({ paidAt: new Date().toISOString().split('T')[0], memo: '' })
-    // 領収書No.（任意・数字7桁）。請求書PDFの押印欄の No に出す。入金登録のときだけ入力する
+    // 入金日の初期値は今日（日本時間）。開くたびに作り直されるよう、呼び出し側は開いている間だけこれを描画する
+    const [paymentData, setPaymentData] = useState({ paidAt: toJapanDateInputValue(), memo: '' })
+    // 領収書No.（任意・数字6桁）。請求書PDFの押印欄の No に出す。入金登録のときだけ入力する
     const [receiptNo, setReceiptNo] = useState('')
     // 領収書の宛名。支払者と喪主のどちらに宛てるかは案件で違うため、入金登録のときに選ぶ。
     // 初期値は支払者名、それが空なら喪主名（以前の領収書と同じ宛名）
@@ -227,7 +228,7 @@ export function PaymentDialog({ invoiceId, isPaid, onClose }: PaymentDialogProps
                             type="text"
                             inputMode="numeric"
                             maxLength={RECEIPT_NO_LENGTH}
-                            placeholder="例: 6253108"
+                            placeholder="例: 625310"
                             value={receiptNo}
                             onChange={(e) => setReceiptNo(e.target.value)}
                             className="w-full focus:outline-none transition-colors"

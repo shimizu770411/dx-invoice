@@ -12,6 +12,7 @@ import { SearchButton } from '@/components/button/SearchButton'
 import { handleLoadError, handleOperationError } from '@/lib/errorHandler'
 import { PdfCompanyProfile } from '@/app/(protected)/pdf/components/PdfCompanyProfile'
 import { useDateFormat } from '@/hooks/useDateFormat'
+import { toJapanDateInputValue } from '@/lib/dateUtils'
 
 interface CustomerInfo {
     funeralFrom: string | null
@@ -64,7 +65,7 @@ export default function FlowerPdfPage() {
             const url = URL.createObjectURL(blob)
             const a = document.createElement('a')
             a.href = url
-            a.download = `供花領収書_${customerId}_${new Date().toISOString().split('T')[0]}.pdf`
+            a.download = `供花領収書_${customerId}_${toJapanDateInputValue()}.pdf`
             a.click()
             URL.revokeObjectURL(url)
         } catch (error) {

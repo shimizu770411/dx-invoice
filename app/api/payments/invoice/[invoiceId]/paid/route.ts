@@ -22,7 +22,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ invo
         const data = await request.json()
         const userId = authResult.payload.sub
 
-        // 領収書No.（任意・数字7桁）。画面でも確かめているが、画面を通さない呼び出しでも不正な値を保存しない
+        // 領収書No.（任意・数字6桁）。画面でも確かめているが、画面を通さない呼び出しでも不正な値を保存しない
         if (!isValidReceiptNo(data.receiptNo)) {
             // 画面は 400 の error をそのまま通知に出す（lib/errorHandler.ts の extractValidationErrorMessage）
             return NextResponse.json({ error: RECEIPT_NO_INVALID_MESSAGE }, { status: 400 })

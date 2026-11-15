@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { recordReceiptIssue } from '@/lib/operationLog'
 import { fitContentToOnePage } from '@/lib/pdfFitToPage'
 import { PDF_VIEWPORT_HEIGHT_PX, PDF_VIEWPORT_WIDTH_PX } from '@/app/(protected)/pdf/components/pdfLayoutConstants'
+import { toJapanDateInputValue } from '@/lib/dateUtils'
 
 /** Vercel Serverless 最大実行時間（秒） */
 export const maxDuration = 60
@@ -92,7 +93,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ invoi
         })
 
         const isDownload = request.nextUrl.searchParams.has('download')
-        const dateStr = new Date().toISOString().split('T')[0]
+        const dateStr = toJapanDateInputValue()
         const filename = `領収書_${invoiceId}_${dateStr}.pdf`
 
         return new NextResponse(Buffer.from(pdfBuffer), {

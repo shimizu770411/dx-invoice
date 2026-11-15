@@ -1,6 +1,6 @@
 // 見積・請求書PDFの会員表の通しテスト。
 // 「入金金額」の次に「状況」列が出ること、入会日が短い和暦（H21/09/08）で出ること、
-// 完納日はPDFに出さないことを、見積PDF・請求書PDFの両方で確かめる。
+// 完納の行は状況の右に完納日が入会日と同じ形（H28/09/08）で出ることを、見積PDF・請求書PDFの両方で確かめる。
 // 列幅の確認用に、会員表の画像を /tmp/membership-pdf-*.png に保存する。
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Page } from 'puppeteer-core'
@@ -97,7 +97,7 @@ describe('見積・請求書PDFの会員表', () => {
     })
 
     for (const kind of ['estimate', 'invoice'] as const) {
-        it(`${kind === 'estimate' ? '見積' : '請求書'}PDF: 入金金額の次に状況が出て、入会日は短い和暦`, async () => {
+        it(`${kind === 'estimate' ? '見積' : '請求書'}PDF: 入金金額の次に状況が出て、入会日・完納日は短い和暦`, async () => {
             await gotoAndSettle(page, `/pdf/${kind}/${kind === 'estimate' ? estimateId : invoiceId}`)
             const table = await readMembershipTable(page)
             expect(table).not.toBeNull()
@@ -109,13 +109,13 @@ describe('見積・請求書PDFの会員表', () => {
                 '入金回数',
                 '入金金額',
                 '状況',
-                '営業担当者名',
+                '営業担当者',
                 '故人との続柄',
             ])
             const [row1, row2, row3] = table!.rows
             expect(row1[1]).toBe('H21/09/08')
             expect(row1[5]).toBe('¥ 270,000')
-            expect(row1[6]).toBe('完納')
+            expect(row1[6]).toBe('完納 H28/09/08')
             expect(row2[1]).toBe('R01/06/27')
             expect(row2[6]).toBe('保留')
             expect(row3[6]).toBe('継続中')

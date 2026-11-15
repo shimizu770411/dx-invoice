@@ -9,18 +9,18 @@ describe('isValidReceiptNo', () => {
         expect(isValidReceiptNo(null)).toBe(true)
     })
 
-    it('半角数字ちょうど7桁は正しい（前後の空白は除く）', () => {
-        expect(isValidReceiptNo('6253108')).toBe(true)
-        expect(isValidReceiptNo('0000001')).toBe(true)
-        expect(isValidReceiptNo(' 6253108 ')).toBe(true)
+    it('半角数字ちょうど6桁は正しい（前後の空白は除く）', () => {
+        expect(isValidReceiptNo('625310')).toBe(true)
+        expect(isValidReceiptNo('000001')).toBe(true)
+        expect(isValidReceiptNo(' 625310 ')).toBe(true)
     })
 
-    it('6桁・8桁・数字以外・全角数字は正しくない', () => {
-        expect(isValidReceiptNo('625310')).toBe(false)
-        expect(isValidReceiptNo('62531080')).toBe(false)
-        expect(isValidReceiptNo('625310A')).toBe(false)
-        expect(isValidReceiptNo('625-310')).toBe(false)
-        expect(isValidReceiptNo('６２５３１０８')).toBe(false)
+    it('5桁・7桁・数字以外・全角数字は正しくない', () => {
+        expect(isValidReceiptNo('62531')).toBe(false)
+        expect(isValidReceiptNo('6253108')).toBe(false)
+        expect(isValidReceiptNo('62531A')).toBe(false)
+        expect(isValidReceiptNo('625-31')).toBe(false)
+        expect(isValidReceiptNo('６２５３１０')).toBe(false)
     })
 })
 
@@ -28,6 +28,6 @@ describe('normalizeReceiptNo', () => {
     it('空欄は null、それ以外は前後の空白を除いた値', () => {
         expect(normalizeReceiptNo('')).toBeNull()
         expect(normalizeReceiptNo(undefined)).toBeNull()
-        expect(normalizeReceiptNo(' 6253108 ')).toBe('6253108')
+        expect(normalizeReceiptNo(' 625310 ')).toBe('625310')
     })
 })

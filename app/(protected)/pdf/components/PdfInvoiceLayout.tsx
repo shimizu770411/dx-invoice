@@ -100,6 +100,7 @@ export type PdfMembership = {
     salesStaffName?: string | null
     relationToDeceased?: string | null
     status?: 'ACTIVE' | 'ON_HOLD' | 'COMPLETED' | null
+    completedAt?: string | Date | null
 }
 
 export type PdfDocumentCustomer = {

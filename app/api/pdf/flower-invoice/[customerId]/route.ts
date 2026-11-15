@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth-middleware'
 import { renderPdfFromPage } from '@/lib/puppeteer'
+import { toJapanDateInputValue } from '@/lib/dateUtils'
 
 /** Vercel Serverless 最大実行時間（秒） */
 export const maxDuration = 60
@@ -13,7 +14,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ custo
     if (authResult instanceof NextResponse) return authResult
 
     const { customerId } = params
-    const dateStr = new Date().toISOString().split('T')[0]
+    const dateStr = toJapanDateInputValue()
 
     return renderPdfFromPage({
         request,

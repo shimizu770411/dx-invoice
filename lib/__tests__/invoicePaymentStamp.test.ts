@@ -26,7 +26,7 @@ describe('buildInvoicePaymentStamp', () => {
     })
 
     it('入金前（または取消後）は入金日・領収書No.を出さない', () => {
-        expect(buildInvoicePaymentStamp({ isPaid: false, paidAt: '2026-10-01T00:00:00.000Z', paidReceiptNo: '6253108' })).toMatchObject({
+        expect(buildInvoicePaymentStamp({ isPaid: false, paidAt: '2026-10-01T00:00:00.000Z', paidReceiptNo: '625310' })).toMatchObject({
             isPaid: false,
             paidAt: null,
             receiptNo: null,
@@ -34,7 +34,7 @@ describe('buildInvoicePaymentStamp', () => {
     })
 
     it('入金済みで領収書No.を入れていれば出し、入れていなければ空欄', () => {
-        expect(buildInvoicePaymentStamp({ isPaid: true, paidAt: '2026-10-01', paidReceiptNo: '6253108' }).receiptNo).toBe('6253108')
+        expect(buildInvoicePaymentStamp({ isPaid: true, paidAt: '2026-10-01', paidReceiptNo: '625310' }).receiptNo).toBe('625310')
         expect(buildInvoicePaymentStamp({ isPaid: true, paidAt: '2026-10-01', paidReceiptNo: null }).receiptNo).toBeNull()
     })
 })
