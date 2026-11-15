@@ -12,8 +12,10 @@ const HEADERS = ['会員番号', '入会日', '会員名', 'コース', '入金�
 // table-layout:autoだと縮小前の幅がそのまま列幅計算に使われテーブル全体が
 // はみ出すため、列幅を明示的に固定してコンテンツ幅の影響を受けないようにする。
 // 状況列（最大3文字）の追加にあわせ、入会日は短い和暦（H21/09/08）にして幅を詰めている。
+// 状況列は完納のとき完納日も並べる（例: 完納 R07/10/01）ため広く取り、その分は他の列から
+// 少しずつ、足りない分は会員名から削った。入会日・コースは今の幅でも縮小ぎみなので据え置き。
 // 会員名は文字数に応じてフォントが自動で小さくなる（AutoFitOneLineText）
-const COLUMN_WIDTHS = [11, 9, 22, 9, 12, 10, 7, 10, 10]
+const COLUMN_WIDTHS = [10, 9, 19, 9, 11, 10, 14, 9, 9]
 
 // 見出しは1文字ずつ両端ぞろえで並べるため、短い見出しが広い列に入ると文字の間が開きすぎる。
 // そうした見出しだけ並べる幅を固定する
@@ -25,9 +27,12 @@ const MUTUAL_AID_COURSE_LABEL = '27万コース'
 // データが無いセルにはノーブレークスペースを入れて行の高さを常に一定に保つ。
 const BLANK_CELL = ' '
 
-// 状況の表示（継続中／保留／完納）。完納日はPDFには出さない
-function buildStatusText(m: PdfMembership): string {
-    return MEMBERSHIP_STATUS_OPTIONS.find((o) => o.value === m.status)?.label ?? ''
+// 状況の表示（継続中／保留／完納）。完納のときは右に完納日を入会日と同じ形（R07/10/01）で添える
+export function buildStatusText(m: Pick<PdfMembership, 'status' | 'completedAt'>): string {
+    const label = MEMBERSHIP_STATUS_OPTIONS.find((o) => o.value === m.status)?.label ?? ''
+    if (m.status !== 'COMPLETED') return label
+    const completedAtText = formatDateEraShort(m.completedAt)
+    return completedAtText ? `${label} ${completedAtText}` : label
 }
 
 export function PdfMembershipTable({ memberships = [] }: Props) {
