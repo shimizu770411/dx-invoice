@@ -350,7 +350,8 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
                     </div>
                     {/* 領収書No.（右上。左の収入印紙欄と左右均等の幅を取る） */}
                     <div className="justify-self-end pt-2 pr-2">
-                        <div className="flex items-end gap-2 border-b border-black pb-0.5 min-w-[9rem]">
+                        {/* 文字は下線の中央に置く（左寄せだと下線だけ右に余って見える） */}
+                        <div className="flex items-end justify-center gap-2 border-b border-black pb-0.5 min-w-[9rem]">
                             <span>No.</span>
                             <span className="tracking-[0.15em]">{receiptNo}</span>
                         </div>
@@ -560,7 +561,7 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
                                 )}
                             </tfoot>
                         </table>
-                        <div className="border border-x-0 border-black px-4 py-1 text-right bg-black text-white">
+                        <div className="border border-x-0 border-black px-4 py-1 text-right bg-white text-black">
                             <p className="text-lg font-bold">差引合計: ¥{fmtAmount(grandTotal)}</p>
                         </div>
                     </div>
