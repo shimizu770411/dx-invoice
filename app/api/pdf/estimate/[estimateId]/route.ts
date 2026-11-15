@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth-middleware'
 import { getBrowser, createJstPage } from '@/lib/puppeteer'
 import { PDF_VIEWPORT_WIDTH_PX, PDF_VIEWPORT_HEIGHT_PX } from '@/app/(protected)/pdf/components/pdfLayoutConstants'
+import { toJapanDateInputValue } from '@/lib/dateUtils'
 
 /** Vercel Serverless 最大実行時間（秒） */
 export const maxDuration = 60
@@ -80,7 +81,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ estim
         await page.close()
 
         const isDownload = request.nextUrl.searchParams.has('download')
-        const dateStr = new Date().toISOString().split('T')[0]
+        const dateStr = toJapanDateInputValue()
         const filename = `見積書_${estimateId}_${dateStr}.pdf`
 
         return new NextResponse(Buffer.from(pdfBuffer), {

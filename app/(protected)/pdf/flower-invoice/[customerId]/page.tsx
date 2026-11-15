@@ -12,6 +12,7 @@ import { ResetButton } from '@/components/button/ResetButton'
 import { SearchButton } from '@/components/button/SearchButton'
 import { handleLoadError, handleOperationError } from '@/lib/errorHandler'
 import { useDateFormat } from '@/hooks/useDateFormat'
+import { toJapanDateInputValue } from '@/lib/dateUtils'
 
 /** 明細テーブルの本体（データ行＋空行）の最低行数 */
 const ITEM_TABLE_MIN_ROWS = 5
@@ -82,7 +83,7 @@ export default function FlowerInvoicePdfPage() {
             const url = URL.createObjectURL(blob)
             const a = document.createElement('a')
             a.href = url
-            a.download = `供花請求書_${customerId}_${new Date().toISOString().split('T')[0]}.pdf`
+            a.download = `供花請求書_${customerId}_${toJapanDateInputValue()}.pdf`
             a.click()
             URL.revokeObjectURL(url)
         } catch (error) {

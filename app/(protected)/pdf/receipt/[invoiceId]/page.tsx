@@ -7,6 +7,7 @@ import { getProducts } from '@/lib/products'
 import { applyPlanToPdfDocument } from '@/lib/pdfDocumentPlan'
 import { toast } from '@/hooks/use-toast'
 import { PdfReceiptLayout } from '@/app/(protected)/pdf/components/PdfReceiptLayout'
+import { toJapanDateInputValue } from '@/lib/dateUtils'
 
 export default function ReceiptPdfPage() {
     const router = useRouter()
@@ -46,7 +47,7 @@ export default function ReceiptPdfPage() {
             const url = URL.createObjectURL(blob)
             const a = document.createElement('a')
             a.href = url
-            a.download = `領収書_${invoice?.docNo || invoiceId}_${new Date().toISOString().split('T')[0]}.pdf`
+            a.download = `領収書_${invoice?.docNo || invoiceId}_${toJapanDateInputValue()}.pdf`
             a.click()
             URL.revokeObjectURL(url)
         } catch (error) {

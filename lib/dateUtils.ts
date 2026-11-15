@@ -70,8 +70,8 @@ export function formatDateEraShort(value: string | Date | null | undefined): str
     return `${era.letter}${eraYear}/${mm}/${dd}`
 }
 
-// 日付入力欄の初期値（今日）は日本時間で決める。toISOString は世界標準時の日付なので、
-// 日本時間の 0〜9時に使うと前日になる
+// 日付入力欄の初期値やPDFのファイル名に付ける「今日」は日本時間で決める。
+// toISOString は世界標準時の日付なので、日本時間の 0〜9時に使うと前日になる
 const JAPAN_TIME_ZONE = 'Asia/Tokyo'
 // sv-SE は日付を YYYY-MM-DD の形で出す（日付入力欄の値の形）
 const japanDateInputFormatter = new Intl.DateTimeFormat('sv-SE', {

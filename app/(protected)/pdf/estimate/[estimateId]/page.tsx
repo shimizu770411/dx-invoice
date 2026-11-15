@@ -12,6 +12,7 @@ import { ResetButton } from '@/components/button/ResetButton'
 import { toast } from '@/hooks/use-toast'
 import { PdfInvoiceLayout, PDF_VIEWPORT_WIDTH_PX } from '@/app/(protected)/pdf/components/PdfInvoiceLayout'
 import { estimateRemarksFooterLines } from '@/lib/separateFees'
+import { toJapanDateInputValue } from '@/lib/dateUtils'
 
 export default function EstimatePdfPage() {
     const router = useRouter()
@@ -66,7 +67,7 @@ export default function EstimatePdfPage() {
             const url = URL.createObjectURL(blob)
             const a = document.createElement('a')
             a.href = url
-            a.download = `見積書_${estimate?.docNo || estimateId}_${new Date().toISOString().split('T')[0]}.pdf`
+            a.download = `見積書_${estimate?.docNo || estimateId}_${toJapanDateInputValue()}.pdf`
             a.click()
             URL.revokeObjectURL(url)
         } catch (error) {
