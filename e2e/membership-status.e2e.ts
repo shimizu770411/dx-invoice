@@ -60,6 +60,20 @@ function fieldState(page: Page, label: string) {
     }, label)
 }
 
+// 項目名のすぐ下の日付欄にある×（消す）ボタンを押す
+async function clickClearOf(page: Page, label: string) {
+    const clicked = await page.evaluate((label) => {
+        const l = Array.from(document.querySelectorAll<HTMLElement>('label.brand-label')).find(
+            (e) => e.textContent?.trim() === label && e.offsetParent !== null
+        )
+        const button = l?.nextElementSibling?.querySelector<HTMLElement>('button[aria-label="日付を消す"]')
+        button?.click()
+        return !!button
+    }, label)
+    if (!clicked) throw new Error(`E2E: 項目「${label}」の×ボタンが見つかりません`)
+    await settle(page, 300)
+}
+
 // 開いている日付選択で西暦の年月日を選んで確定する
 async function pickWesternDate(page: Page, y: number, m: number, d: number) {
     await clickByText(page, 'button', '西暦で入力')
@@ -141,6 +155,27 @@ describe('会員タブの状況・完納日', () => {
             const row = await membershipRow(customerId, tab.rowNo)
             expect(row?.status).toBe('ON_HOLD')
             expect(row?.completedAt).toBeNull()
+        })
+    }
+
+    // 一度入れた加入日（入会日）は、欄の×で消して更新すると空で保存される。
+    // 以前は×が無く、日付選択の「確定」も年月日が揃わないと押せないため、入れた日付を消す手段が無かった
+    for (const tab of TABS) {
+        it(`${tab.label}: 加入日を×で消して更新すると、保存値からも消える`, async () => {
+            await openTab(page, customerId, tab.label)
+            await clickFieldOf(page, '加入日')
+            await pickWesternDate(page, 2014, 5, 3)
+            await submitUpdate(page)
+            expect((await membershipRow(customerId, tab.rowNo))?.joinedAt?.toISOString().slice(0, 10)).toBe('2014-05-03')
+
+            await openTab(page, customerId, tab.label)
+            await clickClearOf(page, '加入日')
+            expect((await fieldState(page, '加入日')).text).toBe('日付を選択')
+            await submitUpdate(page)
+            expect((await membershipRow(customerId, tab.rowNo))?.joinedAt).toBeNull()
+
+            await openTab(page, customerId, tab.label)
+            expect((await fieldState(page, '加入日')).text).toBe('日付を選択')
         })
     }
 
