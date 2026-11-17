@@ -1,9 +1,9 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type MouseEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
-import { Calendar as CalendarIcon } from 'lucide-react'
+import { Calendar as CalendarIcon, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getEraParts, buildEraOptions, formatEraYear, type EraYearEntry } from '@/lib/era'
 
@@ -180,7 +180,16 @@ export function EraDateSelectUI({
         setOpen(false)
     }
 
+    // 「確定」は年月日が揃わないと押せない（途中まで選んだ日付が黙って空になるのを防ぐため）。
+    // そのため入れた日付を取り消す手段は、欄の×ボタンとして別に用意している
     const canConfirm = draft.year != null && draft.month != null && draft.day != null
+    const canClear = !disabled && committed.year != null
+
+    const handleClear = (e: MouseEvent) => {
+        // 欄を押したときのようにポップオーバーが開かないよう、押下を欄へ伝えない
+        e.stopPropagation()
+        onChange('')
+    }
 
     const selectClass = 'w-full rounded border border-gray-300 bg-white px-3 py-3 text-2xl cursor-pointer'
 
@@ -206,6 +215,17 @@ export function EraDateSelectUI({
                         <span className={committed.year ? 'text-gray-900' : 'text-gray-500'}>
                             {formatDisplay(committed) || '日付を選択'}
                         </span>
+                        {canClear && (
+                            // タブレットで押しやすいよう、アイコンより広い範囲を押せるようにしている
+                            <button
+                                type="button"
+                                onClick={handleClear}
+                                className="-my-2 -mr-3 ml-auto flex items-center self-stretch px-3 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                                aria-label="日付を消す"
+                            >
+                                <X className="h-5 w-5" />
+                            </button>
+                        )}
                     </div>
                 </PopoverAnchor>
                 <PopoverContent className="w-auto p-0" align="start">
