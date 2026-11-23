@@ -5,6 +5,7 @@ import { shouldShowFreeItemUnitPrice, toFreeItemDisplay } from '@/lib/pdfFreeIte
 import type { PdfDocument, PdfDocumentCustomer, PdfProductItem, PdfDocumentItem, PdfFreeItem } from './PdfInvoiceLayout'
 import { displayProductItemName } from '@/lib/documentDisplayNames'
 import { resolveReceiptAddressee } from '@/lib/receiptAddressee'
+import { PX_PER_MM } from './pdfLayoutConstants'
 import {
     buildMembershipPaymentRows,
     KEYAKI_ROW_INDEX,
@@ -164,6 +165,12 @@ function buildDisplayRows(
 
 // 備考欄の下の押印欄の見出し（手書きの領収証と同じ並び）
 const RECEIPT_STAMP_LABELS = ['承認印', '主帳印', '取扱者印'] as const
+
+// 収入印紙欄の左右の余白。もとは px-8(32px) だったが、客先の指示で枠の幅を3mm狭めた（2026-11-24）。
+// 「収入印紙」の文字が枠の中央に残るよう、左右均等に1.5mmずつ減らす
+const REVENUE_STAMP_BASE_PADDING_X_PX = 32
+const REVENUE_STAMP_NARROW_MM = 3
+const REVENUE_STAMP_PADDING_X_PX = REVENUE_STAMP_BASE_PADDING_X_PX - (REVENUE_STAMP_NARROW_MM * PX_PER_MM) / 2
 
 type Props = {
     contentId: string
@@ -339,7 +346,10 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
             <div className="border border-[#999] p-4 rounded-lg">
                 <div className="grid grid-cols-[1fr_auto_1fr] items-start">
                     {/* 収入印紙欄 */}
-                    <div className="px-8 py-2.5 text-center border border-dashed border-black [writing-mode:vertical-rl] justify-self-start">
+                    <div
+                        className="py-2.5 text-center border border-dashed border-black [writing-mode:vertical-rl] justify-self-start"
+                        style={{ paddingLeft: REVENUE_STAMP_PADDING_X_PX, paddingRight: REVENUE_STAMP_PADDING_X_PX }}
+                    >
                         収入印紙
                     </div>
                     {/* タイトル（常に中央） */}
@@ -362,9 +372,12 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
                     <div className="w-[55%]">
                         {/* 宛名 */}
                         <div className="mb-2 w-[80%]">
-                            <div className="text-bold flex justify-between border-b-2 border-black text-2xl">
+                            {/* 宛名は下線の中央に置き、「様」は右端。左右の列を同じ幅(1fr)にして名前を中央に寄せる。
+                                名前が長い場合は左の列が縮み、「様」とは重ならない */}
+                            <div className="text-bold grid grid-cols-[1fr_auto_1fr] border-b-2 border-black text-2xl">
+                                <span />
                                 <span data-testid="receipt-addressee">{addressee ? `${addressee}` : ''}</span>
-                                <span>様</span>
+                                <span className="justify-self-end">様</span>
                             </div>
                             <div className="mt-2 text-sm text-gray-700">下記の金額を正に受領いたしました。</div>
                         </div>
@@ -601,9 +614,11 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
                                 </tr>
                                 <tr className="border border-black">
                                     <td className="p-2 text-right tracking-[0.25em]">
-                                        <div className="flex justify-between border-b border-black pb-1 text-sm">
+                                        {/* 宛名と同じく、故人名は下線の中央、「様」は右端 */}
+                                        <div className="grid grid-cols-[1fr_auto_1fr] border-b border-black pb-1 text-sm">
+                                            <span />
                                             <span data-testid="receipt-deceased-name">{customer?.deceasedName || ''}</span>
-                                            <span>様</span>
+                                            <span className="justify-self-end">様</span>
                                         </div>
                                     </td>
                                 </tr>
