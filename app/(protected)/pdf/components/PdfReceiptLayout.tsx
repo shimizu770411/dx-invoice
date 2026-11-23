@@ -363,7 +363,7 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
                         {/* 宛名 */}
                         <div className="mb-2 w-[80%]">
                             <div className="text-bold flex justify-between border-b-2 border-black text-2xl">
-                                <span className="">{addressee ? `${addressee}` : ''}</span>
+                                <span data-testid="receipt-addressee">{addressee ? `${addressee}` : ''}</span>
                                 <span>様</span>
                             </div>
                             <div className="mt-2 text-sm text-gray-700">下記の金額を正に受領いたしました。</div>
@@ -602,7 +602,7 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
                                 <tr className="border border-black">
                                     <td className="p-2 text-right tracking-[0.25em]">
                                         <div className="flex justify-between border-b border-black pb-1 text-sm">
-                                            <span>{customer?.deceasedName || ''}</span>
+                                            <span data-testid="receipt-deceased-name">{customer?.deceasedName || ''}</span>
                                             <span>様</span>
                                         </div>
                                     </td>
