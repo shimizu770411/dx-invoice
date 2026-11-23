@@ -15,6 +15,10 @@ type HeaderLayout = {
     funeralRowTop: number
     itemTableTop: number
     kanaText: string | null
+    /** 「故　○○○○　様」欄の文字そのもの（全角スペースが落ちていないかを見る） */
+    nameBoxText: string
+    /** フリガナの文字の中心と、故人名の文字の中心の左右のずれ(px) */
+    kanaCenterOffset: number | null
 }
 
 // PDF本体の上端を0として、告別式の行・明細表の見出し行の位置を測る
@@ -26,10 +30,20 @@ function readHeaderLayout(page: Page, contentId: string): Promise<HeaderLayout> 
         const funeral = Array.from(root.querySelectorAll('div')).find((d) => d.textContent?.trim() === '告別式')
         const thead = Array.from(root.querySelectorAll('thead')).find((t) => t.textContent?.includes('品名'))
         const kana = root.querySelector('[data-testid="deceased-kana"]')
+        const name = root.querySelector('[data-testid="deceased-name"]')
+        // 要素の箱ではなく、文字が実際に描かれた範囲の中心（左右の余白を含めない）
+        const textCenter = (el: Element) => {
+            const range = document.createRange()
+            range.selectNodeContents(el)
+            const r = range.getBoundingClientRect()
+            return (r.left + r.right) / 2
+        }
         return {
             funeralRowTop: funeral ? funeral.getBoundingClientRect().top - base : NaN,
             itemTableTop: thead ? thead.getBoundingClientRect().top - base : NaN,
             kanaText: kana ? (kana.textContent ?? '') : null,
+            nameBoxText: name?.parentElement?.textContent ?? '',
+            kanaCenterOffset: kana && name && kana.textContent ? Math.abs(textCenter(kana) - textCenter(name)) : null,
         }
     }, contentId)
 }
@@ -47,6 +61,7 @@ describe('見積書PDFの故人名フリガナ', () => {
     let session: Session
     let page: Page
     let customerId = 0n
+    let deceasedName = ''
     let estimateId = ''
     let invoiceId = ''
 
@@ -58,6 +73,7 @@ describe('見積書PDFの故人名フリガナ', () => {
         invoiceId = page.url().match(/\/invoices\/(\d+)/)![1]
         const invoice = await prisma.invoice.findUniqueOrThrow({ where: { id: BigInt(invoiceId) } })
         customerId = invoice.customerId
+        deceasedName = (await prisma.customer.findUniqueOrThrow({ where: { id: customerId } })).deceasedName
         const estimate = await prisma.estimate.findFirstOrThrow({ where: { customerId }, orderBy: { id: 'desc' } })
         estimateId = estimate.id.toString()
     })
@@ -84,6 +100,12 @@ describe('見積書PDFの故人名フリガナ', () => {
 
         expect(estimate.kanaText).toBe('ヤマザト　タロウ')
         expect(invoice.kanaText).toBeNull()
+        // 「故」「様」と名前の間の全角スペースが両方に残っていること（見積・請求書とも）
+        expect(estimate.nameBoxText).toBe(`故　${deceasedName}　様`)
+        expect(invoice.nameBoxText).toBe(`故　${deceasedName}　様`)
+        // フリガナが名前の真上（中心のずれ1px未満）に来ること
+        expect(estimate.kanaCenterOffset).not.toBeNull()
+        expect(estimate.kanaCenterOffset!).toBeLessThan(1)
         expect(Number.isFinite(estimate.funeralRowTop)).toBe(true)
         expect(estimate.funeralRowTop).toBe(invoice.funeralRowTop)
         expect(estimate.itemTableTop).toBe(invoice.itemTableTop)

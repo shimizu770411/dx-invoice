@@ -514,6 +514,11 @@ const KANA_LAYOUT_KANA_LINE_HEIGHT_PX = 11
 const KANA_LAYOUT_KANA_FONT_PX = 10
 // 姓と名のフリガナの区切り
 const KANA_SEPARATOR = '　'
+// 「故　○○○○　様」の前後。全角スペースを行末に直書きすると、編集時に行末の空白として
+// 落ちやすい（一度落ちて「故」と名前が詰まった）ため、文字列定数にしておく。
+// 前後の幅をそろえることで、フリガナ（欄全体の中央寄せ）が名前の中央に来る
+const DECEASED_NAME_PREFIX = '故　'
+const DECEASED_NAME_SUFFIX = '　様'
 
 // フリガナを出す場合の故人名の文字サイズ。通常（getDeceasedNameFontSize）の約0.8倍
 function getKanaLayoutDeceasedNameFontSize(name?: string | null): string {
@@ -1076,9 +1081,9 @@ export function PdfInvoiceLayout({
                                         lineHeight: `${KANA_LAYOUT_NAME_LINE_HEIGHT_PX}px`,
                                     }}
                                 >
-                                    故
-                                    <span className="px-3">{customer?.deceasedName || ''}</span>
-                                    　様
+                                    {DECEASED_NAME_PREFIX}
+                                    <span className="px-3" data-testid="deceased-name">{customer?.deceasedName || ''}</span>
+                                    {DECEASED_NAME_SUFFIX}
                                 </div>
                             </div>
                         ) : (
@@ -1090,9 +1095,9 @@ export function PdfInvoiceLayout({
                                         lineHeight: `${DECEASED_NAME_LINE_HEIGHT_PX}px`,
                                     }}
                                 >
-                                    故
-                                    <span className="px-3">{customer?.deceasedName || ''}</span>
-                                    　様
+                                    {DECEASED_NAME_PREFIX}
+                                    <span className="px-3" data-testid="deceased-name">{customer?.deceasedName || ''}</span>
+                                    {DECEASED_NAME_SUFFIX}
                                 </div>
                             </div>
                         )}
