@@ -105,6 +105,8 @@ export type PdfMembership = {
 
 export type PdfDocumentCustomer = {
     deceasedName?: string
+    deceasedLastName?: string | null
+    deceasedFirstName?: string | null
     estimateDisplayName?: string | null
     gender?: 'MALE' | 'FEMALE' | 'OTHER' | null
     age?: number | null
@@ -204,6 +206,8 @@ type Props = {
     paymentStamp?: InvoicePaymentStamp
     /** 下部の自由入力行の単価・数量を出すか（自社情報管理の設定）。未指定なら両方出す */
     freeItemDisplay?: FreeItemDisplay
+    /** 故人名の上にフリガナを出す（見積書のみ）。見出し・故人名を小さくし、ヘッダー全体の高さは変えない */
+    showDeceasedKana?: boolean
 }
 
 // 支払合計ブロックの罫線の長さ。備考欄の幅いっぱいだと不格好なため、
@@ -498,6 +502,42 @@ function getDeceasedNameFontSize(name?: string | null): string {
 // 最大サイズ(1.875rem=30px)の行の高さに固定し、文字サイズによらず一定にする。
 const DECEASED_NAME_LINE_HEIGHT_PX = 30
 
+// ── 故人名の上にフリガナを出す場合（見積書のみ）のヘッダー寸法 ──
+// 明細表の高さは HEADER_HEIGHT_PX（ヘッダーの高さは常に一定）を前提に計算しているため、
+// フリガナの行を足した分だけ見出しと故人名を小さくし、ヘッダー全体の高さは1pxも変えない。
+// 見出しの文字サイズ: 36px(text-4xl) → 30px で 6px 空く
+const KANA_LAYOUT_TITLE_FONT_PX = 30
+// 故人名の行: 30px → 25px で 5px 空く（最大の文字サイズ 24px が収まる高さ）
+const KANA_LAYOUT_NAME_LINE_HEIGHT_PX = 25
+// 空いた 6px + 5px をフリガナの行に使う
+const KANA_LAYOUT_KANA_LINE_HEIGHT_PX = 11
+const KANA_LAYOUT_KANA_FONT_PX = 10
+// 姓と名のフリガナの区切り
+const KANA_SEPARATOR = '　'
+// 「故　○○○○　様」の前後。全角スペースを行末に直書きすると、編集時に行末の空白として
+// 落ちやすい（一度落ちて「故」と名前が詰まった）ため、文字列定数にしておく。
+// 前後の幅をそろえることで、フリガナ（欄全体の中央寄せ）が名前の中央に来る
+const DECEASED_NAME_PREFIX = '故　'
+const DECEASED_NAME_SUFFIX = '　様'
+
+// フリガナを出す場合の故人名の文字サイズ。通常（getDeceasedNameFontSize）の約0.8倍
+function getKanaLayoutDeceasedNameFontSize(name?: string | null): string {
+    const len = (name ?? '').length
+    if (len <= 6) return '1.5rem'
+    if (len <= 9) return '1.2rem'
+    if (len <= 12) return '1rem'
+    if (len <= 16) return '0.8rem'
+    return '0.7rem'
+}
+
+// 「姓　名」の形にする。登録値をそのまま並べるだけで、重複などの補正はしない（揺れはデータ側で直す）
+function formatDeceasedKana(customer?: PdfDocumentCustomer | null): string {
+    return [customer?.deceasedLastName, customer?.deceasedFirstName]
+        .map((v) => (v ?? '').trim())
+        .filter((v) => v !== '')
+        .join(KANA_SEPARATOR)
+}
+
 
 // 明細欄は常に「39行」固定とする（品目行がこれに満たない分は空白行で埋める。
 // 印刷後の手書き記入用の余白も兼ねる）。品目数に関わらずページ内の行数・行間は
@@ -633,6 +673,7 @@ export function PdfInvoiceLayout({
     remarksFooterLines = [],
     paymentStamp,
     freeItemDisplay = DEFAULT_FREE_ITEM_DISPLAY,
+    showDeceasedKana = false,
 }: Props) {
     const { docNo, membershipPaidAmount, items } = doc
     const docAny = doc as any
@@ -986,9 +1027,21 @@ export function PdfInvoiceLayout({
                 {/* タイトル */}
                 <div className="grid grid-cols-[1fr_2fr_171.5px] items-end border-b-2 border-black px-2 py-1">
                     <div>&nbsp;</div>
-                    <h1 className="text-center text-4xl font-black leading-[1] tracking-widest whitespace-nowrap">
-                        {customer?.estimateDisplayName ?? ''}{title}
-                    </h1>
+                    {showDeceasedKana ? (
+                        <h1
+                            className="text-center font-black tracking-widest whitespace-nowrap"
+                            style={{
+                                fontSize: `${KANA_LAYOUT_TITLE_FONT_PX}px`,
+                                lineHeight: `${KANA_LAYOUT_TITLE_FONT_PX}px`,
+                            }}
+                        >
+                            {customer?.estimateDisplayName ?? ''}{title}
+                        </h1>
+                    ) : (
+                        <h1 className="text-center text-4xl font-black leading-[1] tracking-widest whitespace-nowrap">
+                            {customer?.estimateDisplayName ?? ''}{title}
+                        </h1>
+                    )}
                     <div className="flex justify-end">
                         <div className="whitespace-nowrap border-b border-black pb-[2px] align-bottom text-[0.8rem] leading-none tracking-tight">
                             受付No.
@@ -1007,19 +1060,47 @@ export function PdfInvoiceLayout({
                 <div className="border-b-2 border-black">
                     <div className="grid grid-cols-[1fr_2fr_171.5px] items-center px-2 py-1">
                         <div>&nbsp;</div>
-                        <div className="text-center">
-                            <div
-                                className="inline-block whitespace-nowrap border-b border-black pb-[4px] align-bottom font-black tracking-wide"
-                                style={{
-                                    fontSize: getDeceasedNameFontSize(customer?.deceasedName),
-                                    lineHeight: `${DECEASED_NAME_LINE_HEIGHT_PX}px`,
-                                }}
-                            >
-                                故　
-                                <span className="px-3">{customer?.deceasedName || ''}</span>
-                                　様
+                        {showDeceasedKana ? (
+                            <div className="text-center">
+                                {/* フリガナ。空でも行の高さは確保する（ヘッダーの高さを一定に保つため） */}
+                                <div
+                                    data-testid="deceased-kana"
+                                    className="whitespace-nowrap tracking-wide"
+                                    style={{
+                                        fontSize: `${KANA_LAYOUT_KANA_FONT_PX}px`,
+                                        lineHeight: `${KANA_LAYOUT_KANA_LINE_HEIGHT_PX}px`,
+                                        height: `${KANA_LAYOUT_KANA_LINE_HEIGHT_PX}px`,
+                                    }}
+                                >
+                                    {formatDeceasedKana(customer)}
+                                </div>
+                                <div
+                                    className="inline-block whitespace-nowrap border-b border-black pb-[4px] align-bottom font-black tracking-wide"
+                                    style={{
+                                        fontSize: getKanaLayoutDeceasedNameFontSize(customer?.deceasedName),
+                                        lineHeight: `${KANA_LAYOUT_NAME_LINE_HEIGHT_PX}px`,
+                                    }}
+                                >
+                                    {DECEASED_NAME_PREFIX}
+                                    <span className="px-3" data-testid="deceased-name">{customer?.deceasedName || ''}</span>
+                                    {DECEASED_NAME_SUFFIX}
+                                </div>
                             </div>
-                        </div>
+                        ) : (
+                            <div className="text-center">
+                                <div
+                                    className="inline-block whitespace-nowrap border-b border-black pb-[4px] align-bottom font-black tracking-wide"
+                                    style={{
+                                        fontSize: getDeceasedNameFontSize(customer?.deceasedName),
+                                        lineHeight: `${DECEASED_NAME_LINE_HEIGHT_PX}px`,
+                                    }}
+                                >
+                                    {DECEASED_NAME_PREFIX}
+                                    <span className="px-3" data-testid="deceased-name">{customer?.deceasedName || ''}</span>
+                                    {DECEASED_NAME_SUFFIX}
+                                </div>
+                            </div>
+                        )}
                         <div className="ml-1 flex justify-start">
                             <div className="whitespace-nowrap text-[0.8rem] leading-[1] tracking-tight">
                                 ({customer?.gender ? (genderLabel[customer.gender] ?? '') : ''}) &nbsp; 行年 &nbsp;

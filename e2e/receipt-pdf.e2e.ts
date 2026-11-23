@@ -8,7 +8,7 @@
 // ・金額と小計は請求書PDFと同じ計算で出すこと（セット商品が定価のまま保存された古い書類でも一致する）。
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Page } from 'puppeteer-core'
-import { assertLocalEnvironment, BASE_URL } from './helpers/env'
+import { assertLocalEnvironment, BASE_URL, E2E_NAME_PREFIX } from './helpers/env'
 import { gotoAndSettle, openSession, type Session } from './helpers/session'
 import { cleanupTestCases } from './helpers/testData'
 import { openBlankDocument } from './helpers/blankDocument'
@@ -16,8 +16,12 @@ import { findParentAltar, loadMaster, need } from './helpers/masterLookup'
 import { save, setChecked } from './helpers/itemTable'
 import { NO_CHARGE_LABELS } from '@/lib/documentTotals'
 import { prisma } from '@/lib/prisma'
+import { PX_PER_MM } from '@/app/(protected)/pdf/components/pdfLayoutConstants'
 
 const NO_CHARGE_TEXTS = Object.values(NO_CHARGE_LABELS)
+
+// 収入印紙欄の幅を3mm狭める前の実測値(px)
+const STAMP_WIDTH_BEFORE_PX = 93
 
 // 請求書PDFの明細で、金額の代わりに「セット」等が出ている欄の文言（上から順）。
 // 書類の会員区分に対応する金額欄は、各行のいちばん右の欄（一般の書類には会員価格列が無い）
@@ -112,6 +116,51 @@ describe('領収書PDFの明細', () => {
         const text = await page.evaluate(() => document.getElementById('receipt-pdf-content')?.textContent ?? '')
         expect(text).toContain('備考')
         expect(text).not.toContain(remarks)
+    })
+
+    // 収入印紙欄は客先の指示で幅を3mm狭めた（2026-11-24）。宛名・故人名は下線の中央に出す（以前は左寄せ）
+    it('収入印紙欄の幅は修正前より3mm狭く、宛名・故人名は下線の中央に出る', async () => {
+        const customerId = (await prisma.invoice.findUniqueOrThrow({ where: { id: BigInt(invoiceId) } })).customerId
+        const original = await prisma.customer.findUniqueOrThrow({ where: { id: customerId } })
+        // 故人名は通常の長さにする（テスト案件の名前は欄の幅いっぱいに近く、長い名前は中央に寄せる余地が無い）。
+        // 後片付けは接頭辞で対象を絞るため、接頭辞は残す
+        await prisma.customer.update({
+            where: { id: customerId },
+            data: { payerName: '宛名　テスト', deceasedName: `${E2E_NAME_PREFIX}故人` },
+        })
+        await gotoAndSettle(page, `/pdf/receipt/${invoiceId}`)
+        await page.waitForSelector('#receipt-pdf-content tbody')
+        const layout = await page.evaluate(() => {
+            const root = document.getElementById('receipt-pdf-content')!
+            const stamp = Array.from(root.querySelectorAll('div')).find((d) => d.textContent?.trim() === '収入印紙')
+            // 文字が実際に描かれた範囲の中心と、下線を引いている枠の中心の左右のずれ
+            const offsetFromLineCenter = (testId: string) => {
+                const el = root.querySelector(`[data-testid="${testId}"]`)
+                const line = el?.parentElement
+                if (!el || !line) return null
+                const range = document.createRange()
+                range.selectNodeContents(el)
+                const t = range.getBoundingClientRect()
+                const l = line.getBoundingClientRect()
+                return { text: el.textContent, offset: Math.abs((t.left + t.right) / 2 - (l.left + l.right) / 2) }
+            }
+            return {
+                stampWidth: stamp?.getBoundingClientRect().width ?? NaN,
+                addressee: offsetFromLineCenter('receipt-addressee'),
+                deceasedName: offsetFromLineCenter('receipt-deceased-name'),
+            }
+        })
+        expect(layout.stampWidth).toBeCloseTo(STAMP_WIDTH_BEFORE_PX - 3 * PX_PER_MM, 1)
+        expect(layout.addressee?.text).toBe('宛名　テスト')
+        expect(layout.addressee!.offset).toBeLessThan(1)
+        expect(layout.deceasedName?.text).toBe(`${E2E_NAME_PREFIX}故人`)
+        expect(layout.deceasedName!.offset).toBeLessThan(1)
+
+        // 他のテストに影響しないよう元に戻す
+        await prisma.customer.update({
+            where: { id: customerId },
+            data: { payerName: original.payerName, deceasedName: original.deceasedName },
+        })
     })
 
     // 以前は明細欄を37行で埋めていたため、行が少なくても小計〜差引合計が2ページ目に押し出されていた
