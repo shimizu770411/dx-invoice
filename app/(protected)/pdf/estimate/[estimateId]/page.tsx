@@ -111,6 +111,7 @@ export default function EstimatePdfPage() {
                 products={products}
                 hideSelectedOptions={hideSelectedOptions}
                 showSeparateFees
+                showDeceasedKana
                 freeItemDisplay={freeItemDisplay}
                 remarksFooterLines={estimateRemarksFooterLines(estimate?.estimateType)}
             />
