@@ -566,7 +566,7 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
                                             </td>
                                             <td className="border border-black px-1 text-left">&nbsp;</td>
                                             <td className="border border-r-0 border-black px-1 text-right">
-                                                <span className="mr-1">△</span>
+                                                <span className="mr-1">▲</span>
                                                 {subtotal.toLocaleString()}
                                             </td>
                                         </tr>
