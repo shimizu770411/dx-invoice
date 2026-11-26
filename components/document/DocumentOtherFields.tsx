@@ -28,7 +28,11 @@ export const INVOICE_MAX_REMARKS_LENGTH = REMARKS_LINE_LENGTH * INVOICE_REMARKS_
 // その分だけ入力できる行を減らす。実測では11行入力すると最終行が重なり、10行なら1行ぶんの余白を残して収まる。
 // 事前相談見積の備考は本見積にそのまま引き継がれるため、どちらも同じ行数にしておく必要がある
 const ESTIMATE_FOOTER_RESERVED_ROWS = 1
-export const ESTIMATE_REMARKS_ROWS = REMARKS_ROWS - ESTIMATE_FOOTER_RESERVED_ROWS
+// PDF本体を上端の綴じしろ5mmぶん下げた（2026-11-26・PdfInvoiceLayout.tsx）ことで備考欄が約19px低くなり、
+// 10行入力すると最終行が約3px切れるようになったため、さらに1行減らす。
+// 請求書は実測で約25pxの余白が残るため減らしていない（e2e/pdf-binding-margin.e2e.ts で両方を確認）
+const ESTIMATE_BINDING_MARGIN_RESERVED_ROWS = 1
+export const ESTIMATE_REMARKS_ROWS = REMARKS_ROWS - ESTIMATE_FOOTER_RESERVED_ROWS - ESTIMATE_BINDING_MARGIN_RESERVED_ROWS
 export const ESTIMATE_MAX_REMARKS_LENGTH = REMARKS_LINE_LENGTH * ESTIMATE_REMARKS_ROWS
 // 備考欄の入力幅。実測した24文字ぶんの表示幅(約471px)にpadding/borderと安全マージンを加えた値
 export const REMARKS_TEXTAREA_MAX_WIDTH = '510px'
