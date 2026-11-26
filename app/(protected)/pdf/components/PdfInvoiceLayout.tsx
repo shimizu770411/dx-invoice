@@ -563,7 +563,14 @@ const ITEM_TABLE_GRAND_TOTAL_FONT_PX = 12 + 2 * (96 / 72) // 差引合計額の 
 // 1ページに使える実際の高さ(px)。幅の共有定数は pdfLayoutConstants.ts を参照。
 // 外枠(border-2)の上下 = 2px×2辺 = 4px
 const OUTER_FRAME_BORDER_PX = 4
-const PAGE_CONTENT_HEIGHT_PX = A4_HEIGHT_MM * PX_PER_MM - PAGE_BODY_PADDING_PX - OUTER_FRAME_BORDER_PX
+// 上端の綴じしろ。上閉じで綴じると上端の表示が切れると客先から指摘があり、本体全体を5mm下げた（2026-11-26）。
+// ページの高さは変えず、下げた分は明細表の行間（computeItemTableLineHeight で自動計算）と
+// 備考欄の高さで吸収する（見積書の備考の入力上限はこのため1行減らした: DocumentOtherFields.tsx）
+const BINDING_MARGIN_TOP_MM = 5
+const BINDING_MARGIN_TOP_PX = BINDING_MARGIN_TOP_MM * PX_PER_MM
+// 1ページ目の本体（綴じしろを含む）の高さ
+const PAGE_BODY_HEIGHT_PX = A4_HEIGHT_MM * PX_PER_MM - PAGE_BODY_PADDING_PX
+const PAGE_CONTENT_HEIGHT_PX = PAGE_BODY_HEIGHT_PX - BINDING_MARGIN_TOP_PX - OUTER_FRAME_BORDER_PX
 
 // ヘッダー（タイトル・故人情報）とフッター（互助会テーブル）は内容によらずほぼ一定のサイズになるため、
 // 実測から校正した固定値として扱う。JSでの動的測定（ref計測）はWebフォント読み込みの
@@ -1009,12 +1016,15 @@ export function PdfInvoiceLayout({
                 「選択オプション画像ページ」はこの外側にあるため、複数ページに自由に伸びる。
                 ヘッダー・フッターは自然な高さのまま、明細部分(外枠)だけがflex:1で残り高さを埋める。
                 JSでの高さ測定・計算に頼らず、ブラウザのレイアウトエンジンにヘッダー・フッターの
-                位置決めを任せることで、上下の余白を常に正確に一致させる。 */}
+                位置決めを任せることで、上下の余白を常に正確に一致させる。
+                上端の綴じしろは内側の余白で取り、全体の高さ（1ページ分）は変えない。 */}
             <div
                 style={{
                     display: 'flex',
                     flexDirection: 'column',
-                    height: `${A4_HEIGHT_MM * PX_PER_MM - PAGE_BODY_PADDING_PX}px`,
+                    boxSizing: 'border-box',
+                    height: `${PAGE_BODY_HEIGHT_PX}px`,
+                    paddingTop: `${BINDING_MARGIN_TOP_PX}px`,
                 }}
             >
             {/* 外枠: flex:1で「ヘッダー・フッターを除いた残り高さ」を占める */}
