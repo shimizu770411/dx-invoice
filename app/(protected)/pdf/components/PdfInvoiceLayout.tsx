@@ -568,9 +568,15 @@ const OUTER_FRAME_BORDER_PX = 4
 // 備考欄の高さで吸収する（見積書の備考の入力上限はこのため1行減らした: DocumentOtherFields.tsx）
 const BINDING_MARGIN_TOP_MM = 5
 const BINDING_MARGIN_TOP_PX = BINDING_MARGIN_TOP_MM * PX_PER_MM
-// 1ページ目の本体（綴じしろを含む）の高さ
+// 下端の余白の追加分。用紙の余白（PAGE_BODY_PADDING_PX の片側16px≒4.2mm）だけでは、
+// 印刷できない範囲が広いプリンターで一番下の罫線（会員表）が切れた（2026-11-27）。
+// 上端の綴じしろと同じく、明細表の行間と備考欄の高さで吸収する
+const BOTTOM_EXTRA_MARGIN_MM = 2
+const BOTTOM_EXTRA_MARGIN_PX = BOTTOM_EXTRA_MARGIN_MM * PX_PER_MM
+// 1ページ目の本体（綴じしろ・下端の余白を含む）の高さ
 const PAGE_BODY_HEIGHT_PX = A4_HEIGHT_MM * PX_PER_MM - PAGE_BODY_PADDING_PX
-const PAGE_CONTENT_HEIGHT_PX = PAGE_BODY_HEIGHT_PX - BINDING_MARGIN_TOP_PX - OUTER_FRAME_BORDER_PX
+const PAGE_CONTENT_HEIGHT_PX =
+    PAGE_BODY_HEIGHT_PX - BINDING_MARGIN_TOP_PX - BOTTOM_EXTRA_MARGIN_PX - OUTER_FRAME_BORDER_PX
 
 // ヘッダー（タイトル・故人情報）とフッター（互助会テーブル）は内容によらずほぼ一定のサイズになるため、
 // 実測から校正した固定値として扱う。JSでの動的測定（ref計測）はWebフォント読み込みの
@@ -1017,7 +1023,7 @@ export function PdfInvoiceLayout({
                 ヘッダー・フッターは自然な高さのまま、明細部分(外枠)だけがflex:1で残り高さを埋める。
                 JSでの高さ測定・計算に頼らず、ブラウザのレイアウトエンジンにヘッダー・フッターの
                 位置決めを任せることで、上下の余白を常に正確に一致させる。
-                上端の綴じしろは内側の余白で取り、全体の高さ（1ページ分）は変えない。 */}
+                上端の綴じしろ・下端の余白は内側の余白で取り、全体の高さ（1ページ分）は変えない。 */}
             <div
                 style={{
                     display: 'flex',
@@ -1025,6 +1031,7 @@ export function PdfInvoiceLayout({
                     boxSizing: 'border-box',
                     height: `${PAGE_BODY_HEIGHT_PX}px`,
                     paddingTop: `${BINDING_MARGIN_TOP_PX}px`,
+                    paddingBottom: `${BOTTOM_EXTRA_MARGIN_PX}px`,
                 }}
             >
             {/* 外枠: flex:1で「ヘッダー・フッターを除いた残り高さ」を占める */}

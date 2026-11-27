@@ -172,6 +172,12 @@ const REVENUE_STAMP_BASE_PADDING_X_PX = 32
 const REVENUE_STAMP_NARROW_MM = 3
 const REVENUE_STAMP_PADDING_X_PX = REVENUE_STAMP_BASE_PADDING_X_PX - (REVENUE_STAMP_NARROW_MM * PX_PER_MM) / 2
 
+// 下端の余白の追加分。用紙の余白（約4.2mm）だけでは、印刷できない範囲が広いプリンターで
+// 一番下の罫線が切れる（見積書で発生、2026-11-27）。見積・請求書（PdfInvoiceLayout.tsx）と同じ量。
+// 本体の高さに含めるので、1ページに収まらないときの自動縮小（lib/pdfFitToPage.ts）もこの余白込みで判定される
+const BOTTOM_EXTRA_MARGIN_MM = 2
+const BOTTOM_EXTRA_MARGIN_PX = BOTTOM_EXTRA_MARGIN_MM * PX_PER_MM
+
 type Props = {
     contentId: string
     containerRef?: RefObject<HTMLDivElement | null>
@@ -341,7 +347,7 @@ export function PdfReceiptLayout({ contentId, containerRef, document: doc, produ
             id={contentId}
             ref={containerRef}
             className="bg-white text-black"
-            style={{ fontFamily: '"Noto Serif JP", serif' }}
+            style={{ fontFamily: '"Noto Serif JP", serif', paddingBottom: BOTTOM_EXTRA_MARGIN_PX }}
         >
             <div className="border border-[#999] p-4 rounded-lg">
                 <div className="grid grid-cols-[1fr_auto_1fr] items-start">

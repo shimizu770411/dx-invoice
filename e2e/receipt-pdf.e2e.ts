@@ -17,11 +17,15 @@ import { save, setChecked } from './helpers/itemTable'
 import { NO_CHARGE_LABELS } from '@/lib/documentTotals'
 import { prisma } from '@/lib/prisma'
 import { PX_PER_MM } from '@/app/(protected)/pdf/components/pdfLayoutConstants'
+import { A4_FIT_HEIGHT_PX } from '@/lib/pdfFitToPage'
 
 const NO_CHARGE_TEXTS = Object.values(NO_CHARGE_LABELS)
 
 // 収入印紙欄の幅を3mm狭める前の実測値(px)
 const STAMP_WIDTH_BEFORE_PX = 93
+// 下端の余白の追加分と、ブラウザの端数の丸め
+const RECEIPT_BOTTOM_EXTRA_MARGIN_MM = 2
+const SUBPIXEL_TOLERANCE_PX = 0.5
 
 // 請求書PDFの明細で、金額の代わりに「セット」等が出ている欄の文言（上から順）。
 // 書類の会員区分に対応する金額欄は、各行のいちばん右の欄（一般の書類には会員価格列が無い）
@@ -161,6 +165,21 @@ describe('領収書PDFの明細', () => {
             where: { id: customerId },
             data: { payerName: original.payerName, deceasedName: original.deceasedName },
         })
+    })
+
+    // プリンターによって一番下の罫線が切れるため、用紙の余白（約4.2mm）に加えて下端に2mmの余白を取る（2026-11-27）。
+    // 余白は本体の高さに含めるので、1ページに収まらないときの自動縮小もこの余白込みで判定される
+    it('領収書の下端に2mmの余白があり、縮小せずに1ページに収まる高さである', async () => {
+        await gotoAndSettle(page, `/pdf/receipt/${invoiceId}`)
+        await page.waitForSelector('#receipt-pdf-content tbody')
+        const { bottomMargin, height } = await page.evaluate(() => {
+            const root = document.getElementById('receipt-pdf-content')!
+            const contentBottom = Math.max(...Array.from(root.querySelectorAll('*')).map((e) => e.getBoundingClientRect().bottom))
+            const rect = root.getBoundingClientRect()
+            return { bottomMargin: rect.bottom - contentBottom, height: rect.height }
+        })
+        expect(bottomMargin).toBeGreaterThanOrEqual(RECEIPT_BOTTOM_EXTRA_MARGIN_MM * PX_PER_MM - SUBPIXEL_TOLERANCE_PX)
+        expect(height, '自動縮小がかからない高さ').toBeLessThanOrEqual(A4_FIT_HEIGHT_PX)
     })
 
     // 以前は明細欄を37行で埋めていたため、行が少なくても小計〜差引合計が2ページ目に押し出されていた

@@ -1,5 +1,6 @@
-// 見積書・請求書PDFの上端の綴じしろの通しテスト。
+// 見積書・請求書PDFの上端の綴じしろ・下端の余白の通しテスト。
 // 上閉じで綴じると上端の表示が切れると客先から指摘があり、本体全体を5mm下げた（2026-11-26）。
+// また、プリンターによって一番下の罫線が切れるため、下端にも2mmの余白を足した（2026-11-27）。
 // 下げた分は明細表の行間（自動計算）と備考欄の高さで吸収するため、
 // ・外枠の上端がページ上端から5mm下がっていること
 // ・明細表の最下段（差引合計額）が外枠の中に収まっていること
@@ -17,6 +18,10 @@ import { ESTIMATE_REMARKS_ROWS, INVOICE_REMARKS_ROWS, REMARKS_LINE_LENGTH } from
 import { PX_PER_MM } from '@/app/(protected)/pdf/components/pdfLayoutConstants'
 
 const BINDING_MARGIN_MM = 5
+// 下端の余白の追加分。用紙の余白（約4.2mm）だけでは、プリンターによって一番下の罫線が切れた（2026-11-27）
+const BOTTOM_EXTRA_MARGIN_MM = 2
+// ブラウザの端数の丸め
+const SUBPIXEL_TOLERANCE_PX = 0.5
 // 備考1行に入る最大の文字（全角24文字）
 const FULL_REMARKS_LINE = 'あ'.repeat(REMARKS_LINE_LENGTH)
 
@@ -27,6 +32,8 @@ type Layout = {
     grandTotalRoom: number
     /** 備考欄の下端 − 備考の最終行の下端(px)。負なら最終行が切れている */
     remarksRoom: number
+    /** ページ本体の下端 − いちばん下の罫線（会員表）の下端(px) */
+    bottomMargin: number
 }
 
 function readLayout(page: Page, contentId: string): Promise<Layout> {
@@ -43,10 +50,14 @@ function readLayout(page: Page, contentId: string): Promise<Layout> {
         const range = document.createRange()
         range.selectNodeContents(clip.lastElementChild!)
         const textBottom = Math.max(...Array.from(range.getClientRects()).map((r) => r.bottom))
+        // ページ本体（1ページ分の高さに固定した枠）と、その中でいちばん下にある要素
+        const body = frame.parentElement!
+        const contentBottom = Math.max(...Array.from(body.querySelectorAll('*')).map((e) => e.getBoundingClientRect().bottom))
         return {
             frameTopOffset: frameRect.top - root.getBoundingClientRect().top,
             grandTotalRoom: frameRect.bottom - grandTotal.getBoundingClientRect().bottom,
             remarksRoom: clip.getBoundingClientRect().bottom - textBottom,
+            bottomMargin: body.getBoundingClientRect().bottom - contentBottom,
         }
     }, contentId)
 }
@@ -91,12 +102,13 @@ describe('見積書・請求書PDFの上端の綴じしろ', () => {
 
     for (const kind of ['estimate', 'invoice'] as const) {
         const label = kind === 'estimate' ? '見積書' : '請求書'
-        it(`${label}: 外枠が5mm下がり、差引合計額と上限まで入れた備考の最終行が切れず、1ページに収まる`, async () => {
+        it(`${label}: 外枠が5mm下がり、下端に2mmの余白があり、差引合計額と上限まで入れた備考の最終行が切れず、1ページに収まる`, async () => {
             const id = kind === 'estimate' ? estimateId : invoiceId
             await gotoAndSettle(page, `/pdf/${kind}/${id}`)
             const layout = await readLayout(page, `${kind}-pdf-content`)
 
             expect(layout.frameTopOffset).toBeCloseTo(BINDING_MARGIN_MM * PX_PER_MM, 0)
+            expect(layout.bottomMargin, '下端の余白').toBeGreaterThanOrEqual(BOTTOM_EXTRA_MARGIN_MM * PX_PER_MM - SUBPIXEL_TOLERANCE_PX)
             expect(layout.grandTotalRoom, '差引合計額の行が外枠の中に収まる').toBeGreaterThanOrEqual(0)
             expect(layout.remarksRoom, '備考の最終行が備考欄の中に収まる').toBeGreaterThanOrEqual(0)
             expect(await pdfPageCount(session, `/api/pdf/${kind}/${id}`)).toBe(1)
